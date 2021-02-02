@@ -17,7 +17,7 @@ MoorPy is an open-source quasi-static mooring system model that can be used for 
    :caption: Contents:
    
 
-.. automodule:: MoorPy
+.. automodule:: moorpy
    :members:
    :member-order: bysource
 
