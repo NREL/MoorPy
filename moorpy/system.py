@@ -11,7 +11,7 @@ from moorpy.line import Line
 from moorpy.lineType import LineType
 
 #import moorpy.MoorSolve as msolve
-from moorpy.helpers import rotationMatrix, rotatePosition, getH, printVec, set_axes_equal, dsolve2, SolveError
+from moorpy.helpers import rotationMatrix, rotatePosition, getH, printVec, set_axes_equal, dsolve2, SolveError, MoorPyError
 
 
 
@@ -1311,7 +1311,10 @@ class System():
         
         # Call dsolve function
         #X, Y, info = msolve.dsolve(eval_func_equil, X0, step_func=step_func_equil, tol=tol, maxIter=maxIter)
-        X, Y, info = dsolve2(eval_func_equil, X0, step_func=step_func_equil, tol=tols, maxIter=maxIter, display=display)
+        try:
+            X, Y, info = dsolve2(eval_func_equil, X0, step_func=step_func_equil, tol=tols, maxIter=maxIter, display=display)
+        except Exception as e:
+            raise MoorPyError(e)
         # Don't need to call Ytarget in dsolve because it's already set to be zeros
         
         
