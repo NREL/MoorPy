@@ -1292,8 +1292,8 @@ class System():
             dX = np.linalg.solve(K, Y)   # calculate position adjustment according to Newton's method
             
             
-            if iter==196:
-                breakpoint() 
+            #if iter==196:
+            #    breakpoint() 
             
             # but limit adjustment to keep things under control
             for i in range(n):             
@@ -1341,22 +1341,22 @@ class System():
                 print(f"current system stiffness: {K}")
                 print(f"\n Current force {F}")
             
-            # plot the convergence failure
-            if n < 8:
-                fig, ax = plt.subplots(2*n, 1, sharex=True)
-                for i in range(n):
-                    ax[  i].plot(info['Xs'][:info['iter']+1,i])
-                    ax[n+i].plot(info['Es'][:info['iter']+1,i])
-                ax[-1].set_xlabel("iteration")
-            else:
-                fig, ax = plt.subplots(n, 2, sharex=True)
-                for i in range(n):
-                    ax[i,0].plot(info['Xs'][:info['iter']+1,i])
-                    ax[i,1].plot(info['Es'][:info['iter']+1,i])
-                ax[-1,0].set_xlabel("iteration, X")
-                ax[-1,1].set_xlabel("iteration, Error")
-            plt.show()
-            breakpoint()
+                # plot the convergence failure
+                if n < 8:
+                    fig, ax = plt.subplots(2*n, 1, sharex=True)
+                    for i in range(n):
+                        ax[  i].plot(info['Xs'][:info['iter']+1,i])
+                        ax[n+i].plot(info['Es'][:info['iter']+1,i])
+                    ax[-1].set_xlabel("iteration")
+                else:
+                    fig, ax = plt.subplots(n, 2, sharex=True)
+                    for i in range(n):
+                        ax[i,0].plot(info['Xs'][:info['iter']+1,i])
+                        ax[i,1].plot(info['Es'][:info['iter']+1,i])
+                    ax[-1,0].set_xlabel("iteration, X")
+                    ax[-1,1].set_xlabel("iteration, Error")
+                plt.show()
+                
             raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {iter} iterations, with residual forces of {F}")
 
 
