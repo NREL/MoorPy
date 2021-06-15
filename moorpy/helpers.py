@@ -429,8 +429,8 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, maxI
                             print(f"     now dX will be {dX}")
         
         dXlist[iter,:] = dX
-        if iter==196:
-            breakpoint() 
+        #if iter==196:
+            #breakpoint() 
             
         # enforce bounds
         for i in range(N):
