@@ -54,13 +54,23 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     # make info dict to contain any additional outputs
     info = dict(error=False)
     
+    info['call'] = f"catenary({XF}, {ZF}, {L}, {EA}, {W}, CB={CB}, HF0={HF0}, VF0={VF0}, Tol={Tol}, MaxIter={MaxIter}, plots=1)"
     
-    # flip line in the solver if end A is above end B
-    if ZF < 0:
+    # flip line in the solver if it is buoyant
+    if W < 0:
+        W = -W
         ZF = -ZF
-        reverseFlag=1        
+        CB = -10000.   # <<< TODO: set this to the distance to sea surface <<<
+        flipFlag = True
     else:
-        reverseFlag=0
+        flipFlag = False
+    
+    # reverse line in the solver if end A is above end B
+    if ZF < 0:    
+        ZF = -ZF
+        reverseFlag = True   
+    else:
+        reverseFlag = False
     
     # ensure the input variables are realistic
     if XF <= 0.0:
@@ -98,12 +108,17 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         HA = np.max([0.0, HF - CB*W*L])     # calculate anchor tension by subtracting any seabed friction
         VA = 0.0
         
-        dZFdVF = np.sqrt(2.0*ZF*EA_W + EA_W*EA_W)/EA_W  # inverse of vertical stiffness
+        if HF > 0:
+            dXFdHF = L/EA    # approximation <<<
+        else:
+            dXFdHF = np.nan
+        
+        dZFdVF = 1.0/W   # approximation.  Seemed wrong before >>>  np.sqrt(2.0*ZF*EA_W + EA_W*EA_W)/EA_W  # inverse of vertical stiffness
         
         
         info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
         info["VF"] = 0.0
-        info["jacobian"]  = np.array([[0.0, 0.0], [0.0, dZFdVF]])
+        info["jacobian"]  = np.array([[dXFdHF, 0.0], [0.0, dZFdVF]])
         info["LBot"] = L
     
     # ProfileType 0 case - slack
@@ -119,12 +134,12 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         HA = 0.0
         VA = 0.0
         
-        dZFdVF = np.sqrt(2.0*ZF*EA_W + EA_W*EA_W)/EA_W  # inverse of vertical stiffness
+        dZFdVF = 1.0/W   # approximation.  Seemed wrong before >>> np.sqrt(2.0*ZF*EA_W + EA_W*EA_W)/EA_W  # inverse of vertical stiffness
         
         
         info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
         info["VF"] = VF
-        info["jacobian"]  = np.array([[0.0, 0.0], [0.0, dZFdVF]])
+        info["jacobian"]  = np.array([[np.nan, 0.0], [0.0, dZFdVF]])
         info["LBot"] = L - LHanging
         
         
@@ -181,7 +196,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         
       
         # retry if it failed        
-        if  info2['iter'] >= MaxIter-1  or  info2['oths']['error']==True:
+        if  info2['iter'] >= MaxIter-1  or  info2['oths']['error']==True or np.linalg.norm(info2['err']) > 10*Tol*L:
             #  ! Perhaps we failed to converge because our initial guess was too far off.
             #   (This could happen, for example, while linearizing a model via large
             #   pertubations in the DOFs.)  Instead, use starting values documented in:
@@ -289,13 +304,14 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                 
                 else:                            # if the solve was successful,
                     info.update(info4['oths'])   # copy info from last solve into existing info dictionary
+                    info['catenary'] = info4
                     
             else:                            # if the solve was successful,
                 info.update(info3['oths'])   # copy info from last solve into existing info dictionary
-                    
+                info['catenary'] = info3    
         else:                            # if the solve was successful,
             info.update(info2['oths'])   # copy info from last solve into existing info dictionary
-               
+            info['catenary'] = info2
         
         # check for errors ( WOULD SOME NOT ALREADY HAVE BEEN CAUGHT AND RAISED ALREADY?)
         if info['error']==True:
@@ -441,18 +457,14 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                 
             
         # re-reverse line distributed data back to normal if applicable
-        if reverseFlag == 1:  
+        if reverseFlag:  
             s =  L - s [::-1]
             X = XF - X[::-1]
             Z = Z[::-1] - ZF  # remember ZF still has a flipped sign right now
             Te= Te[::-1]
-            
-    #   print("End 1 Fx "+str(HA))
-    #   print("End 1 Fy "+str(VA))
-    #   print("End 2 Fx "+str(-HF))
-    #   print("End 2 Fy "+str(-VF))
-    #   print("Scope is "+str(XF-LBot))
-            
+        if flipFlag:
+            Z = -Z       # flip calculated line Z coordinates (hopefully this is right)
+                    
 
         if plots==2 or info['error']==True: # also show the profile plot
 
@@ -467,19 +479,34 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         
     # un-swap line ends if they've been previously swapped, and apply global sign convention 
     # (vertical force positive-up, horizontal force positive from A to B)
-    if reverseFlag == 1:  
+    if reverseFlag:  
         ZF = -ZF  # put height rise from end A to B back to negative
         
         FxA =  HF
         FzA = -VF      # VF is positive-down convention so flip sign
         FxB = -HA
         FzB =  VA
+        
+        info["jacobian"][0,1] = -info["jacobian"][0,1]
+        info["jacobian"][1,0] = -info["jacobian"][1,0]
+        
     else:
         FxA =  HA
         FzA =  VA
         FxB = -HF
         FzB = -VF
-    
+
+    if flipFlag:
+        W = -W       # restore original
+        ZF = -ZF     # restore original
+        
+        FzA = -FzA
+        FzB = -FzB
+        
+        info["jacobian"][0,1] = -info["jacobian"][0,1]
+        info["jacobian"][1,0] = -info["jacobian"][1,0]
+        
+        # TODO <<< should add more info <<<
 
 
     # return horizontal and vertical (positive-up) tension components at each end, and length along seabed
@@ -511,6 +538,7 @@ def eval_func_cat(X, args):
     HF_WEA           =      HF/WEA
     VF_WEA           =      VF/WEA
     VF_HF            =      VF/HF
+    #VF_HF            =      np.abs(VF/HF)  # I added the abs <<<<<< <<<<<<<<<<<<<<<<<<<<<<<<<<<
     VFMinWL_HF       = VFMinWL/HF
     VF_HF2           = VF_HF     *VF_HF
     VFMinWL_HF2      = VFMinWL_HF*VFMinWL_HF
@@ -561,6 +589,7 @@ def eval_func_cat(X, args):
             dZFdHF = ( SQRT1VF_HF2 - SQRT1VFMinWL_HF2 )/ W - ( VF_HF2 /SQRT1VF_HF2 - VFMinWL_HF2/SQRT1VFMinWL_HF2 )/ W;
             
             dZFdVF = ( VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA
+            #dZFdVF = ( np.sign(VF)*VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA
 
 
     # A portion of the line rests on the seabed and the anchor tension is nonzero
@@ -635,6 +664,7 @@ def eval_func_cat(X, args):
 
     # if there was an error, send the stop signal
     if info['error']==True:
+        #breakpoint()
         return np.zeros(2), info, True
         
 
@@ -720,3 +750,25 @@ def step_func_cat(X, args, Y, info, Ytarget, err, tols, iter, maxIter):
     
     return dX                              # returns dX (step to make)
 
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    
+    (fAH, fAV, fBH, fBV, info) = catenary(37.96888656874307, 20.49078283711694, 100.0, 751000000.0, 
+                                          -881.0549577007893, CB=-1245.2679469540894, 
+                                          HF0=63442.20077641379, VF0=-27995.71383270186, Tol=1e-06, MaxIter=50, plots=2)
+        
+    
+    #(fAH, fAV, fBH, fBV, info) = catenary(89.9, 59.2, 130.0, 751000000.0, 
+    #                                      881.05, CB=-372.7, Tol=1e-06, MaxIter=50, plots=2)
+     
+    #(fAH, fAV, fBH, fBV, info) = catenary(400, 200, 500.0, 7510000000000.0, 200.0, CB=-372.7, Tol=1e-06, MaxIter=50, plots=3)
+    #                                      
+   
+    print(f"Error is {info['catenary']['err'][0]:8.3f}, {info['catenary']['err'][1]:8.3f} m")
+    
+    print(" Fax={:8.2e}, Faz={:8.2e}, Fbx={:8.2e}, Fbz={:8.2e}".format(fAH, fAV, fBH, fBV))
+    print(info['jacobian'])
+    print(np.linalg.inv(info['jacobian']))
+            
+    plt.plot(info['X'], info['Z'] )
+    plt.show()

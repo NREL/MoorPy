@@ -1963,6 +1963,8 @@ class System():
             
                 n = point.nDOF
                 
+                # >>> TODO: handle case of free end point resting on seabed <<<
+                
                 # get point's self-stiffness matrix
                 K1 = point.getStiffnessA(lines_only=lines_only)
                 K[i:i+n,i:i+n] += K1

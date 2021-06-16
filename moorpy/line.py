@@ -398,7 +398,7 @@ class Line():
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
         
         
-    def staticSolve(self, reset=False):
+    def staticSolve(self, reset=False, plots=0):
         '''Solves static equilibrium of line. Sets the end forces of the line based on the end points' positions.
 
         Parameters
@@ -441,7 +441,7 @@ class Line():
             
         try:
             (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.sys.lineTypes[self.type].EA, self.sys.lineTypes[self.type].w, 
-                                                  CB=self.cb, HF0=self.HF, VF0=self.VF)   # call line model
+                                                  CB=self.cb, HF0=self.HF, VF0=self.VF, plots=plots)   # call line model
         except CatenaryError as error:
             raise LineError(self.number, error.message)
             
@@ -458,6 +458,11 @@ class Line():
         self.fB[0] = fBH*dr[0]/LH
         self.fB[1] = fBH*dr[1]/LH
         self.fB[2] = fBV
+        
+        if plots==1:
+            import matplotlib.pyplot as plt
+            plt.plot(info['X'], info['Z'])
+            plt.show()
         
     
         
@@ -504,12 +509,15 @@ class Line():
             the analytic stiffness matrix of the line in the rotated frame.
 
         '''
-        
+
         # take the inverse of the Jacobian to get the starting analytic stiffness matrix
-        try:
-            K = np.linalg.inv(self.jacobian)
-        except:
-            raise LineError(self.number, f"Check Line Length ({self.L}), it might be too long, or check catenary ProfileType")
+        if np.isnan(self.jacobian[0,0]): #if self.LBot >= self.L and self.HF==0. and self.VF==0.  << handle tricky cases here?
+            K = np.array([[0., 0.], [0., 1.0/self.jacobian[1,1] ]])
+        else:
+            try:
+                K = np.linalg.inv(self.jacobian)
+            except:
+                raise LineError(self.number, f"Check Line Length ({self.L}), it might be too long, or check catenary ProfileType")
         
         # solve for required variables to set up the perpendicular stiffness. Keep it horizontal
         L_xy = np.linalg.norm(self.rB[:2] - self.rA[:2])
@@ -537,4 +545,4 @@ class Line():
         return K2_rot
 
     
-  
+#
