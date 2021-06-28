@@ -1722,7 +1722,7 @@ class System():
         # the perturbation size in each coupled DOF of the system
         X1, dX = self.getPositions(DOFtype="coupled", dXvals=[dx, dth])
         
-        self.solveEquilibrium3()                               # let the system settle into equilibrium 
+        self.solveEquilibrium3(tol=-0.0001)                               # let the system settle into equilibrium 
         
         F1 = self.getForces(DOFtype="coupled", lines_only=lines_only)           # get mooring forces/moments about linearization point
         K = np.zeros([self.nCpldDOF, self.nCpldDOF])          # allocate stiffness matrix
@@ -1757,15 +1757,16 @@ class System():
             for i in range(self.nCpldDOF):                  # loop through each DOF
                 
                 dXi = 1.0*dX[i]
-                
+                #print(f'__________ nCpldDOF = {i+1} __________')
                 # potentially iterate with smaller step sizes if we're at a taut-slack transition (but don't get too small, or else numerical errors)
                 for j in range(nTries):
                     
+                    #print(f'-------- nTries = {j+1} --------')
                     X2 = np.array(X1, dtype=np.float_)  
                     X2[i] += dXi                                  # perturb positions by dx in each DOF in turn            
                     self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
                     #print(f'solving equilibrium {i+1}+_{self.nCpldDOF}')
-                    self.solveEquilibrium3()                       # let the system settle into equilibrium 
+                    self.solveEquilibrium3(tol=-0.0001)                       # let the system settle into equilibrium 
                     F2p = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
                     
                     if plots > 0:
@@ -1774,18 +1775,29 @@ class System():
                     X2[i] -= 2.0*dXi                              # now perturb from original to -dx
                     self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
                     #print(f'solving equilibrium {i+1}-_{self.nCpldDOF}')
-                    self.solveEquilibrium3()                       # let the system settle into equilibrium 
+                    self.solveEquilibrium3(tol=-0.0001)                       # let the system settle into equilibrium 
                     F2m = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
                     
                     if plots > 0:
                         self.cpldDOFs.append(X2.copy())
-                        
+                    
+                    if j==0:
+                        F2pi = F2p
+                        F2mi = F2m
+                    
                     if self.display > 2:
                         print(f"j = {j}  and dXi = {dXi}.   F2m, F1, and F2p are {F2m[i]:6.2f} {F1[i]:6.2f} {F2p[i]:6.2f}")
-                    
+                        print(abs(F2m[i]-2.0*F1[i]+F2p[i]))
+                        #print(0.1*np.abs(F1[i]))
+                        print(0.1*np.abs(F2pi[i]-F2mi[i]))
+                        print(abs(F1[i])<1)
+                        #print(abs(F2m[i]-2.0*F1[i]+F2p[i]) < 0.1*np.abs(F1[i]))
+                        print(abs(F2m[i]-2.0*F1[i]+F2p[i]) < 0.1*np.abs(F2pi[i]-F2mi[i]))
+             
                     
                     # Break if the force is zero or the change in the first derivative is small 
-                    if abs(F1[i]) == 0 or abs(F2m[i]-2.0*F1[i]+F2p[i]) < 0.1*np.abs(F1[i]):  # note: the 0.1 is the adjustable tolerance
+                    #if abs(F1[i]) < 1 or abs(F2m[i]-2.0*F1[i]+F2p[i]) < 0.1*np.abs(F1[i]):  # note: the 0.1 is the adjustable tolerance
+                    if abs(F1[i]) < 1 or abs(F2m[i]-2.0*F1[i]+F2p[i]) < 0.1*np.abs(F2pi[i]-F2mi[i]):  # note: the 0.1 is the adjustable tolerance
                         break
                     elif j == nTries-1:
                         if self.display > 2:
@@ -1797,6 +1809,7 @@ class System():
                     
                     
                 K[i,:] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
+                
                 
         else:
             raise ValueError("getSystemStiffness was called with an invalid solveOption (only 0 and 1 are supported)")
