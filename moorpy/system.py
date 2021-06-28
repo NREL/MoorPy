@@ -1536,7 +1536,7 @@ class System():
                     ax[-1,1].set_xlabel("iteration, Error")
                 plt.show()
                 
-            raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {iter} iterations, with residual forces of {F}")
+            raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {info['iter']} iterations, with residual forces of {F}")
 
 
             

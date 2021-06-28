@@ -343,6 +343,8 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, maxI
         # compute error
         err = Y - Ytarget
         
+        if display==2:
+            print(f"  new iteration #{iter} with RMS error {np.linalg.norm(err):8.3e}")
         if display>2:
             print(f"  new iteration #{iter} with X={X} and Y={Y}")
 
