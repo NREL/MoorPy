@@ -417,43 +417,33 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                     X [I] = ( np.log( VFMinWLs_HF + SQRT1VFMinWLs_HF2 ) - np.log( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )*HF_W + s_EA* HF;
                     Z [I] = ( SQRT1VFMinWLs_HF2 - SQRT1VFMinWL_HF2 )*HF_W + s_EA*( VFMinWL + 0.5*Ws );
                     Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs );
-
-                # A portion of the line rests on the seabed and the anchor tension is nonzero
-                elif ProfileType==2:    
-                
-                    if( s[I] <= LBot ): # // .TRUE. if this node rests on the seabed and the tension is nonzero
-                    
-                        X [I] = s[I] + s_EA*( HF + CB*VFMinWL + 0.5*Ws*CB );
-                        Z [I] = 0.0;
-                        Te[I] = HF + CB*VFMinWLs;
-                    
-                    else:   #// LBot < s <= L:  ! This node must be above the seabed
-                       
-                        X [I] = np.log( VFMinWLs_HF + SQRT1VFMinWLs_HF2 ) *HF_W + s_EA* HF + LBot - 0.5*CB*VFMinWL*VFMinWL/WEA;
-                        Z [I] = ( - 1.0 + SQRT1VFMinWLs_HF2 )*HF_W + s_EA*( VFMinWL + 0.5*Ws ) + 0.5* VFMinWL*VFMinWL/WEA;
-                        Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs );
-
-
+             
                 # A portion of the line must rest on the seabed and the anchor tension is zero
-                elif ProfileType==3:  
+                elif ProfileType in [2,3]:  
                         
-                    if  s[I] <= LBot - HF_W/CB:  # (aka Lbot - s > HF/(CB*W) ) if this node rests on the seabed and the tension is zero
+                    if CB > 0:
+                        xB = LBot - HF_W/CB      # location of point at which line tension reaches zero
+                    else:
+                        xB = 0.0
+                    xBlim = min(xB, 0.0) 
+                        
+                    if  s[I] <= xB:  # (aka Lbot - s > HF/(CB*W) ) if this node rests on the seabed and the tension is zero
                     
                         X [I] = s[I];
                         Z [I] = 0.0;
                         Te[I] = 0.0;
                     
                     elif( s[I] <= LBot ): # // .TRUE. if this node rests on the seabed and the tension is nonzero
-                    
-                        X [I] = s[I] - ( LBot - 0.5*HF_W/CB )*HF/EA + s_EA*( HF + CB*VFMinWL + 0.5*Ws*CB ) + 0.5*CB*VFMinWL*VFMinWL/WEA;
+                                         
+                        X [I] = s[I] + 0.5*CB*W/EA * (s[I]*s[I] - 2.0*xB*s[I] + xB*xBlim)
                         Z [I] = 0.0;
                         Te[I] = HF + CB*VFMinWLs;
                     
                     else:  #  // LBot < s <= L ! This node must be above the seabed
                     
-                       X [I] =  np.log( VFMinWLs_HF + SQRT1VFMinWLs_HF2 ) *HF_W + s_EA*  HF + LBot - ( LBot - 0.5*HF_W/CB )*HF/EA;
-                       Z [I] = ( -1.0  + SQRT1VFMinWLs_HF2)*HF_W + s_EA*(VFMinWL + 0.5*Ws ) + 0.5*   VFMinWL*VFMinWL/WEA;
-                       Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs );
+                        X [I] = LBot + HF_W*np.log( VFMinWLs_HF + SQRT1VFMinWLs_HF2 ) + HF*s_EA + 0.5*CB*W/EA *(-LBot*LBot + xB*xBlim);
+                        Z [I] = ( -1.0  + SQRT1VFMinWLs_HF2)*HF_W + s_EA*(VFMinWL + 0.5*Ws ) + 0.5*   VFMinWL*VFMinWL/WEA;
+                        Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs );
                 
             
         # re-reverse line distributed data back to normal if applicable
@@ -591,53 +581,32 @@ def eval_func_cat(X, args):
             dZFdVF = ( VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA
             #dZFdVF = ( np.sign(VF)*VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA
 
-
-    # A portion of the line rests on the seabed and the anchor tension is nonzero
-    elif ProfileType==2:
-        
-        if (VF_HF + SQRT1VF_HF2 <= 0):
-            info['error'] = True
-            info['message'] = "ProfileType 2: VF_HF + SQRT1VF_HF2 <= 0"
-
-        else:            
-            EXF = np.log( VF_HF + SQRT1VF_HF2 ) *HF_W - 0.5*CB_EA*W* LBot*LBot + L_EA* HF + LBot - XF;
-
-            EZF = ( SQRT1VF_HF2 - 1.0 )*HF_W + 0.5*VF*VF_WEA - ZF;
-
-            dXFdHF = np.log( VF_HF + SQRT1VF_HF2 ) / W - ( ( VF_HF + VF_HF2 /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + L_EA
-            
-            dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + CB_EA*LBot - 1.0/W
-
-            dZFdHF = ( SQRT1VF_HF2 - 1.0 - VF_HF2 /SQRT1VF_HF2 )/ W
-
-            dZFdVF = ( VF_HF /SQRT1VF_HF2 )/ W + VF_WEA
-            
-            #print(" {:6.2e} {:6.2e}  {:6.2e} {:6.2e}   {:6.2e} {:6.2e} {:6.2e} {:6.2e}".format(HF,VF,EXF,EZF,dXFdHF, dXFdVF, dZFdHF, dZFdVF))
-            #if abs( ( SQRT1VF_HF2 - 1.0 )*HF_W + 0.5*VF*VF_WEA ) < 0.0001:
-            #    breakpoint()
-
-
     # A portion of the line must rest on the seabed and the anchor tension is zero
-    elif ProfileType==3:  
+    elif ProfileType in [2, 3]:  
         
         if (VF_HF + SQRT1VF_HF2 <= 0):
             info['error'] = True
-            info['message'] = "ProfileType 3: VF_HF + SQRT1VF_HF2 <= 0"
-        
+            info['message'] = "ProfileType 2 or 3: VF_HF + SQRT1VF_HF2 <= 0"
+            
         else:
-            EXF = np.log( VF_HF + SQRT1VF_HF2 ) *HF_W - 0.5*CB_EA*W*( LBot*LBot - ( LBot - HF_W/CB )*( LBot - HF_W/CB ) ) + L_EA* HF + LBot - XF
+        
+            if CB > 0:
+                xB = LBot - HF_W/CB      # location of point at which line tension reaches zero
+            else:
+                xB = 0.0
+            xBlim = min(xB, 0.0)
+                    
+            EXF = np.log( VF_HF + SQRT1VF_HF2 ) *HF_W - 0.5*CB_EA*W*( LBot*LBot - xBlim*xBlim ) + L_EA* HF + LBot - XF
             
             EZF = ( SQRT1VF_HF2 - 1.0 )*HF_W + 0.5*VF*VF_WEA - ZF
             
-            dXFdHF = (np.log( VF_HF + SQRT1VF_HF2 ) / W - ( ( VF_HF + VF_HF2 /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + L_EA - ( LBot - HF_W/CB )/EA)
+            dXFdHF = np.log( VF_HF + SQRT1VF_HF2 ) / W - ( ( VF_HF + VF_HF2 /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + L_EA - xBlim/EA
             
-            dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + HF_WEA - 1.0/W
+            dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + HF_WEA +xBlim*CB/EA- 1.0/W
             
             dZFdHF = ( SQRT1VF_HF2 - 1.0 - VF_HF2 /SQRT1VF_HF2 )/ W
             
             dZFdVF = ( VF_HF /SQRT1VF_HF2 )/ W + VF_WEA
-
-
 
     # Now compute the tensions at the anchor
 
@@ -753,6 +722,7 @@ def step_func_cat(X, args, Y, info, Ytarget, err, tols, iter, maxIter):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     
+    '''
     (fAH, fAV, fBH, fBV, info) = catenary(37.96888656874307, 20.49078283711694, 100.0, 751000000.0, 
                                           -881.0549577007893, CB=-1245.2679469540894, 
                                           HF0=63442.20077641379, VF0=-27995.71383270186, Tol=1e-06, MaxIter=50, plots=2)
@@ -762,7 +732,11 @@ if __name__ == "__main__":
     #                                      881.05, CB=-372.7, Tol=1e-06, MaxIter=50, plots=2)
      
     #(fAH, fAV, fBH, fBV, info) = catenary(400, 200, 500.0, 7510000000000.0, 200.0, CB=-372.7, Tol=1e-06, MaxIter=50, plots=3)
-    #                                      
+    #   
+    '''
+    
+    (fAH, fAV, fBH, fBV, info) = catenary(400, 200, 500.0, 7510000000000.0, 200.0, CB=5.0, Tol=1e-06, MaxIter=50, plots=3)
+    
    
     print(f"Error is {info['catenary']['err'][0]:8.3f}, {info['catenary']['err'][1]:8.3f} m")
     
