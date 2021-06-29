@@ -83,12 +83,12 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     
     # Solve for the horizontal and vertical forces at the fairlead (HF, VF) and at the anchor (HA, VA)
     
-    # There are many "ProfileTypes" of a mooring line and each must be analyzed separately
+    # There are many "ProfileTypes" of a mooring line and each must be analyzed separately (1-3 are consistent with FAST v7)
+    # ProfileType=0: Entire line is on seabed
     # ProfileType=1: No portion of the line rests on the seabed
     # ProfileType=2: A portion of the line rests on the seabed and the anchor tension is nonzero
     # ProfileType=3: A portion of the line must rest on the seabed and the anchor tension is zero
-    # ProfileType=4: Entire line is on seabed
-    # ProfileType=0: The line is negatively buoyant, seabed interaction is enabled, and the line 
+    # ProfileType=4: The line is negatively buoyant, seabed interaction is enabled, and the line 
         # is longer than a full L between end points (including stretching) i.e. it is horizontal
         # along the seabed from the anchor, then vertical to the fairlaed. Computes the maximum
         # stretched length of the line with seabed interaction beyond which the line would have to 
@@ -97,10 +97,10 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     
     EA_W = EA/W
     
-    # ProfileType 4 case - entirely along seabed
+    # ProfileType 0 case - entirely along seabed
     if ZF==0.0 and CB >= 0.0 and W > 0:
     
-        ProfileType = 4        
+        ProfileType = 0        
         # this is a special case that requires no iteration
         
         HF = np.max([0, (XF/L - 1.0)*EA])   # calculate fairlead tension based purely on elasticity
@@ -121,10 +121,10 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         info["jacobian"]  = np.array([[dXFdHF, 0.0], [0.0, dZFdVF]])
         info["LBot"] = L
     
-    # ProfileType 0 case - slack
+    # ProfileType 4 case - fully slack
     elif (W > 0.0) and (CB >= 0.0) and (L >= XF - EA_W + np.sqrt(2.0*ZF*EA_W + EA_W*EA_W)):
         
-        ProfileType = 0        
+        ProfileType = 4        
         # this is a special case that requires no iteration
         
         LHanging =  np.sqrt(2.0*ZF*EA_W + EA_W*EA_W) - EA_W  # unstretched length of line hanging vertically to seabed
@@ -352,7 +352,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
 
 
             # fully along seabed
-            if ProfileType==4:
+            if ProfileType==0:
                 
                 if (L-s[I])*CB*W > HF:  # if this node is in the zero tension range
                 
@@ -372,7 +372,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
 
 
             # Freely hanging line with no horizontal tension
-            elif ProfileType==0:          
+            elif ProfileType==4:          
                 
                 if s[I] > L-LHanging:   # this node is on the suspended/hanging portion of the line
                 
