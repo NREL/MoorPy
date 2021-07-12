@@ -2020,7 +2020,7 @@ class System():
     
     
 
-    def plot(self, bounds='default', ax=None, color=None, hidebox=False, rbound=0, title=""):
+    def plot(self, bounds='default', ax=None, color=None, hidebox=False, rbound=0, title="", linelabels=False, pointlabels=False):
         '''Plots the mooring system objects in their current positions
 
         Parameters
@@ -2056,7 +2056,7 @@ class System():
             xs.append(point.r[0])
             ys.append(point.r[1])
             zs.append(point.r[2])
-        
+            
 
         # if axes not passed in, make a new figure
         if ax == None:    
@@ -2098,8 +2098,17 @@ class System():
                     line.drawLine(0, ax, color=[0.3,0.3,0.3])
             else:
                 line.drawLine(0, ax, color=color)
-            ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
+                
+            #Add line labels 
+            if linelabels == True:
+                ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
             
+        #Add point labels
+        i = 0 
+        for point in self.pointList:
+            i = i + 1
+            if pointlabels == True:
+                ax.text(point.r[0], point.r[1], point.r[2], i, c = 'r')
         
         fig.suptitle(title)
         
@@ -2115,7 +2124,7 @@ class System():
         return fig, ax  # return the figure and axis object in case it will be used later to update the plot
         
         
-    def plot2d(self, Xuvec=[1,0,0], Yuvec=[0,0,1], ax=None, color=None, title=""):
+    def plot2d(self, Xuvec=[1,0,0], Yuvec=[0,0,1], ax=None, color=None, title="", linelabels=False, pointlabels=False):
         '''Makes a 2D plot of the mooring system objects in their current positions
 
         Parameters
@@ -2150,8 +2159,9 @@ class System():
         #    #body.draw(ax)
         #    plt.plot(body.r6[0],body.r6[1],'ko',markersize = 2)
         
+        j = 0
         for line in self.lineList:
-        
+            j = j + 1
             if color==None:            
                 if 'chain' in line.type:
                     line.drawLine2d(0, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec)
@@ -2161,6 +2171,21 @@ class System():
                     line.drawLine2d(0, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec)
             else:
                 line.drawLine2d(0, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec)
+            
+            # Add Line labels
+            if linelabels == True:
+                xloc = np.dot([(line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2],Xuvec)
+                yloc = np.dot([(line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2],Yuvec)
+                ax.text(xloc,yloc,j)
+        
+        #Add point labels
+        i = 0 
+        for point in self.pointList:
+            i = i + 1
+            if pointlabels == True:
+                xloc = np.dot([point.r[0], point.r[1], point.r[2]], Xuvec)
+                yloc = np.dot([point.r[0], point.r[1], point.r[2]], Yuvec)
+                ax.text(xloc, yloc, i, c = 'r')
         
         ax.axis("equal")
         ax.set_title(title)
