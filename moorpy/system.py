@@ -2086,7 +2086,9 @@ class System():
         for body in self.bodyList:
             body.draw(ax)
         
+        j = 0
         for line in self.lineList:
+            j = j + 1
             if color==None:            
                 if 'chain' in line.type:
                     line.drawLine(0, ax, color=[.1, 0, 0])
@@ -2096,6 +2098,7 @@ class System():
                     line.drawLine(0, ax, color=[0.3,0.3,0.3])
             else:
                 line.drawLine(0, ax, color=color)
+            ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
             
         
         fig.suptitle(title)
