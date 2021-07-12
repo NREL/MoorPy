@@ -272,7 +272,7 @@ class System():
                         else:                                                                      # for now assuming unlabeled free case
                             bodyType = 0
                             # if we detected there were unrecognized chars here, could: raise ValueError(f"Body type not recognized for Body {num}")
-                        
+                        bodyType = -1   # manually setting the body type as -1 for FAST.Farm SM investigation
                         
                         r6  = np.array(entries[1:7], dtype=float)   # initial position and orientation [m, rad]
                         r6[3:] = r6[3:]*np.pi/180.0                 # convert from deg to rad
@@ -324,7 +324,7 @@ class System():
                             # attach to ground body for ease of identifying anchors
                             self.groundBody.attachPoint(num,entries[2:5]) 
                             
-                        elif ("body" in entry1):
+                        elif ("body" in entry1) or ("turbine" in entry1):
                             pointType = 1
                             # attach to body here
                             BodyID = int("".join(filter(str.isdigit, entry1)))
@@ -352,9 +352,7 @@ class System():
                         m = np.float_(entries[5])
                         v = np.float_(entries[6])
                         fExt = np.array(entries[7:10], dtype=float)
-                                            
                         self.pointList.append( Point(self, num, pointType, r, m=m, v=v, fExt=fExt) )
-                                    
                         line = next(f)
                         
                         
@@ -398,7 +396,7 @@ class System():
                         
                         if entry1 == "g" or entry1 == "gravity":
                             self.g  = np.float_(entry0)
-                        elif entries[1] == "WtrDpth":
+                        elif entries[1] == "WtrDpth" or entries[1] == "depth":
                             self.depth = np.float_(entry0)
                         elif entry1=="rho" or entry1=="wtrdnsty":
                             self.rho = np.float_(entry0)
