@@ -141,7 +141,10 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         info["VF"] = VF
         info["jacobian"]  = np.array([[np.nan, 0.0], [0.0, dZFdVF]])
         info["LBot"] = L - LHanging
-        
+    
+    # add a fully slack U-shaped case for non-anchored line segments
+    
+    # >>>> <<<<
         
     # Use an iterable solver function to solve for the forces on the line
     else: 
@@ -425,7 +428,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                         xB = LBot - HF_W/CB      # location of point at which line tension reaches zero
                     else:
                         xB = 0.0
-                    xBlim = min(xB, 0.0) 
+                    xBlim = max(xB, 0.0) 
                         
                     if  s[I] <= xB:  # (aka Lbot - s > HF/(CB*W) ) if this node rests on the seabed and the tension is zero
                     
@@ -534,6 +537,8 @@ def eval_func_cat(X, args):
     VFMinWL_HF2      = VFMinWL_HF*VFMinWL_HF
     SQRT1VF_HF2      = np.sqrt( 1.0 + VF_HF2      )
     SQRT1VFMinWL_HF2 = np.sqrt( 1.0 + VFMinWL_HF2 )
+    
+    Zextreme = 0.0
 
 
     # determine line profile type
@@ -553,6 +558,17 @@ def eval_func_cat(X, args):
     # No portion of the line rests on the seabed
     if ProfileType==1: 
         
+        
+        
+        # for a freely suspended line, if necessary, check to ensure the line doesn't droop and hit the seabed
+        if CB < 0 and VFMinWL < 0.0:   # only need to do this if the line is slack (has zero slope somewhere)
+            # this is indicated by the anchor force having a positive value, meaning it's helping hold up the line
+        
+            Zextreme = (1 - SQRT1VFMinWL_HF2)*HF_W - 0.5* VFMinWL**2/WEA  # max or min line elevation (where slope=0)
+        else:
+            Zextreme = 0.0
+        
+        
         if (VF_HF + SQRT1VF_HF2 <= 0): 
             info['error'] = True
             info['message'] = "ProfileType 1: VF_HF + SQRT1VF_HF2 <= 0"
@@ -560,6 +576,9 @@ def eval_func_cat(X, args):
             info['error'] = True
             info['message'] = "ProfileType 1: VFMinWL_HF + SQRT1VFMinWL_HF2 <= 0"
             # note: these errors seemed to occur when a buoyant line got to an HF=0 iteration (hopefully avoided now)
+
+        elif False:
+            pass
 
         else:
         
@@ -594,7 +613,7 @@ def eval_func_cat(X, args):
                 xB = LBot - HF_W/CB      # location of point at which line tension reaches zero
             else:
                 xB = 0.0
-            xBlim = min(xB, 0.0)
+            xBlim = max(xB, 0.0)
                     
             EXF = np.log( VF_HF + SQRT1VF_HF2 ) *HF_W - 0.5*CB_EA*W*( LBot*LBot - xBlim*xBlim ) + L_EA* HF + LBot - XF
             
@@ -610,17 +629,10 @@ def eval_func_cat(X, args):
 
     # Now compute the tensions at the anchor
 
-    Zextreme = 0.0
     
     if ProfileType==1:          # No portion of the line rests on the seabed
         HA = HF;
         VA = VFMinWL             # note: VF is defined positive when tension pulls downward, while VA is defined positive when tension pulls up
-        
-        # for a freely suspended line, if necessary, check to ensure the line doesn't droop and hit the seabed
-        if CB < 0 and VFMinWL < 0.0:   # only need to do this if the line is slack (has zero slope somewhere)
-            # this is indicated by the anchor force having a positive value, meaning it's helping hold up the line
-        
-            Zextreme = (1 - SQRT1VFMinWL_HF2)*HF_W - 0.5* VFMinWL**2/WEA  # max or min line elevation (where slope=0)
         
     elif ProfileType==2:        # A portion of the line rests on the seabed and the anchor tension is nonzero
         HA = HF + CB*VFMinWL    # note: -VFMinWL = -(VF-W*L) is the negative of line weight NOT supported by the fairlead; i.e. the weight on the seabed
@@ -735,7 +747,8 @@ if __name__ == "__main__":
     #   
     '''
     
-    (fAH, fAV, fBH, fBV, info) = catenary(400, 200, 500.0, 7510000000000.0, 200.0, CB=5.0, Tol=1e-06, MaxIter=50, plots=3)
+    #(fAH, fAV, fBH, fBV, info) = catenary(400, 200, 500.0, 7510000000000.0, 200.0, CB=5.0, Tol=1e-06, MaxIter=50, plots=3)
+    (fAH, fAV, fBH, fBV, info) = catenary(400, 200, 500.0, 7510000000000.0, 200.0, CB=-20, Tol=1e-06, MaxIter=50, plots=3)
     
    
     print(f"Error is {info['catenary']['err'][0]:8.3f}, {info['catenary']['err'][1]:8.3f} m")
