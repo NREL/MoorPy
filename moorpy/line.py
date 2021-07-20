@@ -214,6 +214,65 @@ class Line():
             else:
                 
                 return self.xp[ts,:], self.yp[ts,:], self.zp[ts,:]
+        '''Gets the updated line coordinates for drawing and plotting purposes.'''
+    
+        # if a quasi-static analysis, just call the catenary function to return the line coordinates
+        if self.qs==1:
+        
+            depth = self.sys.depth
+        
+            dr =  self.rB - self.rA                 
+            LH = np.hypot(dr[0], dr[1])     # horizontal spacing of line ends
+            LV = dr[2]                      # vertical offset from end A to end B
+            
+            if np.min([self.rA[2],self.rB[2]]) > -depth:
+                self.cb = -depth - np.min([self.rA[2],self.rB[2]])   # if this line's lower end is off the seabed, set cb negative and to the distance off the seabed
+            elif self.cb < 0:   # if a line end is at the seabed, but the cb is still set negative to indicate off the seabed
+                self.cb = 0.0     # set to zero so that the line includes seabed interaction.
+        
+            try:
+                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.sys.lineTypes[self.type].EA, 
+                                                  self.sys.lineTypes[self.type].w, self.cb, HF0=self.HF, VF0=self.VF, nNodes=self.nNodes, plots=1) 
+            except CatenaryError as error:
+                raise LineError(self.number, error.message)
+            
+            Xs = self.rA[0] + info["X"]*dr[0]/LH
+            Ys = self.rA[1] + info["X"]*dr[1]/LH
+            Zs = self.rA[2] + info["Z"]
+            Ts = info["Te"]
+            return Xs, Ys, Zs, Ts
+            
+        # otherwise, count on read-in time-series data
+        else:
+            # figure out what time step to use
+            ts = self.getTimestep(Time)
+            
+            # drawing rods
+            if self.isRod > 0:
+            
+                k1 = np.array([ self.xp[ts,-1]-self.xp[ts,0], self.yp[ts,-1]-self.yp[ts,0], self.zp[ts,-1]-self.zp[ts,0] ]) / self.length # unit vector
+                
+                k = np.array(k1) # make copy
+            
+                Rmat = np.array(rotationMatrix(0, np.arctan2(np.hypot(k[0],k[1]), k[2]), np.arctan2(k[1],k[0])))  # <<< should fix this up at some point, MattLib func may be wrong
+                
+                # make points for appropriately sized cylinder
+                d = self.sys.lineTypes[self.type].d
+                Xs, Ys, Zs = makeTower(self.length, np.array([d, d]))
+                
+                # translate and rotate into proper position for Rod
+                coords = np.vstack([Xs, Ys, Zs])
+                newcoords = np.matmul(Rmat,coords)
+                Xs = newcoords[0,:] + self.xp[ts,0]
+                Ys = newcoords[1,:] + self.yp[ts,0]
+                Zs = newcoords[2,:] + self.zp[ts,0]
+                
+                return Xs, Ys, Zs
+                
+            # drawing lines
+            else:
+                
+                return self.xp[ts,:], self.yp[ts,:], self.zp[ts,:]
             
     
     def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1]):
@@ -270,7 +329,66 @@ class Line():
         return linebit
 
     
-    def drawLine(self, Time, ax, color="k"):
+
+    def drawLine(self, Time, ax, color="k", endpoints = False):
+        '''Draw the line in 3D
+        Parameters
+        ----------
+        Time : float
+            time value at which to draw the line
+        ax : axis
+            the axis on which the line is to be drawn
+        color : string, optional
+            color identifier in one letter (k=black, b=blue,...). The default is "k".
+        Xuvec : list, optional
+            plane at which the x-axis is desired. The default is [1,0,0].
+        Yuvec : lsit, optional
+            plane at which the y-axis is desired. The default is [0,0,1].
+        Returns
+        -------
+        linebit : list
+            list of axes and points on which the line can be plotted
+        '''
+        
+        linebit = []  # make empty list to hold plotted lines, however many there are
+    
+        if self.isRod > 0:
+            
+            Xs, Ys, Zs = self.getLineCoords(Time)
+            
+            for i in range(int(len(Xs)/2-1)):
+                linebit.append(ax.plot(Xs[2*i:2*i+2],Ys[2*i:2*i+2],Zs[2*i:2*i+2]            , color=color))  # side edges
+                linebit.append(ax.plot(Xs[[2*i,2*i+2]],Ys[[2*i,2*i+2]],Zs[[2*i,2*i+2]]      , color=color))  # end A edges
+                linebit.append(ax.plot(Xs[[2*i+1,2*i+3]],Ys[[2*i+1,2*i+3]],Zs[[2*i+1,2*i+3]], color=color))  # end B edges
+            
+            #Scatter points for line ends 
+            if endpoints == True:
+                linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
+        # drawing lines...
+        else:
+        
+            Xs, Ys, Zs = self.getLineCoords(Time)
+            
+            linebit.append(ax.plot(Xs, Ys, Zs, color=color))
+            
+            if endpoints == True:
+                linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
+                
+            # drawing water velocity vectors (not for Rods for now) <<< should handle this better (like in getLineCoords) <<<
+            if self.qs == 0:
+                ts = self.getTimestep(Time)
+                Ux = self.Ux[ts,:]
+                Uy = self.Uy[ts,:]
+                Uz = self.Uz[ts,:]      
+                self.Ubits = ax.quiver(Xs, Ys, Zs, Ux, Uy, Uz)  # make quiver plot and save handle to line object
+                
+            
+        self.linebit = linebit # can we store this internally?
+        
+        self.X = np.array([Xs, Ys, Zs])
+        
+            
+        return linebit
         '''Draw the line in 3D
 
         Parameters
@@ -294,12 +412,17 @@ class Line():
         '''
         
         linebit = []  # make empty list to hold plotted lines, however many there are
-    
+
+            
         if self.isRod > 0:
             
-            Xs, Ys, Zs = self.getLineCoords(Time)
+            Xs, Ys, Zs, Ts = self.getLineCoords(Time)
             
             for i in range(int(len(Xs)/2-1)):
+                if colortensions == True:
+                    r = 255*(Ts[2*i:2*i+2] - mint)/(maxt - mint)
+                    g = 0
+                    b = 1-r
                 linebit.append(ax.plot(Xs[2*i:2*i+2],Ys[2*i:2*i+2],Zs[2*i:2*i+2]            , color=color))  # side edges
                 linebit.append(ax.plot(Xs[[2*i,2*i+2]],Ys[[2*i,2*i+2]],Zs[[2*i,2*i+2]]      , color=color))  # end A edges
                 linebit.append(ax.plot(Xs[[2*i+1,2*i+3]],Ys[[2*i+1,2*i+3]],Zs[[2*i+1,2*i+3]], color=color))  # end B edges
@@ -307,7 +430,7 @@ class Line():
         # drawing lines...
         else:
         
-            Xs, Ys, Zs = self.getLineCoords(Time)
+            Xs, Ys, Zs, Ts = self.getLineCoords(Time)
             
             linebit.append(ax.plot(Xs, Ys, Zs, color=color))
             
@@ -543,6 +666,101 @@ class Line():
             K2_rot[1,2] *= -1
         
         return K2_rot
+    
+    def getLineTens(self, Time):    # formerly UpdateLine
+        '''Gets the updated line coordinates for drawing and plotting purposes.'''
+    
+        #quasi-static analysis, just call the catenary function to return the tensions
+
+        depth = self.sys.depth
+    
+        dr =  self.rB - self.rA                 
+        LH = np.hypot(dr[0], dr[1])     # horizontal spacing of line ends
+        LV = dr[2]                      # vertical offset from end A to end B
+        
+        if np.min([self.rA[2],self.rB[2]]) > -depth:
+            self.cb = -depth - np.min([self.rA[2],self.rB[2]])   # if this line's lower end is off the seabed, set cb negative and to the distance off the seabed
+        elif self.cb < 0:   # if a line end is at the seabed, but the cb is still set negative to indicate off the seabed
+            self.cb = 0.0     # set to zero so that the line includes seabed interaction.
+    
+        try:
+            (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.sys.lineTypes[self.type].EA, 
+                                              self.sys.lineTypes[self.type].w, self.cb, HF0=self.HF, VF0=self.VF, nNodes=self.nNodes, plots=1) 
+        except CatenaryError as error:
+            raise LineError(self.number, error.message)
+
+        Ts = info["Te"]
+        return Ts
+
+    def drawColorTensionLine(self, Time, ax, maxt, mint):
+        '''Draw the line in 3D
+
+        Parameters
+        ----------
+        Time : float
+            time value at which to draw the line
+        ax : axis
+            the axis on which the line is to be drawn
+        color : string, optional
+            color identifier in one letter (k=black, b=blue,...). The default is "k".
+        Xuvec : list, optional
+            plane at which the x-axis is desired. The default is [1,0,0].
+        Yuvec : lsit, optional
+            plane at which the y-axis is desired. The default is [0,0,1].
+
+        Returns
+        -------
+        linebit : list
+            list of axes and points on which the line can be plotted
+
+        '''
+        
+        linebit = []  # make empty list to hold plotted lines, however many there are
+
+            
+        if self.isRod > 0:
+            Xs, Ys, Zs = self.getLineCoords(Time)
+            Ts = self.getLineTens(Time)
+            
+            for i in range(int(len(Xs)/2-1)):
+            
+                r = int(Ts[2*i:2*i+2] - mint)/(maxt - mint)
+                g = 0
+                b = 1-r
+                linebit.append(ax.plot(Xs[2*i:2*i+2],Ys[2*i:2*i+2],Zs[2*i:2*i+2]            , color=(r,g,b)))  # side edges
+                linebit.append(ax.plot(Xs[[2*i,2*i+2]],Ys[[2*i,2*i+2]],Zs[[2*i,2*i+2]]      , color=(r,g,b)))  # end A edges
+                linebit.append(ax.plot(Xs[[2*i+1,2*i+3]],Ys[[2*i+1,2*i+3]],Zs[[2*i+1,2*i+3]], color=(r,g,b)))  # end B edges
+        
+        # drawing lines...
+        else:
+           
+            Xs, Ys, Zs = self.getLineCoords(Time)
+            Ts = self.getLineTens(Time)
+            for i in range(0,len(Xs)-1):
+                r = ((Ts[i] +Ts[i+1])/2 - mint)/(maxt - mint)
+                g = 0
+                b = 1-r
+                linebit.append(ax.plot(Xs[i:i+2], Ys[i:i+2], Zs[i:i+2], color=(r,g,b)))
+            #linebit.append(ax.plot(Xs, Ys, Zs,color=(r,g,b)))
+                
+            # drawing water velocity vectors (not for Rods for now) <<< should handle this better (like in getLineCoords) <<<
+            if self.qs == 0:
+                ts = self.getTimestep(Time)
+                Ux = self.Ux[ts,:]
+                Uy = self.Uy[ts,:]
+                Uz = self.Uz[ts,:]      
+                self.Ubits = ax.quiver(Xs, Ys, Zs, Ux, Uy, Uz)  # make quiver plot and save handle to line object
+                
+            
+        self.linebit = linebit # can we store this internally?
+        
+        self.X = np.array([Xs, Ys, Zs])
+        
+            
+        return linebit
 
     
+    def maxtension(self, Time):
+        Ts = self.getLineTens(Time)
+        return max(Ts), min(Ts)
 #
