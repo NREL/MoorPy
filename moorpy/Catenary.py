@@ -108,7 +108,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     
     # calculate a vertical stiffness estimate for an end lifting off the seabed
     def dV_dZ_s(z0, H):   # height off seabed to evaluate at (infinite if 0), horizontal tension
-        return W*(z0*W/J + 1)/np.sqrt( (z0*W/H + 1)**2 - 1)   # inelastic apprxoimation
+        return W*(z0*W/H + 1)/np.sqrt( (z0*W/H + 1)**2 - 1)   # inelastic apprxoimation
     
 
     # ProfileType 0 case - entirely along seabed
@@ -178,7 +178,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             info["stiffnessA"]  = np.array([[0.0, 0.0], [0.0, W / np.sqrt(2.0*(  -CB)/EA_W + 1.0)]])
             info["LBot"] = L - LHanging
             info['ProfileType'] = 5
-            info['Zextreme'] = 0
+            info['Zextreme'] = CB
     
         
     # Use an iterable solver function to solve for the forces on the line
@@ -357,8 +357,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             # >>>> what about errors for which we can first plot the line profile?? <<<<
             raise CatenaryError("Error in catenary computations: "+info['message'])
 
-        if info['Zextreme'] < CB:
-            info["warning"] = "Line is suspended from both ends but hits the seabed (this isn't allowed in MoorPy)"
+        #if info['Zextreme'] < CB:
+        #    info["warning"] = "Line is suspended from both ends but hits the seabed (this isn't allowed in MoorPy)"
     
         ProfileType = info['ProfileType']
         HF = X[0]
@@ -368,7 +368,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         
         
     # compute the Zextreme value - for a freely suspended line, if necessary, check to ensure the line doesn't droop and hit the seabed
-    if info['ProfileType']==1 and CB < 0 and VFMinWL < 0.0:   # only need to do this if the line is slack (has zero slope somewhere)
+    if info['ProfileType']==1 and CB < 0 and  VF-WL < 0.0:   # only need to do this if the line is slack (has zero slope somewhere)
 
         VFMinWL            = VF - WL;
         LBot               = L  - VF/W;    # unstretched length of line resting on seabed (Jonkman's PhD eqn 2-38), LMinVFOVrW
@@ -385,14 +385,14 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         # this is indicated by the anchor force having a positive value, meaning it's helping hold up the line
         info["Sextreme"] = L-VF/W  # arc length where slope is zero
         info["Zextreme"] = (1 - SQRT1VFMinWL_HF2)*HF_W - 0.5* VFMinWL**2/WEA  # max or min line elevation (where slope=0)
-        info["Xextreme"] = ( -np.log(VFMinWL_HF + SQRT1VFMinWL_HF2))*HF_W + HF*Sextreme/EA
+        info["Xextreme"] = ( -np.log(VFMinWL_HF + SQRT1VFMinWL_HF2))*HF_W + HF*info["Sextreme"]/EA
     else:
         info["Sextreme"] = 0.0
         info["Zextreme"] = 0.0
         info["Xextreme"] = 0.0    
         
         
-    # handle special case of a U-shaped line that has seabed contact (will actually run 2 new catenary solves)
+    # handle special case of a U-shaped line that has seabed contact (using 2 new catenary solves)
     if info['ProfileType']==1 and info["Zextreme"] < CB:
     
         # we will solve this as two separate lines to form the U shape
@@ -418,10 +418,10 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             
             Himbalance = fBH2 - fBH1
             
-            K1 = np.linalg.inv(info1["jacobian"])
-            K2 = np.linalg.inv(info2["jacobian"])
+            K1 = info1["stiffnessB"]
+            K2 = info2["stiffnessB"]
             
-            info['dH_dX'] = K1[0,0] + K2[0,0]
+            info['dH_dX'] = K1[0,0] + K2[0,0]  # horizontal stiffness on connection point on seabed between two line portions
             
             #print(f" X1 = {X1}, H1 = {fBH1}, H2 = {fBH2}, err={Himbalance}, dH/dX = {info['dH_dX']}")\
             #breakpoint()
@@ -444,18 +444,39 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         X1 = X[0]
         X2 = XF-X1
         
+        # call one more time to get final values
         (fAH1, fAV1, fBH1, fBV1, info1) = catenary(X1, Z1, L1, EA, W, CB=0, Tol=Tol, MaxIter=MaxIter, plots=plots)
         (fAH2, fAV2, fBH2, fBV2, info2) = catenary(X2, Z2, L2, EA, W, CB=0, Tol=Tol, MaxIter=MaxIter, plots=plots)
 
         if plots > 0 or (info1['error'] and info2['error']):
         
-            X  = np.hstack([ info1["X" ] , info2["X" ]+X1 ])
-            Z  = np.hstack([ info1["Z" ] , info2["Z" ]+Z1 ])
-            s  = np.hstack([ info1["s" ] , info2["s" ]+L1 ])
-            Te = np.hstack([ info1["Te"] , info2["Te"]    ])
+            info['X' ] = np.hstack([ info1["X" ] , info2["X" ]+X1 ])
+            info['Z' ] = np.hstack([ info1["Z" ] , info2["Z" ]+Z1 ])
+            info['s' ] = np.hstack([ info1["s" ] , info2["s" ]+L1 ])
+            info['Te'] = np.hstack([ info1["Te"] , info2["Te"]    ])
         
+        # get stiffnesses    (check sign of A!)
+        K1 = info1['stiffnessB']
+        K2 = info2['stiffnessB']        
+        dH_dX = 1./(1./K1[0,0] + 1./K2[0,0])
+        Kmid = infoU['oths']['dH_dX']
         
-        >>> stiffnesses >>> <<<<???
+        info['stiffnessA'] = np.array([[ dH_dX, K1[0,1] - K1[0,1]/Kmid*K1[0,0]], 
+                                               [K1[1,0] - K1[0,0]/Kmid*K1[1,0] , K1[1,1] - K1[0,1]/Kmid*K1[1,0]]])
+        
+        info['stiffnessB'] = np.array([[ dH_dX, K2[0,1] - K2[0,1]/Kmid*K2[0,0]], 
+                                               [K2[1,0] - K2[0,0]/Kmid*K2[1,0] , K2[1,1] - K2[0,1]/Kmid*K2[1,0]]])
+                                               
+        info['LBot'] = info1['LBot'] + info2['LBot']
+        # not very useful outputs for this case:
+        info["Sextreme"] = L1 - info1['LBot']
+        info["Zextreme"] = CB
+        info["Xextreme"] = X1 - info1['LBot']  
+                    
+        FxA = fAH1
+        FzA = fAV1
+        FxB = fBH2
+        FzB = fBV2
         
         if plots > 3:
             plt.plot(X, Z)
@@ -602,9 +623,9 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             
         elif ProfileType in [2,3]:
             if CB == 0.0:
-                info['stiffnessA'] = np.array([[info['stiffnessB'][0,0], 0], [0, dV_dZ_s(tol*L, HF)]])  # vertical term is very approximate 
+                info['stiffnessA'] = np.array([[info['stiffnessB'][0,0], 0], [0, dV_dZ_s(Tol*L, HF)]])  # vertical term is very approximate 
             else:
-                info['stiffnessA'] = np.empty((2.2)) * np.nan  # if friction, flag to ensures users to use this
+                info['stiffnessA'] = np.empty((2.2)) * np.nan  # if friction, flag to ensure users don't use this
         
         # un-swap line ends if they've been previously swapped, and apply global sign convention 
         # (vertical force positive-up, horizontal force positive from A to B)
@@ -616,8 +637,10 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             FxB = -HA
             FzB =  VA
             
-            info["jacobian"][0,1] = -info["jacobian"][0,1]   <<<<
-            info["jacobian"][1,0] = -info["jacobian"][1,0]
+            info["stiffnessA"][0,1] = -info["stiffnessA"][0,1]
+            info["stiffnessA"][1,0] = -info["stiffnessA"][1,0]
+            info["stiffnessB"][0,1] = -info["stiffnessB"][0,1]
+            info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
             
         else:
             FxA =  HA
@@ -632,8 +655,10 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             FzA = -FzA
             FzB = -FzB
             
-            info["jacobian"][0,1] = -info["jacobian"][0,1]
-            info["jacobian"][1,0] = -info["jacobian"][1,0]
+            info["stiffnessA"][0,1] = -info["stiffnessA"][0,1]
+            info["stiffnessA"][1,0] = -info["stiffnessA"][1,0]
+            info["stiffnessB"][0,1] = -info["stiffnessB"][0,1]
+            info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
             
             # TODO <<< should add more info <<<
 
