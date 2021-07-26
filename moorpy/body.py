@@ -66,11 +66,7 @@ class Body():
         
         self.attachedR   = []          # ID numbers of any Rods attached to the Body (not yet implemented)
         
-        self.sharedLineTheta = []
-        self.fairR = 0.
-        
         self.R = np.eye(3)             # body orientation rotation matrix
-    
         #print("Created Body "+str(self.number))
         
     
