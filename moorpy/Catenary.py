@@ -33,8 +33,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     VF0 : float, optional
         Vertical fairlead tension. If zero or not provided, a guess will be calculated.
     
-    Tol    :  int, optional
-        Convergence tolerance within Newton-Raphson iteration specified as a fraction of tension
+    Tol    :  float, optional
+        Convergence tolerance within Newton-Raphson iteration specified as an absolute displacement error
     nNodes : int, optional
         Number of nodes to describe the line
     MaxIter:  int, optional
@@ -108,7 +108,9 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     
     # calculate a vertical stiffness estimate for an end lifting off the seabed
     def dV_dZ_s(z0, H):   # height off seabed to evaluate at (infinite if 0), horizontal tension
-        return W*(z0*W/H + 1)/np.sqrt( (z0*W/H + 1)**2 - 1)   # inelastic apprxoimation
+        #return W*(z0*W/H + 1)/np.sqrt( (z0*W/H + 1)**2 - 1)   # inelastic apprxoimation
+        return W # returning a fully slack line approximation, 
+        #   because a large value here risks adding a bad cross coupling term in the system stiffness matrix
     
 
     # ProfileType 0 case - entirely along seabed
@@ -214,6 +216,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             HF = 1.0*HF0
             VF = 1.0*VF0
 
+        # >>> note, the above Tol uses should be adjusted now that I've changed it to be absolute and distance <<<
+
         # make sure required values are non-zero
         HF = np.max([ HF, Tol ])
         XF = np.max([ XF, Tol ])
@@ -230,11 +234,11 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         # call the master solver function
         #X, Y, info2 = msolve.dsolve(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, tol=Tol, maxIter=MaxIter, a_max=1.2)
         X, Y, info2 = dsolve2(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, 
-                              tol=Tol, stepfac=1, maxIter=MaxIter, a_max=1.2)
+                              ytol=Tol, stepfac=1, maxIter=MaxIter, a_max=1.2)
         
       
         # retry if it failed        
-        if  info2['iter'] >= MaxIter-1  or  info2['oths']['error']==True or np.linalg.norm(info2['err']) > 10*Tol*L:
+        if  info2['iter'] >= MaxIter-1  or  info2['oths']['error']==True or np.linalg.norm(info2['err']) > 10*Tol:
             #  ! Perhaps we failed to converge because our initial guess was too far off.
             #   (This could happen, for example, while linearizing a model via large
             #   pertubations in the DOFs.)  Instead, use starting values documented in:
@@ -261,7 +265,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             # call the master solver function
             #X, Y, info3 = msolve.dsolve(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, tol=Tol, maxIter=MaxIter, a_max=1.1) #, dX_last=info2['dX'])
             X, Y, info3 = dsolve2(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, 
-                                  tol=Tol, stepfac=1, maxIter=MaxIter, a_max=1.2)
+                                  ytol=Tol, stepfac=1, maxIter=MaxIter, a_max=1.2)
                 
             # retry if it failed              
             if  info3['iter'] >= MaxIter-1  or  info3['oths']['error']==True:
@@ -272,7 +276,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                 # call the master solver function
                 #X, Y, info4 = msolve.dsolve(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, tol=Tol, maxIter=10*MaxIter, a_max=1.15) #, dX_last=info3['dX'])
                 X, Y, info4 = dsolve2(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, 
-                                      tol=Tol, stepfac=1, maxIter=MaxIter, a_max=1.2)
+                                      ytol=Tol, stepfac=1, maxIter=MaxIter, a_max=1.2)
                     
                 # check if it failed                  
                 if  info4['iter'] >= 10*MaxIter-1  or  info4['oths']['error']==True:
@@ -396,6 +400,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     if info['ProfileType']==1 and info["Zextreme"] < CB:
     
         # we will solve this as two separate lines to form the U shape
+        info['ProfileType'] = 'U'
         
         X1_0 = info['Xextreme']   # define fake anchor point as lowest point of line (if the seabed wasn't there)
         X2_0 = XF - X1_0
@@ -413,8 +418,9 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             X1 = X[0]
             X2 = XF-X1
             
-            (fAH1, fAV1, fBH1, fBV1, info1) = catenary(X1, Z1, L1, EA, W, CB=0, Tol=Tol, MaxIter=MaxIter)
-            (fAH2, fAV2, fBH2, fBV2, info2) = catenary(X2, Z2, L2, EA, W, CB=0, Tol=Tol, MaxIter=MaxIter)
+            # note: reducing tolerances for these sub-calls <<< how much is good? <<<
+            (fAH1, fAV1, fBH1, fBV1, info1) = catenary(X1, Z1, L1, EA, W, CB=0, Tol=0.5*Tol, MaxIter=MaxIter)
+            (fAH2, fAV2, fBH2, fBV2, info2) = catenary(X2, Z2, L2, EA, W, CB=0, Tol=0.5*Tol, MaxIter=MaxIter)
             
             Himbalance = fBH2 - fBH1
             
@@ -439,14 +445,13 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
 
 
         # call this to solve for line shapes that balance the horizontal tension in the line
-        X, Y, infoU = dsolve2(eval_func_U, [X1_0], step_func=step_func_U, tol=0.0001, stepfac=1, maxIter=20, a_max=1.2, display=3)
-
+        X, Y, infoU = dsolve2(eval_func_U, [X1_0], step_func=step_func_U, ytol=0.25*Tol, stepfac=1, maxIter=20, a_max=1.2, display=0)
         X1 = X[0]
         X2 = XF-X1
         
         # call one more time to get final values
-        (fAH1, fAV1, fBH1, fBV1, info1) = catenary(X1, Z1, L1, EA, W, CB=0, Tol=Tol, MaxIter=MaxIter, plots=plots)
-        (fAH2, fAV2, fBH2, fBV2, info2) = catenary(X2, Z2, L2, EA, W, CB=0, Tol=Tol, MaxIter=MaxIter, plots=plots)
+        (fAH1, fAV1, fBH1, fBV1, info1) = catenary(X1, Z1, L1, EA, W, CB=0, Tol=0.5*Tol, MaxIter=MaxIter, plots=plots)
+        (fAH2, fAV2, fBH2, fBV2, info2) = catenary(X2, Z2, L2, EA, W, CB=0, Tol=0.5*Tol, MaxIter=MaxIter, plots=plots)
 
         if plots > 0 or (info1['error'] and info2['error']):
         
@@ -454,6 +459,17 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             info['Z' ] = np.hstack([ info1["Z" ] , info2["Z" ]+Z1 ])
             info['s' ] = np.hstack([ info1["s" ] , info2["s" ]+L1 ])
             info['Te'] = np.hstack([ info1["Te"] , info2["Te"]    ])
+            
+            # re-reverse line distributed data back to normal if applicable
+            if reverseFlag:  
+                info['s']  =  L - info['s' ][::-1]
+                info['X']  = XF - info['X' ][::-1]
+                info['Z']  =      info['Z' ][::-1] - ZF  # remember ZF still has a flipped sign right now
+                info['Te'] =      info['Te'][::-1]
+        if flipFlag:
+            raise Exception("flipFlag connot be True for the case of a U shaped line with seabed contact. Something must be wrong.")
+                        
+            
         
         # get stiffnesses    (check sign of A!)
         K1 = info1['stiffnessB']
@@ -473,16 +489,18 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         info["Zextreme"] = CB
         info["Xextreme"] = X1 - info1['LBot']  
                     
-        FxA = fAH1
-        FzA = fAV1
-        FxB = fBH2
-        FzB = fBV2
+        #FxA = fAH1
+        #FzA = fAV1
+        #FxB = fBH2
+        #FzB = fBV2
+        HA =  fAH1
+        VA =  fAV1
+        HF = -fBH2
+        VF = -fBV2
         
         if plots > 3:
-            plt.plot(X, Z)
+            plt.plot(info['X'], info['Z'])
             plt.show()
-
-
 
     # the normal case
     else:
@@ -617,50 +635,54 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             info["Te"] = Te                                
         
 
-        # from fairlead (upper) end stiffness matrix, get lower end stiffness matrix
-        if ProfileType == 1:
-            info['stiffnessA'] = info['stiffnessB']
-            
-        elif ProfileType in [2,3]:
-            if CB == 0.0:
-                info['stiffnessA'] = np.array([[info['stiffnessB'][0,0], 0], [0, dV_dZ_s(Tol*L, HF)]])  # vertical term is very approximate 
-            else:
-                info['stiffnessA'] = np.empty((2.2)) * np.nan  # if friction, flag to ensure users don't use this
+    # from fairlead (upper) end stiffness matrix, get lower end stiffness matrix
+    if ProfileType == 1:
+        info['stiffnessA'] = info['stiffnessB']
         
-        # un-swap line ends if they've been previously swapped, and apply global sign convention 
-        # (vertical force positive-up, horizontal force positive from A to B)
-        if reverseFlag:  
-            ZF = -ZF  # put height rise from end A to B back to negative
-            
-            FxA =  HF
-            FzA = -VF      # VF is positive-down convention so flip sign
-            FxB = -HA
-            FzB =  VA
-            
-            info["stiffnessA"][0,1] = -info["stiffnessA"][0,1]
-            info["stiffnessA"][1,0] = -info["stiffnessA"][1,0]
-            info["stiffnessB"][0,1] = -info["stiffnessB"][0,1]
-            info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
-            
+    elif ProfileType in [2,3]:
+        if CB == 0.0:
+            info['stiffnessA'] = np.array([[info['stiffnessB'][0,0], 0], [0, dV_dZ_s(Tol, HF)]])  # vertical term is very approximate 
         else:
-            FxA =  HA
-            FzA =  VA
-            FxB = -HF
-            FzB = -VF
+            info['stiffnessA'] = np.ones([2,2]) * np.nan  # if friction, flag to ensure users don't use this
+    
+    # un-swap line ends if they've been previously swapped, and apply global sign convention 
+    # (vertical force positive-up, horizontal force positive from A to B)
+    if reverseFlag:  
+        ZF = -ZF  # put height rise from end A to B back to negative
+        
+        FxA =  HF
+        FzA = -VF      # VF is positive-down convention so flip sign
+        FxB = -HA
+        FzB =  VA
+        
+        info["stiffnessA"], info["stiffnessB"] = info["stiffnessB"], info["stiffnessA"]  # swap A and B
+        
+        info["stiffnessA"][0,1] = -info["stiffnessA"][0,1]  # reverse off-diagonal signs
+        info["stiffnessA"][1,0] = -info["stiffnessA"][1,0]
+        info["stiffnessB"][0,1] = -info["stiffnessB"][0,1]
+        info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
+        
+    else:
+        FxA =  HA
+        FzA =  VA
+        FxB = -HF
+        FzB = -VF
 
-        if flipFlag:
-            W = -W       # restore original
-            ZF = -ZF     # restore original
-            
-            FzA = -FzA
-            FzB = -FzB
-            
-            info["stiffnessA"][0,1] = -info["stiffnessA"][0,1]
-            info["stiffnessA"][1,0] = -info["stiffnessA"][1,0]
-            info["stiffnessB"][0,1] = -info["stiffnessB"][0,1]
-            info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
-            
-            # TODO <<< should add more info <<<
+    if flipFlag:
+        W = -W       # restore original
+        ZF = -ZF     # restore original
+        
+        FzA = -FzA
+        FzB = -FzB
+        
+        info["stiffnessA"], info["stiffnessB"] = info["stiffnessB"], info["stiffnessA"]  # swap A and B
+        
+        info["stiffnessA"][0,1] = -info["stiffnessA"][0,1]  # reverse off-diagonal signs
+        info["stiffnessA"][1,0] = -info["stiffnessA"][1,0]
+        info["stiffnessB"][0,1] = -info["stiffnessB"][0,1]
+        info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
+        
+        # TODO <<< should add more info <<<
 
         
 
@@ -906,9 +928,17 @@ if __name__ == "__main__":
     print(np.linalg.inv(info['jacobian']))
     '''
     
-    (fAH, fAV, fBH, fBV, info) = catenary(100, 20, 130, 1e12, 100.0, CB=-20, Tol=1e-06, MaxIter=50, plots=3)
+    #(fAH, fAV, fBH, fBV, info) = catenary(100, 20, 130, 1e12, 100.0, CB=-20, Tol=0.001, MaxIter=50, plots=3)
+    #(fAH, fAV, fBH, fBV, info) = catenary(205, -3.9, 250, 1229760000.0, 2442, CB=-55, Tol=1e-06, MaxIter=50, plots=3)
     
-    plt.plot(info['X'], info['Z'] )
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary( 50, 20,  65, 1e12, 100.0, CB=  0, Tol=0.001, MaxIter=50, plots=4)
+    (fAHU, fAVU, fBHU, fBVU, infoU) = catenary(100,  0, 130, 1e12, 100.0, CB=-20, Tol=0.001, MaxIter=50, plots=4)
+    
+    plt.plot(info1['X'], info1['Z'] )
+    plt.plot(infoU['X'], infoU['Z'] )
     plt.axis('equal')
+    plt.figure()
+    plt.plot(info1['s'], info1['Te'] )
+    plt.plot(infoU['s'], infoU['Te'] )
     
     plt.show()

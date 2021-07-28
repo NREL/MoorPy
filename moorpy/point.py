@@ -273,7 +273,12 @@ class Point():
         # append the stiffness matrix of each line attached to the point
         for lineID,endB in zip(self.attached,self.attachedEndB):
             line = self.sys.lineList[lineID-1]
-            K += line.getStiffnessMatrix()
+            KA, KB = line.getStiffnessMatrix()
+            
+            if endB == 1:                  # assuming convention of end A is attached to the point, so if not,
+                KA, KB = KB, KA            # swap matrices of ends A and B                                
+            
+            K += KA 
             
         # NOTE: can rotate the line's stiffness matrix in either Line.getStiffnessMatrix() or here in Point.getStiffnessA()
         
@@ -287,6 +292,10 @@ class Point():
             # if less than zTol above the seabed (could even be below the seabed), apply a stiffness (should bring wet weight to zero at seabed)
             if self.r[2] < self.zTol - self.sys.depth:
                 K[2,2] += max(self.m - self.v*self.sys.rho, 0)*self.sys.g / self.zTol
+                
+            # if on seabed, apply a large stiffness to help out system equilibrium solve (if it's transitioning off, keep it a small step to start with)    
+            if self.r[2] == -self.sys.depth:
+                K[2,2] += 1.0e12
         
         if xyz:                     # if asked to output all DOFs, do it
             return K

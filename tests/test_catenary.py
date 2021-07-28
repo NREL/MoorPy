@@ -30,9 +30,21 @@ def test_catenary_solutions(index):
 
     ins = indata[index]
         
-    (fAH, fAV, fBH, fBV, info) = catenary( *ins[:5], CB=ins[5], HF0=ins[6], VF0=ins[7], Tol=1e-06, MaxIter=50, plots=3)
+    (fAH, fAV, fBH, fBV, info) = catenary( *ins[:5], CB=ins[5], HF0=ins[6], VF0=ins[7], Tol=0.0001, MaxIter=50, plots=3)
         
-    assert_allclose([fAH, fAV, fBH, fBV, info['LBot']], desired[index], rtol=1e-07, atol=0, verbose=True)
-
-
+    print(f"ProfileType is {info['ProfileType']}")
+    assert_allclose([fAH, fAV, fBH, fBV, info['LBot']], desired[index], rtol=1e-05, atol=0, verbose=True)
     
+    
+def test_catenary_symmetricU():
+    '''Tests the U shaped line with seabed contact against a simulation of half the line'''
+    
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary( 50, 20,  65, 1e12, 100.0, CB=  0, Tol=0.00001, MaxIter=50)
+    (fAHU, fAVU, fBHU, fBVU, infoU) = catenary(100,  0, 130, 1e12, 100.0, CB=-20, Tol=0.00001, MaxIter=50)
+
+    assert_allclose([fAHU, fAVU, fBHU, fBVU], [-fBH1, fBV1, fBH1, fBV1], rtol=1e-05, atol=0, verbose=True)
+    
+
+if __name__ == '__main__':
+    for i in range(len(indata)):
+        test_catenary_solutions(i)
