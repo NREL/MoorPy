@@ -127,7 +127,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         if HF > 0: # if taut
             dHF_dXF = EA/L    # approximation <<<  what about friction?  <<<<<<<<
             #dVF_dZF = W + HF/L # vertical stiffness <<< approximation a
-            dVF_dZF = dV_dZ_s(tol*L, HF)      # vertical stiffness <<< approximation b
+            dVF_dZF = dV_dZ_s(Tol*L, HF)      # vertical stiffness <<< approximation b
         else:  # if slack
             dHF_dXF = 0.0
             dVF_dZF = W  # vertical stiffness 
