@@ -9,6 +9,10 @@ import moorpy as mp
 from moorpy.MoorProps import getLineProps
 
 import matplotlib.pyplot as plt
+
+
+inCBs = [0, 1.0, 10.0]  # friction coefficients as inputs for test_seabed
+
     
 def test_basic():
 
@@ -65,6 +69,36 @@ def test_basic():
     assert_allclose(ms.bodyList[0].r6, np.zeros(6), rtol=0, atol=0.01, verbose=True)
     
 
+def test_multiseg():
+    '''Compares a single catenary mooring line with a two-line system.'''
+       
+    # single line
+    ms1 = mp.System()
+    ms1.depth = 200    
+    ms1.lineTypes['chain'] = getLineProps(120, name='chain')
+    ms1.addPoint(1, [-800, 0 , -200])                 # anchor point
+    ms1.addPoint(1, [   0, 0 ,    0])                 # fairlead    
+    ms1.addLine(860, 'chain', pointA=1, pointB=2)
+    ms1.initialize()
+    ms1.solveEquilibrium3(tol=0.0001)
+    
+    # two line
+    ms2 = mp.System()
+    ms2.depth = 200    
+    ms2.lineTypes['chain'] = getLineProps(120, name='chain')
+    ms2.addPoint(1, [-800, 0 , -200])                 # anchor point
+    ms2.addPoint(0, [-205, 0 , -100])                 # point along line
+    ms2.addPoint(1, [   0, 0 ,    0])                 # fairlead    
+    ms2.addLine(630, 'chain', pointA=1, pointB=2)
+    ms2.addLine(230, 'chain', pointA=2, pointB=3)
+    ms2.initialize()
+    ms2.solveEquilibrium3(tol=0.0001)
+    
+    
+    # compare tensions
+    assert_allclose(np.hstack([ms1.pointList[0].getForces(), ms1.pointList[-1].getForces()]),
+                    np.hstack([ms2.pointList[0].getForces(), ms2.pointList[-1].getForces()]), rtol=0, atol=10.0, verbose=True)
+
 def test_basicU():
     '''Compares a system with a U-shape line with seabed contact with an equivalent case 
        that has a node along the U.'''
@@ -116,6 +150,39 @@ def test_basicU():
     # compare floating point positions
     assert_allclose(np.hstack([ms1.pointList[1].r, ms1.pointList[3].r]),
                     np.hstack([msU.pointList[1].r, msU.pointList[2].r]), rtol=0, atol=0.001, verbose=True)
+
+
+@pytest.mark.parametrize('CB', inCBs)
+def test_seabed(CB):
+    '''Compares a single catenary mooring line along the seabed with a two-line system
+       where the point is on the seabed, with different friction settings.'''
+       
+    # single line
+    ms1 = mp.System()
+    ms1.depth = 200    
+    ms1.lineTypes['chain'] = getLineProps(120, name='chain')
+    ms1.addPoint(1, [-800, 0 , -200])                 # anchor point
+    ms1.addPoint(1, [   0, 0 ,    0])                 # fairlead    
+    ms1.addLine(860, 'chain', pointA=1, pointB=2, cb=CB)
+    ms1.initialize()
+    ms1.solveEquilibrium3(tol=0.0001)
+    
+    # two line
+    ms2 = mp.System()
+    ms2.depth = 200    
+    ms2.lineTypes['chain'] = getLineProps(120, name='chain')
+    ms2.addPoint(1, [-800, 0 , -200])                 # anchor point
+    ms2.addPoint(0, [-405, 0 , -150])                 # midpoint    
+    ms2.addPoint(1, [   0, 0 ,    0])                 # fairlead    
+    ms2.addLine(430, 'chain', pointA=1, pointB=2, cb=CB)
+    ms2.addLine(430, 'chain', pointA=2, pointB=3, cb=CB)
+    ms2.initialize()
+    ms2.solveEquilibrium3(tol=0.0001)
+    
+    
+    # compare tensions
+    assert_allclose(np.hstack([ms1.pointList[0].getForces(), ms1.pointList[-1].getForces()]),
+                    np.hstack([ms2.pointList[0].getForces(), ms2.pointList[-1].getForces()]), rtol=0, atol=10.0, verbose=True)
 
 
 if __name__ == '__main__':
@@ -186,51 +253,33 @@ if __name__ == '__main__':
     print(ms.pointList[2].getStiffnessA())
     '''
     
-    # a seabed contact case with 2 lines to form a U
-    ms1 = mp.System()
 
-    ms1.depth = 100
-    
-    ms1.lineTypes['chain'] = getLineProps(120, name='chain')
-
-    ms1.addPoint(1, [-200, 0 , -100])                 # anchor point
-    ms1.addPoint(0, [-100, 0 ,  -50], m=0, v=50)      # float
-    ms1.addPoint(0, [   0, 0 , -100])                 # midpoint
-    ms1.addPoint(0, [ 100, 0 ,  -40], m=0, v=50)      # float
-    ms1.addPoint(1, [ 200, 0 , -100])                 # anchor point
-        
-    ms1.addLine(120, 'chain', pointA=1, pointB=2)
-    ms1.addLine(125, 'chain', pointA=2, pointB=3)
-    ms1.addLine(125, 'chain', pointA=3, pointB=4)
-    ms1.addLine(120, 'chain', pointA=4, pointB=5)
     
     
     # a seabed contact case with single U line
-    msU = mp.System()
-
-    msU.depth = 100
-    
-    msU.lineTypes['chain'] = getLineProps(120, name='chain')
-
-    msU.addPoint(1, [-200, 0 , -100])                 # anchor point
-    msU.addPoint(0, [-100, 0 ,  -50], m=0, v=50)      # float
-    msU.addPoint(0, [ 100, 0 ,  -40], m=0, v=50)      # float
-    msU.addPoint(1, [ 200, 0 , -100])                 # anchor point
-        
-    msU.addLine(120, 'chain', pointA=1, pointB=2)
-    msU.addLine(250, 'chain', pointA=2, pointB=3)
-    msU.addLine(120, 'chain', pointA=3, pointB=4)
-        
-
+    ms = mp.System()
+    ms.depth = 100
+    ms.lineTypes['chain'] = getLineProps(120, name='chain')
+    # a suspension bridge shape
+    ms.addPoint(1, [-200, 0 , -100])                 # 1 anchor point
+    ms.addPoint(0, [-100, 0 ,  -50], m=0, v=50)      # 2 float
+    ms.addPoint(0, [ 100, 0 ,  -40], m=0, v=90)      # 3 float
+    ms.addPoint(1, [ 200, 0 , -100])                 # 4 anchor point        
+    ms.addLine(120, 'chain', pointA=1, pointB=2)
+    ms.addLine(250, 'chain', pointA=2, pointB=3)
+    ms.addLine(120, 'chain', pointA=3, pointB=4)
+    # something in a new direction
+    ms.addPoint(1, [ 100,  200, -100])               # 5 north anchor
+    ms.addPoint(0, [ 100,  100,  -50])               # 6 point along seabed
+    ms.addPoint(1, [ 100, -100,  -50])               # 7 south anchor in midair     
+    ms.addLine(120, 'chain', pointA=5, pointB=6)
+    ms.addLine(120, 'chain', pointA=6, pointB=3)
+    ms.addLine(250, 'chain', pointA=7, pointB=3)
     # ------- simulate it ----------
-    ms1.initialize()                                             # make sure everything's connected
-    msU.initialize()                                             # make sure everything's connected
-    
-    ms1.solveEquilibrium3(tol=0.0001)                            # equilibrate - see if it goes back to zero!
-    msU.solveEquilibrium3(tol=0.0001)                            # equilibrate - see if it goes back to zero!
-       
-    fig,ax = ms1.plot(color='g')
-    msU.plot(color=[1,0,0,0.5], ax=ax)
+    ms.initialize()            
+    fig,ax = ms.plot(color='g')        
+    ms.solveEquilibrium3(tol=0.0001)   
+    ms.plot(color=[1,0,0,0.5], ax=ax)
     
     plt.show()
     

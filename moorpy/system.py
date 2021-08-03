@@ -131,7 +131,7 @@ class System():
         #print("Created Point "+str(self.pointList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
         
-    def addLine(self, lUnstr, type_string, nSegs=20, pointA=0, pointB=0):
+    def addLine(self, lUnstr, type_string, nSegs=20, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
 
         Parameters
@@ -153,7 +153,7 @@ class System():
 
         '''
         
-        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, self.lineTypes[type_string].name, nSegs=nSegs) )
+        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, self.lineTypes[type_string].name, nSegs=nSegs, cb=cb) )
         
         if pointA > 0:
             if pointA <= len(self.pointList):
@@ -1483,6 +1483,9 @@ class System():
             Y = self.mooringEq(X, DOFtype=DOFtype, tol=lineTol)
             oths = dict(status=1)                # other outputs - returned as dict for easy use
             
+            self.Xs.append(X) # temporary
+            self.Es.append(Y)
+            
             return Y, oths, False
         
         def step_func_equil(X, args, Y, oths, Ytarget, err, tol_, iter, maxIter):
@@ -2125,7 +2128,7 @@ class System():
             body.draw(ax)
         
         for line in self.lineList:
-            if color==None:            
+            if color==None and isinstance(line.type, str):            
                 if 'chain' in line.type:
                     line.drawLine(0, ax, color=[.1, 0, 0])
                 elif 'rope' in line.type:
@@ -2187,7 +2190,7 @@ class System():
         
         for line in self.lineList:
         
-            if color==None:            
+            if color==None and isinstance(line.type, str):            
                 if 'chain' in line.type:
                     line.drawLine2d(0, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec)
                 elif 'rope' in line.type:

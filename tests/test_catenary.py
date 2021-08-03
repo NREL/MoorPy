@@ -48,3 +48,5 @@ def test_catenary_symmetricU():
 if __name__ == '__main__':
     for i in range(len(indata)):
         test_catenary_solutions(i)
+        
+        #catenary(0.007335040615956245, 46.969250518704726, 100.0, 257826627.22942558, 512.1255141001664, CB=-532.0307494812953, HF0=2169047.825684437, VF0=1165782.713912318, Tol=2.0000000000000003e-06, MaxIter=50, plots=1)
