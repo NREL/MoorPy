@@ -240,7 +240,7 @@ class Point():
             self.sys.solveEquilibrium3(tol=tol)   # find equilibrium of mooring system given this Point's new position
             f_2 =self.getForces(lines_only=True)  # get the net 3DOF forces/moments from any attached lines 
 
-            K[i,:] = -(f_2-f)/dx                  # get stiffness in this DOF via finite difference and add to matrix column
+            K[:,i] = -(f_2-f)/dx                  # get stiffness in this DOF via finite difference and add to matrix column
             
         # ----------------- restore the system back to previous positions ------------------
         self.setPosition(X1)                      # set position to linearization point

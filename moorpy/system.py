@@ -1646,7 +1646,7 @@ class System():
                 if plots > 0:
                     self.freeDOFs.append(X2)
                 
-                K[i,:] = -(F2p-F1)/dX[i]                      # take finite difference of force w.r.t perturbation
+                K[:,i] = -(F2p-F1)/dX[i]                      # take finite difference of force w.r.t perturbation
             
             
         elif solveOption==1:  # ::: adaptive central difference approach :::
@@ -1697,7 +1697,7 @@ class System():
                         # until the derivatives agree better. Decrease the step size by 10X.
                         dXi = 0.1*dXi
                 
-                K[i,:] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
+                K[:,i] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
                 
                 
                 
@@ -1778,7 +1778,7 @@ class System():
                 if plots > 0:
                     self.cpldDOFs.append(X2)
                 
-                K[i,:] = -(F2p-F1)/dX[i]                # take finite difference of force w.r.t perturbation
+                K[:,i] = -(F2p-F1)/dX[i]                # take finite difference of force w.r.t perturbation
             
             
         elif solveOption==1:  # ::: adaptive central difference approach :::
@@ -1839,7 +1839,7 @@ class System():
                         dXi = 0.1*dXi
                     
                     
-                K[i,:] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
+                K[:,i] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
                 
                 
         else:
