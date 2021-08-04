@@ -9,7 +9,7 @@ from moorpy.body import Body
 from moorpy.point import Point
 from moorpy.line import Line
 from moorpy.lineType import LineType
-
+import matplotlib as mpl
 #import moorpy.MoorSolve as msolve
 from moorpy.helpers import rotationMatrix, rotatePosition, getH, printVec, set_axes_equal, dsolve2, SolveError, MoorPyError
 
@@ -2206,9 +2206,8 @@ class System():
     
     
 
-    def plot(self, bounds='default', ax=None, color=None, hidebox=False, rbound=0, title="", linelabels=False, pointlabels=False):
+    def plot(self, bounds='default', ax=None, color=None, hidebox=False, rbound=0, title="", linelabels=False, pointlabels=False, endpoints=False):
         '''Plots the mooring system objects in their current positions
-
         Parameters
         ----------
         bounds : string, optional
@@ -2223,7 +2222,8 @@ class System():
             A bound to be placed on each axis of the plot. If 0, the bounds will be the max values on each axis. The default is 0.
         title : string, optional
             A title of the plot. The default is "".
-
+        linelabels : adds line numbers to plot cooresponding to MoorDyn file 
+         pointlabels: adds line numbers to plot cooresponding to MoorDyn file 
         Returns
         -------
         fig : figure object
@@ -2277,13 +2277,13 @@ class System():
             j = j + 1
             if color==None and isinstance(line.type, str):       
                 if 'chain' in line.type:
-                    line.drawLine(0, ax, color=[.1, 0, 0])
+                    line.drawLine(0, ax, color=[.1, 0, 0], endpoints = endpoints)
                 elif 'rope' in line.type:
-                    line.drawLine(0, ax, color=[.3,.5,.5])
+                    line.drawLine(0, ax, color=[.3,.5,.5], endpoints = endpoints)
                 else:
-                    line.drawLine(0, ax, color=[0.3,0.3,0.3])
+                    line.drawLine(0, ax, color=[0.3,0.3,0.3], endpoints = endpoints)
             else:
-                line.drawLine(0, ax, color=color)
+                line.drawLine(0, ax, color=color, endpoints = endpoints)
                 
             #Add line labels 
             if linelabels == True:
@@ -2308,6 +2308,7 @@ class System():
         #plt.show()
         
         return fig, ax  # return the figure and axis object in case it will be used later to update the plot
+        
         
         
     def plot2d(self, Xuvec=[1,0,0], Yuvec=[0,0,1], ax=None, color=None, title="", linelabels=False, pointlabels=False):
@@ -2471,3 +2472,113 @@ class System():
             
         pass #I added this line to get the above commented lines (^^^) to be included in the animate method 
     
+    def colortensions(self, bounds='default', ax=None, hidebox=False, rbound=0, title="", linelabels=False, pointlabels=False):
+        '''Plots the mooring system objects in their current positions
+
+        Parameters
+        ----------
+        bounds : string, optional
+            signifier for the type of bounds desired in the plot. The default is "default".
+        ax : axes, optional
+            Plot on an existing set of axes
+        color : string, optional
+            Some way to control the color of the plot ... TBD <<<
+        hidebox : bool, optional
+            If true, hides the axes and box so just the plotted lines are visible.
+        rbound : float, optional
+            A bound to be placed on each axis of the plot. If 0, the bounds will be the max values on each axis. The default is 0.
+        title : string, optional
+            A title of the plot. The default is "".
+
+        Returns
+        -------
+        fig : figure object
+            To hold the axes of the plot
+        ax: axis object
+            To hold the points and drawing of the plot
+            
+        '''
+        
+        # sort out bounds
+        xs = []
+        ys = []
+        zs = [0, -self.depth]
+        
+        for point in self.pointList:
+            xs.append(point.r[0])
+            ys.append(point.r[1])
+            zs.append(point.r[2])
+            
+
+        # if axes not passed in, make a new figure
+        if ax == None:    
+            fig = plt.figure()
+            #fig = plt.figure(figsize=(20/2.54,12/2.54), dpi=300)
+            ax = plt.axes(projection='3d')
+        else:
+            fig = ax.get_figure()
+        
+        # set bounds
+        if rbound==0:
+            rbound = max([max(xs), max(ys), -min(xs), -min(ys)]) # this is the most extreme coordinate
+            
+        
+        if bounds=='default':
+            ax.set_zlim([-self.depth, 0])
+        elif bounds=='rbound':   
+            ax.set_xlim([-rbound,rbound])
+            ax.set_ylim([-rbound,rbound])
+            ax.set_zlim([-rbound, rbound])
+        elif bounds=='mooring':
+            ax.set_xlim([-rbound,0])
+            ax.set_ylim([-rbound/2,rbound/2])
+            ax.set_zlim([-self.depth, 0])
+        
+        #find max tension 
+        tens = []
+        for line in self.lineList:
+            tens.extend(line.maxtension(0))
+        maxten = max(tens)
+        minten = min(tens)
+        
+        # draw things
+        for body in self.bodyList:
+            body.draw(ax)
+        
+        j = 0
+        for line in self.lineList:
+            j = j + 1
+            line.drawColorTensionLine(0, ax,  maxten, minten)
+               
+            #Add line labels 
+            if linelabels == True:
+                ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
+            
+        #Add point labels
+        i = 0 
+        for point in self.pointList:
+            i = i + 1
+            if pointlabels == True:
+                ax.text(point.r[0], point.r[1], point.r[2], i, c = 'r')
+        
+        fig.suptitle(title)
+
+
+        set_axes_equal(ax)
+        
+        ax.set_zticks([-self.depth, 0])  # set z ticks to just 0 and seabed
+        
+        if hidebox:
+            ax.axis('off')
+        
+        #plt.show()
+        
+        # fig1, ax1 = plt.subplots(figsize=(6, 1))
+        # fig1.subplots_adjust(bottom=0.5)
+
+        # cmap = mpl.cm.cool
+        # norm = mpl.colors.Normalize(vmin=minten, vmax=maxten)
+        # cb1 = mpl.colorbar.ColorbarBase(ax, cmap=cmap,norm=norm,orientation='horizontal')
+        
+        return fig, ax, minten, maxten  # return the figure and axis object in case it will be used later to update the plot
+        
