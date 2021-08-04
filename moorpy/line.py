@@ -59,7 +59,8 @@ class Line():
         self.th = 0           # heading of line from end A to B
         self.HF = 0           # fairlead horizontal force saved for next solve
         self.VF = 0           # fairlead vertical force saved for next solve
-        self.jacobian = []    # to be filled with the 2x2 Jacobian from catenary
+        self.KA = []          # to be filled with the 2x2 end stiffness matrix from catenary
+        self.KB = []          # to be filled with the 2x2 end stiffness matrix from catenary
         self.info = {}        # to hold all info provided by catenary
         
         self.qs = 1  # flag indicating quasi-static analysis (1). Set to 0 for time series data
@@ -398,7 +399,7 @@ class Line():
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
         
         
-    def staticSolve(self, reset=False, plots=0):
+    def staticSolve(self, reset=False, plots=0, tol=0.0001):
         '''Solves static equilibrium of line. Sets the end forces of the line based on the end points' positions.
 
         Parameters
@@ -441,14 +442,15 @@ class Line():
             
         try:
             (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.sys.lineTypes[self.type].EA, self.sys.lineTypes[self.type].w, 
-                                                  CB=self.cb, HF0=self.HF, VF0=self.VF, plots=plots)   # call line model
+                                                  CB=self.cb, Tol=tol, HF0=self.HF, VF0=self.VF, plots=plots)   # call line model
         except CatenaryError as error:
             raise LineError(self.number, error.message)
             
         self.th = np.arctan2(dr[1],dr[0])  # probably a more efficient way to handle this <<<
         self.HF = info["HF"]
         self.VF = info["VF"]
-        self.jacobian = info["jacobian"]
+        self.KA = info["stiffnessA"]
+        self.KB = info["stiffnessB"]
         self.LBot = info["LBot"]
         self.info = info
             
@@ -511,6 +513,7 @@ class Line():
         '''
 
         # take the inverse of the Jacobian to get the starting analytic stiffness matrix
+        '''
         if np.isnan(self.jacobian[0,0]): #if self.LBot >= self.L and self.HF==0. and self.VF==0.  << handle tricky cases here?
             K = np.array([[0., 0.], [0., 1.0/self.jacobian[1,1] ]])
         else:
@@ -518,6 +521,7 @@ class Line():
                 K = np.linalg.inv(self.jacobian)
             except:
                 raise LineError(self.number, f"Check Line Length ({self.L}), it might be too long, or check catenary ProfileType")
+        '''
         
         # solve for required variables to set up the perpendicular stiffness. Keep it horizontal
         L_xy = np.linalg.norm(self.rB[:2] - self.rA[:2])
@@ -525,24 +529,30 @@ class Line():
         Kt = T_xy/L_xy
         
         # initialize the line's analytic stiffness matrix in the "in-line" plane
-        K2 = np.array([[K[0,0], 0 , K[0,1]],
-                       [0     , Kt, 0     ],
-                       [K[1,0], 0 , K[1,1]]])
+        KA = np.array([[self.KA[0,0], 0 , self.KA[0,1]],
+                       [     0      , Kt,      0      ],
+                       [self.KA[1,0], 0 , self.KA[1,1]]])
+                       
+        KB = np.array([[self.KB[0,0], 0 , self.KB[0,1]],
+                       [     0      , Kt,      0      ],
+                       [self.KB[1,0], 0 , self.KB[1,1]]])
         
         # create the rotation matrix based on the heading angle that the line is from the horizontal
         R = rotationMatrix(0,0,self.th)
         
         # rotate the matrix to be about the global frame [K'] = [R][K][R]^T
-        K2_rot = np.matmul(np.matmul(R, K2), R.T)
+        KA_rot = np.matmul(np.matmul(R, KA), R.T)
+        KB_rot = np.matmul(np.matmul(R, KB), R.T)
         
         # need to make sign changes if the end fairlead (B) of the line is lower than the starting point (A)
+        '''  I'm not sure what exactly this was...
         if self.rB[2] < self.rA[2]:
             K2_rot[2,0] *= -1
             K2_rot[0,2] *= -1
             K2_rot[2,1] *= -1
             K2_rot[1,2] *= -1
-        
-        return K2_rot
+        '''
+        return KA_rot, KB_rot
 
     
 #

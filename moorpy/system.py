@@ -131,7 +131,7 @@ class System():
         #print("Created Point "+str(self.pointList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
         
-    def addLine(self, lUnstr, type_string, nSegs=20):
+    def addLine(self, lUnstr, type_string, nSegs=20, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
 
         Parameters
@@ -142,6 +142,10 @@ class System():
             string identifier of LineType object that this Line is to be.
         nSegs : int, optional
             number of segments to split the line into. The default is 20.
+        pointA int, optional
+            Point number to attach end A of the line to.
+        pointB int, optional
+            Point number to attach end B of the line to.
 
         Returns
         -------
@@ -149,7 +153,18 @@ class System():
 
         '''
         
-        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, self.lineTypes[type_string].name, nSegs=nSegs) )
+        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, self.lineTypes[type_string].name, nSegs=nSegs, cb=cb) )
+        
+        if pointA > 0:
+            if pointA <= len(self.pointList):
+                self.pointList[pointA-1].attachLine(self.lineList[-1].number, 0)
+            else:
+                raise Exception(f"Provided pointA of {pointA} exceeds number of points.")
+        if pointB > 0:
+            if pointB <= len(self.pointList):
+                self.pointList[pointB-1].attachLine(self.lineList[-1].number, 1)
+            else:
+                raise Exception(f"Provided pointB of {pointB} exceeds number of points.")
         
         #print("Created Line "+str(self.lineList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
@@ -272,7 +287,7 @@ class System():
                         else:                                                                      # for now assuming unlabeled free case
                             bodyType = 0
                             # if we detected there were unrecognized chars here, could: raise ValueError(f"Body type not recognized for Body {num}")
-                        bodyType = 0   # manually setting the body type as -1 for FAST.Farm SM investigation
+                        #bodyType = -1   # manually setting the body type as -1 for FAST.Farm SM investigation
                         
                         r6  = np.array(entries[1:7], dtype=float)   # initial position and orientation [m, rad]
                         r6[3:] = r6[3:]*np.pi/180.0                 # convert from deg to rad
@@ -1331,7 +1346,7 @@ class System():
         
     
     
-    def mooringEq(self, X, DOFtype="free", lines_only=False):
+    def mooringEq(self, X, DOFtype="free", lines_only=False, tol=0.001):
         '''Error function used in solving static equilibrium by calculating the forces on free objects
 
         Parameters
@@ -1341,6 +1356,8 @@ class System():
             If type is 'both', X provides the free DOFs followed by the coupled DOFs.
         DOFtype : string, optional
             Specifies whether to consider 'free' DOFs, 'coupled' DOFs, or 'both'. The default is 'free'.
+        tol : float, optional
+            Tolerance to use in catenary calculations [m].
 
         Returns
         -------
@@ -1358,7 +1375,7 @@ class System():
              
         # solve profile and forces of all lines 
         for line in self.lineList:
-            line.staticSolve()
+            line.staticSolve(tol=tol)
         
         # get reactions in DOFs
         f = self.getForces(DOFtype=DOFtype, lines_only=lines_only)
@@ -1391,6 +1408,9 @@ class System():
         Returns
         -------
         None.
+        
+        
+        NOTE: this does not do anything intelligent with catenary tolerances.
 
         '''
         
@@ -1520,7 +1540,7 @@ class System():
         
         
         
-    def solveEquilibrium3(self, DOFtype="free", plots=0, tol=-0.001, rmsTol=0.0, maxIter=200, display=0, finite_difference=False):
+    def solveEquilibrium3(self, DOFtype="free", plots=0, tol=0.005, rmsTol=0.0, maxIter=200, display=0, finite_difference=False):
         '''Solves for the static equilibrium of the system using the dsolve function approach in MoorSolve
 
         Parameters
@@ -1531,11 +1551,7 @@ class System():
         plots : int, optional
             Determines whether to plot the equilibrium process or not. The default is 0.
         tol : float, optional
-            The tolerance on positions/rottions when calculating equilibrium
-            If positive, it's a relative tolerance applied to the instantaneous position
-            If negative, it's taken as a fraction of 5.0 for translation and 0.3 for rotation, to give an absolute tolerance.
-            If an array, must be size of number of DOFs and specifies the absolute tolerance in each DOF.            
-            >>>> ToDo: need to sort out the step sizes and the db values better <<<<<
+            The absolute tolerance on positions when calculating equilibriumk [m]
         maxIter : int, optional
             The maximum number of interations to try to solve for equilibrium. The default is 200.
         finite_difference : bool
@@ -1557,6 +1573,7 @@ class System():
         X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[5.0, 0.3])
         
         # temporary for backwards compatibility <<<<<<<<<<
+        '''
         if rmsTol != 0.0:
             tols = np.zeros(len(X0)) + rmsTol
             print("WHAT IS PASSING rmsTol in to solveEquilibrium3?")
@@ -1564,13 +1581,16 @@ class System():
         elif np.isscalar(tol):
             if tol < 0:
                 tols = -tol*db    # tolerances set relative to max step size
+                lineTol = 0.05*tols[0]  # hard coding a tolerance for catenary calcs <<<<<<<<<<<
             else:
                 tols = 1.0*tol   # normal case, passing dsovle(2) a scalar for tol
         else:
             tols = np.array(tol)  # assuming tolerances are passed in for each free variable
-        
-        # store z indices for later seabed contact handling 
+        '''
+       
+        # store z indices for later seabed contact handling, and create vector of tolerances
         zInds = []
+        tols = []
         i = 0      # index to go through system DOF vector
         if DOFtype == "free":
             types = [0]
@@ -1582,13 +1602,20 @@ class System():
         for body in self.bodyList:
             if body.type in types:
                 zInds.append(i+2)
-                i+=6                    
+                i+=6
+                rtol = tol/max([np.linalg.norm(rpr) for rpr in body.rPointRel])    # estimate appropriate body rotational tolerance based on attachment point radii
+                tols += 3*[tol] + 3*[rtol]
+        
         for point in self.pointList:
             if point.type in types:
                 if 2 in point.DOFs:
                     zInds.append(i + point.DOFs.index(2))   # may need to check this bit <<<<
                 i+=point.nDOF                              # note: only including active DOFs of the point (z may not be one of them)                              
         
+                tols += point.nDOF*[tol]
+                
+        tols = np.array(tols)
+        lineTol = 0.01*tol
         n = len(X0)
         
         # clear some arrays to log iteration progress
@@ -1598,8 +1625,11 @@ class System():
         
         def eval_func_equil(X, args):
             
-            Y = self.mooringEq(X, DOFtype=DOFtype)
+            Y = self.mooringEq(X, DOFtype=DOFtype, tol=lineTol)
             oths = dict(status=1)                # other outputs - returned as dict for easy use
+            
+            self.Xs.append(X) # temporary
+            self.Es.append(Y)
             
             return Y, oths, False
         
@@ -1650,7 +1680,7 @@ class System():
         self.Es = info['Es']    # List of errors that the forces are away from 0, which in this case, is the same as the forces
         
         # Update equilibrium position at converged X values
-        F = self.mooringEq(X, DOFtype=DOFtype)
+        F = self.mooringEq(X, DOFtype=DOFtype, tol=lineTol)
         
         # Print statements if it ever reaches the maximum number of iterations
         if info['iter'] == maxIter-1:
@@ -1729,18 +1759,16 @@ class System():
         if self.display > 2:
             print("Getting mooring system stiffness matrix...")
 
+        lineTol = 0.05*dx # manually specify an adaptive catenary solve tolerance <<<<
+
         # ------------------ get the positions to linearize about -----------------------
        
         X1, dX = self.getPositions(DOFtype=DOFtype, dXvals=[dx, dth])
         
-        # solve profile and forces of all lines (ensure lines are up to date)  <<<<<< don't think this needs to be called if mooringEq is called
-        for line in self.lineList:
-            line.staticSolve()
-        
         n = len(X1)
         
         #F1 = self.getForces(DOFtype=DOFtype)                # get mooring forces/moments about linearization point
-        F1 = self.mooringEq(X1, DOFtype=DOFtype, lines_only=lines_only) # get mooring forces/moments about linearization point (call this ensures point forces reflect current reported positions (even if on seabed)
+        F1 = self.mooringEq(X1, DOFtype=DOFtype, lines_only=lines_only, tol=lineTol) # get mooring forces/moments about linearization point (call this ensures point forces reflect current reported positions (even if on seabed)
                 
         K = np.zeros([n, n])                 # allocate stiffness matrix
         
@@ -1756,14 +1784,14 @@ class System():
                 
                 X2 = np.array(X1, dtype=np.float_)  
                 X2[i] += dX[i]                                # perturb positions by dx in each DOF in turn            
-                F2p = self.mooringEq(X2, DOFtype=DOFtype, lines_only=lines_only)     # system net force/moment vector from positive perturbation
+                F2p = self.mooringEq(X2, DOFtype=DOFtype, lines_only=lines_only, tol=lineTol)     # system net force/moment vector from positive perturbation
                 
                 if self.display > 2:
                     print(F2p)
                 if plots > 0:
                     self.freeDOFs.append(X2)
                 
-                K[i,:] = -(F2p-F1)/dX[i]                      # take finite difference of force w.r.t perturbation
+                K[:,i] = -(F2p-F1)/dX[i]                      # take finite difference of force w.r.t perturbation
             
             
         elif solveOption==1:  # ::: adaptive central difference approach :::
@@ -1779,7 +1807,7 @@ class System():
                     if self.display > 2: print(" ")
                     X2 = np.array(X1, dtype=np.float_)  
                     X2[i] += dXi                               # perturb positions by dx in each DOF in turn            
-                    F2p = self.mooringEq(X2, DOFtype=DOFtype, lines_only=lines_only)  # system net force/moment vector from positive perturbation
+                    F2p = self.mooringEq(X2, DOFtype=DOFtype, lines_only=lines_only, tol=lineTol)  # system net force/moment vector from positive perturbation
                     if self.display > 2: 
                         printVec(self.pointList[0].r)
                         printVec(self.lineList[0].rB)
@@ -1787,7 +1815,7 @@ class System():
                         self.freeDOFs.append(X2.copy())
                         
                     X2[i] -= 2.0*dXi
-                    F2m = self.mooringEq(X2, DOFtype=DOFtype, lines_only=lines_only)  # system net force/moment vector from negative perturbation
+                    F2m = self.mooringEq(X2, DOFtype=DOFtype, lines_only=lines_only, tol=lineTol)  # system net force/moment vector from negative perturbation
                     if self.display > 2: 
                         printVec(self.pointList[0].r)
                         printVec(self.lineList[0].rB)
@@ -1814,7 +1842,7 @@ class System():
                         # until the derivatives agree better. Decrease the step size by 10X.
                         dXi = 0.1*dXi
                 
-                K[i,:] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
+                K[:,i] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
                 
                 
                 
@@ -1861,13 +1889,16 @@ class System():
         if self.display > 2:
             print("Getting mooring system stiffness matrix...")
 
+        lineTol = 0.05*dx # manually specify an adaptive catenary solve tolerance <<<<
+        eqTol   = 0.05*dx        # manually specify an adaptive tolerance for when calling solveEquilibrium3
+
         # ------------------ get the positions to linearize about -----------------------
         
         # get the positions about which the system is linearized, and an array containting
         # the perturbation size in each coupled DOF of the system
         X1, dX = self.getPositions(DOFtype="coupled", dXvals=[dx, dth])
         
-        self.solveEquilibrium3(tol=-0.0001)                               # let the system settle into equilibrium 
+        self.solveEquilibrium3(tol=eqTol)                               # let the system settle into equilibrium 
         
         F1 = self.getForces(DOFtype="coupled", lines_only=lines_only)           # get mooring forces/moments about linearization point
         K = np.zeros([self.nCpldDOF, self.nCpldDOF])          # allocate stiffness matrix
@@ -1892,7 +1923,7 @@ class System():
                 if plots > 0:
                     self.cpldDOFs.append(X2)
                 
-                K[i,:] = -(F2p-F1)/dX[i]                # take finite difference of force w.r.t perturbation
+                K[:,i] = -(F2p-F1)/dX[i]                # take finite difference of force w.r.t perturbation
             
             
         elif solveOption==1:  # ::: adaptive central difference approach :::
@@ -1911,7 +1942,7 @@ class System():
                     X2[i] += dXi                                  # perturb positions by dx in each DOF in turn            
                     self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
                     #print(f'solving equilibrium {i+1}+_{self.nCpldDOF}')
-                    self.solveEquilibrium3(tol=-0.0001)                       # let the system settle into equilibrium 
+                    self.solveEquilibrium3(tol=eqTol)                       # let the system settle into equilibrium 
                     F2p = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
                     
                     if plots > 0:
@@ -1920,7 +1951,7 @@ class System():
                     X2[i] -= 2.0*dXi                              # now perturb from original to -dx
                     self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
                     #print(f'solving equilibrium {i+1}-_{self.nCpldDOF}')
-                    self.solveEquilibrium3(tol=-0.0001)                       # let the system settle into equilibrium 
+                    self.solveEquilibrium3(tol=eqTol)                       # let the system settle into equilibrium 
                     F2m = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
                     
                     if plots > 0:
@@ -1953,7 +1984,7 @@ class System():
                         dXi = 0.1*dXi
                     
                     
-                K[i,:] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
+                K[:,i] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
                 
                 
         else:
@@ -1961,7 +1992,7 @@ class System():
         
         
         # ----------------- restore the system back to previous positions ------------------
-        self.mooringEq(X1, DOFtype="coupled")
+        self.mooringEq(X1, DOFtype="coupled", tol=lineTol)
         
         # show an animation of the stiffness perturbations if applicable
         if plots > 0:
@@ -2054,9 +2085,14 @@ class System():
                         endFound = 0                    # simple flag to indicate when the other end's attachment has been found
                         j = i+6                         # first index of the DOFs this line is attached to. Start it off at the next spot after body1's DOFs
                         
-                        Kline = -self.lineList[lineID-1].getStiffnessMatrix()
-
-
+                        KA, KB = self.lineList[lineID-1].getStiffnessMatrix()
+                            
+                        # flip sign for coupling
+                        if point1.attachedEndB == 1:    # assuming convention of end A is attached to the first point, so if not,
+                            KB = -KA                    # swap matrices of ends A and B
+                        else:
+                            KB = -KB
+                            
                         # look through Bodies further on in the list (coupling with earlier Bodies will already have been taken care of)
                         for body2 in self.bodyList[self.bodyList.index(body1)+1: ]:
                             if body2.type in d:
@@ -2071,12 +2107,8 @@ class System():
                                         r2 = rotatePosition(rPointRel2, body2.r6[3:])   # relative position of Point about body ref point in unrotated reference frame  
                                         H2 = getH(r2)
                                         
-                                        #K[i  :i+3, j  :j+3] += K3
-                                        #K[i  :i+3, j+3:j+6] += np.matmul(K3, H1) 
-                                        #K[i+3:i+6, j  :j+3] += np.matmul(H2.T, K3)
-                                        #K[i+3:i+6, j+3:j+6] += np.matmul(np.matmul(H2, K3), H1.T)
-                                        K66 = np.block([[   Kline        , np.matmul(Kline, H1)],
-                                                  [np.matmul(H2.T, Kline), np.matmul(np.matmul(H2, Kline), H1.T)]])
+                                        K66 = np.block([[   KB        , np.matmul(KB, H1)],
+                                                  [np.matmul(H2.T, KB), np.matmul(np.matmul(H2, KB), H1.T)]])
                                         
                                         K[i:i+6, j:j+6] += K66
                                         K[j:j+6, i:i+6] += K66.T  # mirror
@@ -2100,7 +2132,7 @@ class System():
                                         # only add up one off-diagonal sub-matrix for now, then we'll mirror at the end                                          
                                         #K[i  :i+3, j:j+3] += K3
                                         #K[i+3:i+6, j:j+3] += np.matmul(H1.T, K3)          
-                                        K63 = np.vstack([Kline, np.matmul(H1.T, Kline)])                                        
+                                        K63 = np.vstack([KB, np.matmul(H1.T, KB)])                                        
                                         K63 = K63[:,point2.DOFs]                        # trim the matrix to only use the enabled DOFs of each point
                                         
                                         K[i:i+6          , j:j+point2.nDOF] += K63
@@ -2137,11 +2169,18 @@ class System():
                         if point2.type in d:
                             if lineID in point2.attached:                                # if this point is at the other end of the line
                             
-                                K2 = -self.lineList[lineID-1].getStiffnessMatrix()       # get full 3x3 stiffness matrix of the line that attaches them                            
-                                K2 = K2[point.DOFs,:][:,point2.DOFs]                     # trim the matrix to only use the enabled DOFs of each point
+                                KA, KB = self.lineList[lineID-1].getStiffnessMatrix()       # get full 3x3 stiffness matrix of the line that attaches them 
+
+                                # flip sign for coupling
+                                if point.attachedEndB == 1:     # assuming convention of end A is attached to the first point, so if not,
+                                    KB = -KA                    # swap matrices of ends A and B
+                                else:
+                                    KB = -KB
+                                    
+                                KB = KB[point.DOFs,:][:,point2.DOFs]                     # trim the matrix to only use the enabled DOFs of each point
                                 
-                                K[i:i+n          , j:j+point2.nDOF] += K2
-                                K[j:j+point2.nDOF, i:i+n          ] += K2.T  # mirror
+                                K[i:i+n          , j:j+point2.nDOF] += KB
+                                K[j:j+point2.nDOF, i:i+n          ] += KB.T  # mirror
                                 
                             j += point2.nDOF                  # if this point has DOFs we're considering, then count them
                                 
@@ -2236,7 +2275,7 @@ class System():
         j = 0
         for line in self.lineList:
             j = j + 1
-            if color==None:            
+            if color==None and isinstance(line.type, str):       
                 if 'chain' in line.type:
                     line.drawLine(0, ax, color=[.1, 0, 0])
                 elif 'rope' in line.type:
@@ -2309,7 +2348,7 @@ class System():
         j = 0
         for line in self.lineList:
             j = j + 1
-            if color==None:            
+            if color==None and isinstance(line.type, str):            
                 if 'chain' in line.type:
                     line.drawLine2d(0, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec)
                 elif 'rope' in line.type:

@@ -232,7 +232,7 @@ class Body():
             self.sys.solveEquilibrium3(tol=tol)   # find equilibrium of mooring system given this Body's new position
             f6_2 =self.getForces(lines_only=True) # get the net 6DOF forces/moments from any attached lines 
             
-            K[i,:] = -(f6_2-f6)/dx                # get stiffness in this DOF via finite difference and add to matrix column
+            K[:,i] = -(f6_2-f6)/dx                # get stiffness in this DOF via finite difference and add to matrix column
             
         # ----------------- restore the system back to previous positions ------------------
         self.setPosition(X1)                      # set position to linearization point
