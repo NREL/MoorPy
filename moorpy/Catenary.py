@@ -210,7 +210,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                     if s[I] > L-LHanging:   # this node is on the suspended/hanging portion of the line
                     
                         Xs[I] = XF
-                        Zs[I] = ZF - ( L-s[I] + 0.5*W/EA*(L-s[I])**2 )
+                        Zs[I] = ZF - ( L-s[I] + 0.5*W/EA*(L-s[I])**2 )   # <<<< double check this
                         Te[I] = W*(L-s[I])
                         
                     else:                   # this node is on the seabed
@@ -244,18 +244,19 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                 for I in range(nNodes):
                     if s[I] <   LHanging1:          # the 1st suspended/hanging portion of the line
                         Xs[I] = 0.0
-                        Zs[I] = -( s[I] + 0.5*W/EA* s[I]**2 )
+                        Zs[I] = -s[I] - W/EA*(LHanging1*s[I] - 0.5*s[I]**2 )
                         Te[I] = W*s[I]
                     
                     elif s[I] <= L-LHanging2:       # the middle portion of the line, slack along the seabed
-                        Xs[I] = np.min([s[I]-LHanging1, XF])
+                        Xs[I] = (s[I]-LHanging1)*XF/(L-LHanging1-LHanging2)
                         Zs[I] = CB
                         Te[I] = 0.0                        
                         
                     else:                           # the 2nd suspended/hanging portion of the line
+                        Lms = L - s[I]              # distance from end B
                         Xs[I] = XF
-                        Zs[I] = ZF - ( L-s[I] + 0.5*W/EA*(L-s[I])**2 )
-                        Te[I] = W*(L-s[I])
+                        Zs[I] = ZF - Lms - W/EA*(LHanging2*Lms - 0.5*Lms**2 )
+                        Te[I] = W*Lms
         
             
         
