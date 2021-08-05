@@ -583,6 +583,8 @@ class Line():
         self.fB[0] = fBH*dr[0]/LH
         self.fB[1] = fBH*dr[1]/LH
         self.fB[2] = fBV
+        self.TA = np.sqrt(fAH*fAH + fAV*fAV) # end tensions
+        self.TB = np.sqrt(fBH*fBH + fBV*fBV)
         
         if plots==1:
             import matplotlib.pyplot as plt

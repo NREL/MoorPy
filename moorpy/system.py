@@ -1345,6 +1345,27 @@ class System():
         return np.array(f)   
         
     
+    def getTensions(self):
+        '''Returns a vector with the line end tensions for all lines in the system.
+
+        Returns
+        -------
+        T : array
+            The tension values for all line ends A then all line ends B [N].
+
+        '''
+        
+        n = len(self.lineList)
+        
+        T = np.zeros(n*2)
+        
+        for i in range(n):
+            T[  i] = self.lineList[i].TA
+            T[n+i] = self.lineList[i].TB
+        
+        return T   
+        
+    
     
     def mooringEq(self, X, DOFtype="free", lines_only=False, tol=0.001):
         '''Error function used in solving static equilibrium by calculating the forces on free objects
@@ -1560,7 +1581,7 @@ class System():
         Raises
         ------
         SolveError
-            If the system fails to solve for equilirbium in the given tolerance and iteration number
+            If the system fails to solve for equilibrium in the given tolerance and iteration number
 
         Returns
         -------
@@ -1570,7 +1591,7 @@ class System():
         
         
         # create arrays for the initial positions of the objects that need to find equilibrium, and the max step sizes
-        X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[5.0, 0.3])
+        X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[100, 0.3])
         
         # temporary for backwards compatibility <<<<<<<<<<
         '''
@@ -1672,7 +1693,7 @@ class System():
         # Don't need to call Ytarget in dsolve because it's already set to be zeros
         
         
-        if self.display > 1:
+        if display > 1:
             print(X)
             print(Y)
         
@@ -1684,7 +1705,7 @@ class System():
         
         # Print statements if it ever reaches the maximum number of iterations
         if info['iter'] == maxIter-1:
-            if self.display > 1:
+            if display > 1:
                 
                 if finite_difference:
                     K = self.getSystemStiffness(DOFtype=DOFtype) 
@@ -1710,7 +1731,9 @@ class System():
                     ax[-1,0].set_xlabel("iteration, X")
                     ax[-1,1].set_xlabel("iteration, Error")
                 plt.show()
-                
+            
+            breakpoint()
+            
             raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {info['iter']} iterations, with residual forces of {F}")
 
 
@@ -1860,7 +1883,7 @@ class System():
         return K
         
     
-    def getCoupledStiffness(self, dx = 0.1, dth = 0.1, solveOption=1, lines_only=False, nTries=3, plots=0):
+    def getCoupledStiffness(self, dx = 0.1, dth = 0.1, solveOption=1, lines_only=False, tensions=False, nTries=3, plots=0):
         '''Calculates the stiffness matrix for coupled degrees of freedom of a mooring system
         with free uncoupled degrees of freedom equilibrated. 
         
@@ -1874,6 +1897,10 @@ class System():
             Indicator of which solve option to use. The default is 1.
         plots : boolean, optional
             Determines whether the stiffness calculation process is plotted and/or animated or not. The default is 0.
+        lines_only : boolean
+            Whether to consider only line forces and ignore body/point properties.
+        tensions : boolean
+            Whether to also compute and return mooring line tension jacobians
 
         Raises
         ------
@@ -1902,6 +1929,10 @@ class System():
         
         F1 = self.getForces(DOFtype="coupled", lines_only=lines_only)           # get mooring forces/moments about linearization point
         K = np.zeros([self.nCpldDOF, self.nCpldDOF])          # allocate stiffness matrix
+        
+        if tensions:
+            T1 = self.getTensions()
+            J = np.zeros([self.nCpldDOF, len(T1)])   # allocate Jacobian of tensions w.r.t. coupled DOFs
                 
         if plots > 0:
             self.cpldDOFs.clear()  # clear the positions history to refill if animating this process
@@ -1917,6 +1948,7 @@ class System():
                 self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
                 self.solveEquilibrium()                       # let the system settle into equilibrium 
                 F2p = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
+                if tensions:  T2p = self.getTensions()
                 
                 if self.display > 2:
                     print(F2p)
@@ -1924,7 +1956,7 @@ class System():
                     self.cpldDOFs.append(X2)
                 
                 K[:,i] = -(F2p-F1)/dX[i]                # take finite difference of force w.r.t perturbation
-            
+                if tensions:  J[i,:] = (T2p-T1)/dX[i]
             
         elif solveOption==1:  # ::: adaptive central difference approach :::
         
@@ -1944,6 +1976,7 @@ class System():
                     #print(f'solving equilibrium {i+1}+_{self.nCpldDOF}')
                     self.solveEquilibrium3(tol=eqTol)                       # let the system settle into equilibrium 
                     F2p = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
+                    if tensions:  T2p = self.getTensions()
                     
                     if plots > 0:
                         self.cpldDOFs.append(X2.copy())
@@ -1953,6 +1986,7 @@ class System():
                     #print(f'solving equilibrium {i+1}-_{self.nCpldDOF}')
                     self.solveEquilibrium3(tol=eqTol)                       # let the system settle into equilibrium 
                     F2m = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
+                    if tensions:  T2m = self.getTensions()
                     
                     if plots > 0:
                         self.cpldDOFs.append(X2.copy())
@@ -1985,7 +2019,7 @@ class System():
                     
                     
                 K[:,i] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
-                
+                if tensions:  J[i,:] = 0.5*(T2p-T2m)/dX[i]
                 
         else:
             raise ValueError("getSystemStiffness was called with an invalid solveOption (only 0 and 1 are supported)")
@@ -1998,7 +2032,10 @@ class System():
         if plots > 0:
             self.animateSolution()
         
-        return K    
+        if tensions:
+            return K, J
+        else:
+            return K    
         
         
         
