@@ -1662,34 +1662,63 @@ class System():
             else:
                 K = self.getSystemStiffnessA(DOFtype=DOFtype) 
             
-            # adjust positions according to stiffness matrix to move toward net zero forces (but only a fraction of the way!)
-            #dX = np.matmul(np.linalg.inv(K), Y)   # calculate position adjustment according to Newton's method
-            dX = np.linalg.solve(K, Y)   # calculate position adjustment according to Newton's method
+            # adjust positions according to stiffness matrix to move toward net zero forces
             
+            if np.linalg.det(K) == 0.0:                 # if the stiffness matrix is singular, we will modify the approach
+                
+                # first try ignoring any DOFs with zero stiffness
+                indices = list(range(n))                # list of DOF indices that will remain active for this step
+                mask = [True]*n                         # this is a mask to be applied to the array K indices
+                
+                for i in range(n-1, -1, -1):            # go through DOFs and flag any with zero stiffness for exclusion
+                    if K[i,i] == 0:
+                        mask[i] = False
+                        del indices[i]
+                
+                K_select = K[mask,:][:,mask]
+                Y_select = Y[mask]
+                
+                dX = np.zeros(n)
+                
+                if np.linalg.det(K_select) == 0.0:      
+                    dX_select = Y_select/np.diag(K_select)   # last-ditch attempt to get a step despite matrix singularity
+                else:
+                    dX_select = np.linalg.solve(K_select, Y_select)
+                dX[indices] = dX_select                 # assign active step DOFs, other DOFs will be zero
             
-            #if iter==196:
-            #    breakpoint() 
+            else:                                       # Normal case where all DOFs are adjusted
+                dX = np.linalg.solve(K, Y)              # calculate position adjustment according to Newton's method
             
-            # but limit adjustment to keep things under control
+            # but limit adjustment magnitude (still preserve direction) to keep things under control
+            overratio = np.max(np.abs(dX)/db)            
+            if overratio > 1.0:
+                dX = dX/overratio
+            '''
             for i in range(n):             
                 if dX[i] > db[i]:
                     dX[i] = db[i]
                 elif dX[i] < -db[i]:
                     dX[i] = -db[i]       
-
+            '''
+            
             # avoid oscillations about the seabed
             for i in zInds:
                 if X[i] + dX[i] <= -self.depth or (X[i] <= -self.depth and Y[i] <= 0.0):
                     dX[i] = -self.depth - X[i]
                     
+            #if iter > 100:
+            #    print(iter)
+            #    breakpoint()
+                    
             return dX
         
         # Call dsolve function
         #X, Y, info = msolve.dsolve(eval_func_equil, X0, step_func=step_func_equil, tol=tol, maxIter=maxIter)
-        try:
-            X, Y, info = dsolve2(eval_func_equil, X0, step_func=step_func_equil, tol=tols, maxIter=maxIter, display=display)
-        except Exception as e:
-            raise MoorPyError(e)
+        #try:
+        X, Y, info = dsolve2(eval_func_equil, X0, step_func=step_func_equil, tol=tols, a_max=1.4, 
+                             maxIter=maxIter, display=display, dodamping=True)  # <<<<
+        #except Exception as e:
+        #    raise MoorPyError(e)
         # Don't need to call Ytarget in dsolve because it's already set to be zeros
         
         
@@ -1717,22 +1746,9 @@ class System():
                 print(f"\n Current force {F}")
             
                 # plot the convergence failure
-                if n < 8:
-                    fig, ax = plt.subplots(2*n, 1, sharex=True)
-                    for i in range(n):
-                        ax[  i].plot(info['Xs'][:info['iter']+1,i])
-                        ax[n+i].plot(info['Es'][:info['iter']+1,i])
-                    ax[-1].set_xlabel("iteration")
-                else:
-                    fig, ax = plt.subplots(n, 2, sharex=True)
-                    for i in range(n):
-                        ax[i,0].plot(info['Xs'][:info['iter']+1,i])
-                        ax[i,1].plot(info['Es'][:info['iter']+1,i])
-                    ax[-1,0].set_xlabel("iteration, X")
-                    ax[-1,1].set_xlabel("iteration, Error")
-                plt.show()
+                self.plotEQsolve(iter=info['iter']+1)
             
-            breakpoint()
+            #breakpoint()
             
             raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {info['iter']} iterations, with residual forces of {F}")
 
@@ -1744,6 +1760,27 @@ class System():
     
     
     
+    def plotEQsolve(self, iter=-1):
+        '''Plots trajectories of solving equilibrium from solveEquilibrium.'''
+        
+        n = self.Xs.shape[1]
+        
+        if n < 8:
+            fig, ax = plt.subplots(2*n, 1, sharex=True)
+            for i in range(n):
+                ax[  i].plot(self.Xs[:iter, i])
+                ax[n+i].plot(self.Es[:iter, i])
+            ax[-1].set_xlabel("iteration")
+        else:
+            fig, ax = plt.subplots(n, 2, sharex=True)
+            for i in range(n):
+                ax[i,0].plot(self.Xs[:iter, i])
+                ax[i,1].plot(self.Es[:iter, i])
+            ax[-1,0].set_xlabel("iteration, X")
+            ax[-1,1].set_xlabel("iteration, Error")
+        plt.show()
+        
+        
     
     def getSystemStiffness(self, DOFtype="free", dx = 0.1, dth = 0.1, solveOption=1, lines_only=False, plots=0):
         '''Calculates the stiffness matrix for all selected degrees of freedom of a mooring system 

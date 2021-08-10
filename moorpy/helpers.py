@@ -224,7 +224,7 @@ def set_axes_equal(ax):
 
 
 def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol=0, maxIter=20, 
-           Xmin=[], Xmax=[], a_max=2.0, dX_last=[], stepfac=4, display=0):
+           Xmin=[], Xmax=[], a_max=2.0, dX_last=[], stepfac=4, display=0, dodamping=False):
     '''
     PARAMETERS
     ----------    
@@ -262,6 +262,8 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     Es = np.zeros([maxIter,N])
     dXlist = np.zeros([maxIter,N])
     dXlist2 = np.zeros([maxIter,N])
+    
+    damper = 1.0   # used to add a relaxation/damping factor to reduce the step size and combat instability
     
     
     # check the target Y value input
@@ -437,6 +439,22 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
         dXlist[iter,:] = dX
         #if iter==196:
             #breakpoint() 
+        
+        
+        # add damping if cyclic behavior is detected at the halfway point
+        if dodamping and iter == int(0.5*maxIter):
+            print(f"Optimizer is at iteration {iter} (some % of maxIter) <<<<<<<<<<<<<<<<")
+                    
+            for j in range(2,iter-1):
+                iterc = iter - j
+                if all(np.abs(X - Xs[iterc,:]) < tols):
+                    print(f"Optimizer is going in circles detected at iteration {iter}")
+                    print(f"last similar point was at iteration {iterc}")
+                    damper = damper * 0.9
+                    break
+                    
+        dX = damper*dX
+            
             
         # enforce bounds
         for i in range(N):

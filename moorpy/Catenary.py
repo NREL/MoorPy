@@ -8,7 +8,7 @@ from moorpy.helpers import CatenaryError, dsolve2
 
 
 
-def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxIter=50, plots=0):
+def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxIter=100, plots=0):
     '''
     The quasi-static mooring line solver. Adapted from catenary subroutine in FAST v7 by J. Jonkman.
     Note: this version is updated Oct 7 2020 to use the dsolve solver.
@@ -804,6 +804,26 @@ def eval_func_cat(X, args):
             dZFdVF = ( VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA
             #dZFdVF = ( np.sign(VF)*VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA
 
+    elif ProfileType==27:
+        
+        if (VF_HF + SQRT1VF_HF2 <= 0):
+            info['error'] = True
+            info['message'] = "ProfileType 2: VF_HF + SQRT1VF_HF2 <= 0"
+
+        else:            
+            EXF = np.log( VF_HF + SQRT1VF_HF2 ) *HF_W - 0.5*CB_EA*W* LBot*LBot + L_EA* HF + LBot - XF;
+
+            EZF = ( SQRT1VF_HF2 - 1.0 )*HF_W + 0.5*VF*VF_WEA - ZF;
+
+            dXFdHF = np.log( VF_HF + SQRT1VF_HF2 ) / W - ( ( VF_HF + VF_HF2 /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + L_EA
+            
+            dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + CB_EA*LBot - 1.0/W
+
+            dZFdHF = ( SQRT1VF_HF2 - 1.0 - VF_HF2 /SQRT1VF_HF2 )/ W
+
+            dZFdVF = ( VF_HF /SQRT1VF_HF2 )/ W + VF_WEA
+            breakpoint()
+
     # A portion of the line must rest on the seabed and the anchor tension is zero
     elif ProfileType in [2, 3]:  
         
@@ -825,7 +845,12 @@ def eval_func_cat(X, args):
             
             dXFdHF = np.log( VF_HF + SQRT1VF_HF2 ) / W - ( ( VF_HF + VF_HF2 /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + L_EA - xBlim/EA
             
-            dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + HF_WEA +xBlim*CB/EA- 1.0/W
+            #dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + HF_WEA +xBlim*CB/EA- 1.0/W   <<<< incorrect, at least when CB=0
+            if xB <= 0:
+                dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + CB_EA*LBot - 1.0/W   # from ProfileType 2
+            else:
+                dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + HF_WEA - 1.0/W   # from ProfileType 3
+            
             
             dZFdHF = ( SQRT1VF_HF2 - 1.0 - VF_HF2 /SQRT1VF_HF2 )/ W
             
@@ -967,7 +992,13 @@ if __name__ == "__main__":
     #(fAH, fAV, fBH, fBV, info) = catenary(205, -3.9, 250, 1229760000.0, 2442, CB=-55, Tol=1e-06, MaxIter=50, plots=3)
     
     
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary( 400, 50,  700, 1e12, 100.0, CB=-100, Tol=0.001, MaxIter=50, plots=4)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary( 400, 50,  700, 1e12, 100.0, CB=-100, Tol=0.001, MaxIter=50, plots=4)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(2306.4589923684835, 1.225862496312402e-05, 1870.0799339749528, 203916714.02425563, 405.04331583394304, CB=0.0, HF0=58487689.78903873, VF0=0.0, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(459.16880261639346, 0.0004792939078015479, 447.67890341877506, 2533432597.6567926, 5032.201233267459, CB=0.0, HF0=65021800.32966018, VF0=17487.252675845888, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.00040612281105723014, 391.558570722038, 400.0, 3300142385.3140063, 6555.130220040344, CB=-287.441429277962, HF0=2127009.4122708915, VF0=10925834.69512347, Tol=4.000000000000001e-06, MaxIter=100, plots=1)
+
+    print(info1['stiffnessA'])
+    print(info1['stiffnessB'])
     
     
     plt.plot(info1['X'], info1['Z'] )
