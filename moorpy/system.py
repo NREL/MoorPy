@@ -1639,6 +1639,13 @@ class System():
         lineTol = 0.01*tol
         n = len(X0)
         
+        # if there are no DOFs, just update the mooring system force calculations then exit
+        if n == 0:
+            self.mooringEq(X0, DOFtype=DOFtype, tol=lineTol)
+            if display > 0:
+                print("There are no DOFs so solveEquilibrium3 is returning without adjustment.")
+            return
+        
         # clear some arrays to log iteration progress
         self.freeDOFs.clear()    # clear stored list of positions, so it can be refilled for this solve process
         self.Xs = [] # for storing iterations from callback fn
@@ -1716,7 +1723,8 @@ class System():
         #X, Y, info = msolve.dsolve(eval_func_equil, X0, step_func=step_func_equil, tol=tol, maxIter=maxIter)
         #try:
         X, Y, info = dsolve2(eval_func_equil, X0, step_func=step_func_equil, tol=tols, a_max=1.4, 
-                             maxIter=maxIter, display=display, dodamping=True)  # <<<<
+                          
+                          maxIter=maxIter, display=display, dodamping=True)  # <<<<
         #except Exception as e:
         #    raise MoorPyError(e)
         # Don't need to call Ytarget in dsolve because it's already set to be zeros
