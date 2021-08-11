@@ -270,7 +270,7 @@ class System():
                         
                         
                 # get properties of each Body
-                if line.count('---') > 0 and (line.upper().count('BODY LIST') > 0 or line.upper().count('BODY PROPERTIES') > 0):
+                if line.count('---') > 0 and (line.upper().count('BODIES') > 0 or line.upper().count('BODY LIST') > 0 or line.upper().count('BODY PROPERTIES') > 0):
                     line = next(f) # skip this header line, plus channel names and units lines
                     line = next(f)
                     line = next(f)
@@ -301,7 +301,7 @@ class System():
                         
                         
                 # get properties of each rod
-                if line.count('---') > 0 and (line.upper().count('ROD LIST') > 0 or line.upper().count('ROD PROPERTIES') > 0):
+                if line.count('---') > 0 and (line.upper().count('RODS') > 0 or line.upper().count('ROD LIST') > 0 or line.upper().count('ROD PROPERTIES') > 0):
                     line = next(f) # skip this header line, plus channel names and units lines
                     line = next(f)
                     line = next(f)
@@ -321,7 +321,7 @@ class System():
                         
                 
                 # get properties of each Point
-                if line.count('---') > 0 and (line.upper().count('POINT LIST') > 0 or line.upper().count('POINT PROPERTIES') > 0):
+                if line.count('---') > 0 and (line.upper().count('POINTS') > 0 or line.upper().count('POINT LIST') > 0 or line.upper().count('POINT PROPERTIES') > 0):
                     line = next(f) # skip this header line, plus channel names and units lines
                     line = next(f)
                     line = next(f)
@@ -372,7 +372,7 @@ class System():
                         
                         
                 # get properties of each line
-                if line.count('---') > 0 and (line.upper().count('LINE LIST') > 0 or line.upper().count('LINE PROPERTIES') > 0):
+                if line.count('---') > 0 and (line.upper().count('LINES') > 0 or line.upper().count('LINE LIST') > 0 or line.upper().count('LINE PROPERTIES') > 0):
                     line = next(f) # skip this header line, plus channel names and units lines
                     line = next(f)
                     line = next(f)
@@ -648,7 +648,7 @@ class System():
                          .format(cIntDamp,Can,Cat,Cdn,Cdt))
 
             #Point Properties Header
-            L.append("---------------------- NODE PROPERTIES ---------------------------------------------------------")
+            L.append("---------------------- POINTS ---------------------------------------------------------")
             L.append(f"{len(self.pointList)}    NConnects   - number of connections including anchors and fairleads")
             L.append("Node    Type         X        Y        Z        M      V      FX     FY     FZ    CdA    Ca ")
             L.append("(-)     (-)         (m)      (m)      (m)      (kg)   (m^3)  (kN)   (kN)   (kN)   (m2)   ()")
@@ -680,7 +680,7 @@ class System():
                 
             
             #Line Properties Header
-            L.append("---------------------- LINE PROPERTIES -----------------------------------------------------")
+            L.append("---------------------- LINES -----------------------------------------------------")
             L.append(f"{len(self.lineList)}    NLines   - number of line objects")
             L.append("Line      LineType   UnstrLen  NumSegs  AttachA  AttachB  Outputs")
             L.append("(-)         (-)       (m)        (-)     (-)      (-)     (-)")
@@ -702,7 +702,7 @@ class System():
                           .format(self.lineList[i].number,self.lineList[i].type,self.lineList[i].L,self.lineList[i].nNodes - 1,int(connection_points[i,0]),int(connection_points[i,1]),flag))
             
             #Solver Options Header
-            L.append("---------------------- SOLVER OPTIONS ----------------------------------------")
+            L.append("---------------------- OPTIONS ----------------------------------------")
             
             #Solver Options
             L.append("{:<9.3f}dtM          - time step to use in mooring integration (s)".format(float(dtm)))
@@ -835,7 +835,7 @@ class System():
             """
             
             #Body List Header
-            L.append("----------------------- BODY LIST -----------------------------------")
+            L.append("----------------------- BODIES -----------------------------------")
             L.append("BodyID      X0   Y0   Z0    r0    p0    y0    Xcg   Ycg   Zcg     M      V        IX       IY       IZ     CdA-x,y,z Ca-x,y,z")
             L.append("   (-)      (m)  (m)  (m)  (deg) (deg) (deg)  (m)   (m)   (m)    (kg)   (m^3)  (kg-m^2) (kg-m^2) (kg-m^2)   (m^2)      (-)")
             
@@ -847,7 +847,7 @@ class System():
                          .format(IX,IY,IZ,CdA_xyz[0],CdA_xyz[1],CdA_xyz[2],Ca_xyz[0],Ca_xyz[1],Ca_xyz[2]))
                           
             #Rod Properties Header
-            L.append("---------------------- ROD LIST --------------------")
+            L.append("---------------------- RODS --------------------")
             L.append("RodID  Type/BodyID  RodType   Xa   Ya   Za   Xb   Yb   Zb  NumSegs  Flags/Outputs")
             L.append("(-)      (-)         (-)      (m)  (m)  (m)  (m)  (m)  (m)    (-)      (-)   ")
             
@@ -856,7 +856,7 @@ class System():
             """
             
             #Point Properties Header
-            L.append("---------------------- POINT LIST ---------------------------------------------------------")
+            L.append("---------------------- POINTS ---------------------------------------------------------")
             L.append("Node    Type         X        Y        Z        M      V      FX     FY     FZ    CdA    Ca ")
             L.append("(-)     (-)         (m)      (m)      (m)      (kg)   (m^3)  (kN)   (kN)   (kN)   (m2)   ()")
             
@@ -886,7 +886,7 @@ class System():
                 
             
             #Line Properties Header
-            L.append("---------------------- LINE LIST -----------------------------------------------------")
+            L.append("---------------------- LINES -----------------------------------------------------")
             L.append("Line      LineType   UnstrLen  NumSegs  AttachA  AttachB  Outputs")
             L.append("(-)         (-)       (m)        (-)     (-)      (-)     (-)")
             
@@ -907,7 +907,7 @@ class System():
                           .format(self.lineList[i].number,self.lineList[i].type,self.lineList[i].L,self.lineList[i].nNodes - 1,int(connection_points[i,0]),int(connection_points[i,1]),flag))
             
             #Solver Options Header
-            L.append("---------------------- SOLVER OPTIONS ----------------------------------------")
+            L.append("---------------------- OPTIONS ----------------------------------------")
             
             #Solver Options
             L.append("{:<9.4f}dtM          - time step to use in mooring integration".format(float(dtm)))
@@ -1004,7 +1004,7 @@ class System():
                      .format(BA, Can, Cat, Cdn, Cdt))
         
         # Point Properties Header
-        L.append("---------------------- CONNECTION PROPERTIES ---------------------------------------------------------")
+        L.append("---------------------- POINTS ---------------------------------------------------------")
         L.append(f"{len(self.pointList)}    NConnects   - number of connections including anchors and fairleads")
         L.append("Node    Type         X        Y        Z        M      V      FX     FY     FZ    CdA    Ca ")
         L.append("(-)     (-)         (m)      (m)      (m)      (kg)   (m^3)  (kN)   (kN)   (kN)  (m^2)   ()")
@@ -1031,7 +1031,7 @@ class System():
             
         
         # Line Properties Header
-        L.append("---------------------- LINE PROPERTIES -----------------------------------------------------")
+        L.append("---------------------- LINES -----------------------------------------------------")
         L.append(f"{len(self.lineList)}    NLines   - number of line objects")
         L.append("Line      LineType   UnstrLen  NumSegs  NodeAnch  NodeFair  Outputs  CtrlChan")
         L.append("(-)         (-)       (m)        (-)      (-)       (-)       (-)       (-)")
@@ -1056,7 +1056,7 @@ class System():
                       .format(self.lineList[i].number,self.lineList[i].type,self.lineList[i].L,self.lineList[i].nNodes-1,int(connection_points[i,0]),int(connection_points[i,1]),flag, 0))
         
         #Solver Options Header
-        L.append("---------------------- SOLVER OPTIONS ----------------------------------------")
+        L.append("---------------------- OPTIONS ----------------------------------------")
         
         #Solver Options
         L.append("{:<9.3f}dtM          - time step to use in mooring integration (s)".format(float(dtm)))
@@ -1186,8 +1186,8 @@ class System():
             point.r = transform3(point.r)
             for body in self.bodyList:
                 if point.number in body.attachedP:
-                    rRel = body.rPointRel[body.attachedP.index(point.number)]
-                    body.rPointRel[body.attachedP.index(point.number)] = transform3(rRel)
+                    rRel = body.rPointRel[body.attachedP.index(point.number)]                   # get relative location of point on body
+                    body.rPointRel[body.attachedP.index(point.number)] = np.matmul(rotMat,rRel) # apply rotation to relative location
     
     
     def getPositions(self, DOFtype="free", dXvals=[]):
