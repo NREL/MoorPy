@@ -324,17 +324,18 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             # NOTE: We don't need to check if the current mooring line is exactly
             #       vertical (i.e., we don't need to check if XF == 0.0), because XF is
             #       limited by the tolerance above. */
-            
-            XF2 = XF*XF;
-            ZF2 = ZF*ZF;
-
-            if ( L <= np.sqrt( XF2 + ZF2 ) ): # if the current mooring line is taut
-                Lamda0 = 0.2
-            else:                             # The current mooring line must be slack and not vertical
-                Lamda0 = np.sqrt( 3.0*( ( L*L - ZF2 )/XF2 - 1.0 ) )
-                
-            HF = np.max([ abs( 0.5*W* XF/ Lamda0 ), Tol ])     # As above, set the lower limit of the guess value of HF to the tolerance
-            VF = 0.5*W*( ZF/np.tanh(Lamda0) + L )
+                        
+            if info2['iter'] >= MaxIter-1 and XF/ZF < 0.001:    # if it's nearly vertical, keep iterating from the last point
+                HF = X[0]
+                VF = X[1]
+            else:                                               # otherwise try starting from some good initial guesses
+                if ( L <= np.sqrt( XF**2 + ZF**2 ) ):           # if the current mooring line is taut
+                    Lamda0 = 0.2
+                else:                                           # The current mooring line must be slack and not vertical
+                    Lamda0 = np.sqrt( 3.0*( ( L*L - ZF**2 )/XF**2 - 1.0 ) )
+                    
+                HF = np.max([ abs( 0.5*W* XF/ Lamda0 ), Tol ])     # As above, set the lower limit of the guess value of HF to the tolerance
+                VF = 0.5*W*( ZF/np.tanh(Lamda0) + L )
         
             X0 = [HF, VF]
             Ytarget = [0,0]
@@ -346,6 +347,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                 
             # retry if it failed              
             if  info3['iter'] >= MaxIter-1  or  info3['oths']['error']==True:
+            
+                print("RE-RETRYING CATENARY SOLVE")
             
                 X0 = X
                 Ytarget = [0,0]
@@ -924,7 +927,7 @@ def step_func_cat(X, args, Y, info, Ytarget, err, tols, iter, maxIter):
     # to ensure that we converge on a solution even in the case were we obtain a nonconvergent cycle about the 
     # correct solution (this happens, for example, if we jump to quickly between a taut and slack catenary)
 
-    alpha = np.max([alpha_min, alpha0*(1.0 - alphaR*iter/maxIter)])
+    alpha = 1.0 #M<<<<<<<< np.max([alpha_min, alpha0*(1.0 - alphaR*iter/maxIter)])
     
     #exponential approach       alpha = alpha0 * np.exp( iter/maxIter * np.log(alpha_min/alpha0 ) )
 
@@ -995,7 +998,8 @@ if __name__ == "__main__":
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary( 400, 50,  700, 1e12, 100.0, CB=-100, Tol=0.001, MaxIter=50, plots=4)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(2306.4589923684835, 1.225862496312402e-05, 1870.0799339749528, 203916714.02425563, 405.04331583394304, CB=0.0, HF0=58487689.78903873, VF0=0.0, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(459.16880261639346, 0.0004792939078015479, 447.67890341877506, 2533432597.6567926, 5032.201233267459, CB=0.0, HF0=65021800.32966018, VF0=17487.252675845888, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.00040612281105723014, 391.558570722038, 400.0, 3300142385.3140063, 6555.130220040344, CB=-287.441429277962, HF0=2127009.4122708915, VF0=10925834.69512347, Tol=4.000000000000001e-06, MaxIter=100, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.00040612281105723014, 391.558570722038, 400.0, 3300142385.3140063, 6555.130220040344, CB=-287.441429277962, HF0=2127009.4122708915, VF0=10925834.69512347, Tol=4.000000000000001e-06, MaxIter=100, plots=1)
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.0004959907076624859, 69.87150531147275, 110.89397565668423, 80297543.26800226, 146.26820268238743, CB=-509.12849468852727, HF0=1322712.3676957292, VF0=1045583.1849462093, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
 
     print(info1['stiffnessA'])
     print(info1['stiffnessB'])
