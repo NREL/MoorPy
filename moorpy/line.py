@@ -326,6 +326,8 @@ class Line():
             linebit.append(ax.plot(Xs2d, Ys2d, lw=1, color=color))
             
         self.linebit = linebit # can we store this internally?
+        
+        self.X = np.array([Xs, Ys, Zs])
             
         return linebit
 

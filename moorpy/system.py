@@ -1614,7 +1614,7 @@ class System():
         else:
             tols = np.array(tol)  # assuming tolerances are passed in for each free variable
         '''
-       
+        
         # store z indices for later seabed contact handling, and create vector of tolerances
         zInds = []
         tols = []
