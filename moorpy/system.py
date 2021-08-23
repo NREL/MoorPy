@@ -131,7 +131,7 @@ class System():
         #print("Created Point "+str(self.pointList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
         
-    def addLine(self, lUnstr, type_string, nSegs=20, pointA=0, pointB=0, cb=0):
+    def addLine(self, lUnstr, type_string, nSegs=40, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
 
         Parameters
@@ -1151,8 +1151,8 @@ class System():
     
  
  
-    def transform(self, trans=[0,0], rot=0, scale=[1,1]):
-        '''Applies translations, rotations, and/or stretching to the mooring system positions
+    def transform(self, trans=[0,0], rot=0, scale=[1,1,1]):
+        '''Applies scaling (can flip if negative), rotation, and translations (in that order) to the mooring system positions
 
         Parameters
         ----------
@@ -1164,19 +1164,25 @@ class System():
             how much to scale the mooring system x and y dimensions by (relative) (NOT IMPLEMENTED). The default is [1,1] (unity).
 
         '''
+        
+        if len(scale) == 3:
+            scale = np.array(scale)
+        else:
+            raise ValueError("scale parameter must be of length 3")
 
         rotMat = rotationMatrix(0, 0, rot*np.pi/180.0)
         tVec = np.array([trans[0], trans[1], 0.0])
 
         # little functions to transform r or r6 vectors in place
         def transform3(X):
-            Xrot = np.matmul(rotMat,X)   
+            Xrot = np.matmul(rotMat, X*scale)   
             X = Xrot + tVec   
             return X            
 
         def transform6(X):
-            Xrot = np.matmul(rotMat,X[:3])   
-            X = np.hstack([Xrot + tVec, X[3], X[4], X[5]+rot*np.pi/180.0])
+            Xrot = np.matmul(rotMat, X[:3]*scale)   
+            #X = np.hstack([Xrot + tVec, X[3], X[4], X[5]+rot*np.pi/180.0])  # this line would be to also rotate the body, but that's double counting if we also rotate the fairlead positions
+            X = np.hstack([Xrot + tVec, X[3], X[4], X[5]])
             return X
 
         # update positions of all objects
@@ -1186,8 +1192,9 @@ class System():
             point.r = transform3(point.r)
             for body in self.bodyList:
                 if point.number in body.attachedP:
-                    rRel = body.rPointRel[body.attachedP.index(point.number)]                   # get relative location of point on body
-                    body.rPointRel[body.attachedP.index(point.number)] = np.matmul(rotMat,rRel) # apply rotation to relative location
+                    i = body.attachedP.index(point.number)
+                    rRel = body.rPointRel[i]                            # get relative location of point on body
+                    body.rPointRel[i] = np.matmul(rotMat, rRel*scale)   # apply rotation to relative location
     
     
     def getPositions(self, DOFtype="free", dXvals=[]):
@@ -1561,7 +1568,7 @@ class System():
         
         
         
-    def solveEquilibrium3(self, DOFtype="free", plots=0, tol=0.005, rmsTol=0.0, maxIter=200, display=0, finite_difference=False):
+    def solveEquilibrium3(self, DOFtype="free", plots=0, tol=0.05, rmsTol=0.0, maxIter=500, display=0, finite_difference=False):
         '''Solves for the static equilibrium of the system using the dsolve function approach in MoorSolve
 
         Parameters
@@ -1608,7 +1615,7 @@ class System():
         else:
             tols = np.array(tol)  # assuming tolerances are passed in for each free variable
         '''
-       
+        
         # store z indices for later seabed contact handling, and create vector of tolerances
         zInds = []
         tols = []

@@ -443,12 +443,12 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
         
         # add damping if cyclic behavior is detected at the halfway point
         if dodamping and iter == int(0.5*maxIter):
-            print(f"Optimizer is at iteration {iter} (some % of maxIter) <<<<<<<<<<<<<<<<")
+            print(f"dsolve2 is at iteration {iter} (some % of maxIter) <<<<<<<<<<<<<<<<")
                     
             for j in range(2,iter-1):
                 iterc = iter - j
                 if all(np.abs(X - Xs[iterc,:]) < tols):
-                    print(f"Optimizer is going in circles detected at iteration {iter}")
+                    print(f"dsolve2 is going in circles detected at iteration {iter}")
                     print(f"last similar point was at iteration {iterc}")
                     damper = damper * 0.9
                     break
