@@ -131,7 +131,7 @@ class System():
         #print("Created Point "+str(self.pointList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
         
-    def addLine(self, lUnstr, type_string, nSegs=20, pointA=0, pointB=0, cb=0):
+    def addLine(self, lUnstr, type_string, nSegs=40, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
 
         Parameters
@@ -1181,7 +1181,8 @@ class System():
 
         def transform6(X):
             Xrot = np.matmul(rotMat, X[:3]*scale)   
-            X = np.hstack([Xrot + tVec, X[3], X[4], X[5]+rot*np.pi/180.0])
+            #X = np.hstack([Xrot + tVec, X[3], X[4], X[5]+rot*np.pi/180.0])  # this line would be to also rotate the body, but that's double counting if we also rotate the fairlead positions
+            X = np.hstack([Xrot + tVec, X[3], X[4], X[5]])
             return X
 
         # update positions of all objects

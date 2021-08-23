@@ -347,9 +347,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                 
             # retry if it failed              
             if  info3['iter'] >= MaxIter-1  or  info3['oths']['error']==True:
-            
-                print("RE-RETRYING CATENARY SOLVE")
-            
+                        
                 X0 = X
                 Ytarget = [0,0]
                 args = dict(cat=[XF, ZF, L, EA, W, CB, WL, WEA, L_EA, CB_EA], step=[0.1,1.0,2.0])  
