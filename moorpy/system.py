@@ -1601,7 +1601,7 @@ class System():
         
         
         
-    def solveEquilibrium3(self, DOFtype="free", plots=0, tol=0.05, rmsTol=0.0, maxIter=500, display=0, finite_difference=False):
+    def solveEquilibrium3(self, DOFtype="free", plots=0, tol=0.05, rmsTol=0.0, maxIter=500, display=0, no_fail=False, finite_difference=False):
         '''Solves for the static equilibrium of the system using the dsolve function approach in MoorSolve
 
         Parameters
@@ -1615,6 +1615,8 @@ class System():
             The absolute tolerance on positions when calculating equilibriumk [m]
         maxIter : int, optional
             The maximum number of interations to try to solve for equilibrium. The default is 200.
+        no_fail : bool
+            False raises an error if convergence fails. True doesn't.
         finite_difference : bool
             False uses the analytical methods for system stiffness, true uses original finite difference methods.
 
@@ -1625,7 +1627,8 @@ class System():
 
         Returns
         -------
-        None.
+        success : bool
+            True/False whether converged to within tolerance.
         
         '''
         
@@ -1684,7 +1687,7 @@ class System():
             self.mooringEq(X0, DOFtype=DOFtype, tol=lineTol)
             if display > 0:
                 print("There are no DOFs so solveEquilibrium3 is returning without adjustment.")
-            return
+            return True
         
         # clear some arrays to log iteration progress
         self.freeDOFs.clear()    # clear stored list of positions, so it can be refilled for this solve process
@@ -1798,7 +1801,10 @@ class System():
             
             #breakpoint()
             
-            raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {info['iter']} iterations, with residual forces of {F}")
+            if no_fail:
+                return False
+            else:
+                raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {info['iter']} iterations, with residual forces of {F}")
 
 
             
@@ -1806,6 +1812,7 @@ class System():
         if plots > 0:   
             self.animateSolution()
     
+        return True
     
     
     def plotEQsolve(self, iter=-1):
