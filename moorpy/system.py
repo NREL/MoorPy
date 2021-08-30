@@ -1169,7 +1169,7 @@ class System():
         CdScaleIC = 4.0
         threshIC = 0.001
         dtOut = 0.0125
-        
+ 
         # Line Type Properties
         BA = -1.0
         Can = 0.8
@@ -1190,7 +1190,43 @@ class System():
             #print('Using Custom value for', key,kwargs[key])
         
         # Outputs List
+<<<<<<< HEAD
 
+=======
+        Outputs = ["L3N1T" , "L10N1T", "L17N1T","L7N1T" , "L14N1T", "L21N1T" ,"L4N10Pz", "L11N10Pz", "L18N10Pz", "L4N10T", "L11N10T", "L18N10T"];
+
+        for i in range(24, 54, 3): #iterate through rope anchor lines
+            Outputs.append("L" + str(i)+ "N1Pz")
+            Outputs.append("L" +str(i) +"N20T")
+        for i in range(25,65,4): #iterate through fixed points
+            Outputs.append("Con" +str(i) +"Fx")
+            Outputs.append("Con" +str(i) +"Fy")
+            Outputs.append("Con" +str(i) +"Fz")
+        # for i in range(25, 75, 5): #iterate through chain lines
+        #     Outputs.append("Con" +str(i) +"Fx")
+        #     Outputs.append("Con" +str(i) +"Fy")
+        #     Outputs.append("Con" +str(i) +"Fz")   
+       
+        # for i in range(25, 65, 4): #iterate through rope anchor lines
+        #     Outputs.append("L" + str(i)+ "N1Pz")
+        #     Outputs.append("L" +str(i) +"N14T")
+        # for i in range(22,62,4): #iterate through fixed points
+        #     Outputs.append("L" +str(i) +"N12T")
+        
+        # for i in range(66, 132, 3): #iterate through rope anchor lines
+        #     Outputs.append("L" + str(i)+ "N1Pz")
+        #     Outputs.append("L" +str(i) +"N20T")
+        # for i in range(73,161,4): #iterate through fixed points
+        #     Outputs.append("Con" +str(i) +"Fx")
+        #     Outputs.append("Con" +str(i) +"Fy")
+        #     Outputs.append("Con" +str(i) +"Fz")
+        # for i in range(4,67, 7):
+        #     Outputs.append("L" + str(i)+ "N10Pz")
+        #     Outputs.append("L" +str(i) +"N10T")
+        # for i in range(3, 59,7):
+        #     Outputs.append("L" +str(i) +"N1T")
+        #     Outputs.append("L" +str(i+4) +"N1T")
+>>>>>>> changes to unload_farm for MoorDyn file output (simulation time step, initialization time, output channels, added output timestep)
         print('attempting to write '+fileName +' for MoorDyn FAST.Farm input file')
         
         # Array to add strings to for each line of moordyn input file
@@ -1271,8 +1307,10 @@ class System():
         L.append("---------------------- OPTIONS ----------------------------------------")
         
         #Solver Options
+
         L.append("{:<9.3f}dtM          - time step to use in mooring integration (s)".format(float(dtm)))
         L.append("{:<9.1f}wtrdpth        - water depth (m) <<< must be specified for farm-level mooring".format(float(depth)))
+
         L.append("{:<9.1e}kbot         - bottom stiffness (Pa/m)".format(kbot))
         L.append("{:<9.1e}cbot         - bottom damping (Pa-s/m)".format(cbot))
         L.append("{:<9.1f}dtIC         - time interval for analyzing convergence during IC gen (s)".format(int(dtIC)))
