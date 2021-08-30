@@ -949,13 +949,14 @@ class System():
         
         # Settings
         Echo = False        #Echo input data to <RootName>.ech (flag)
-        dtm = 0.001
+        dtm = 0.00005
         kbot = 3e6
         cbot = 3e5
-        dtIC = 2
-        TmaxIC = 10
+        dtIC = 1
+        TmaxIC = 60
         CdScaleIC = 4.0
         threshIC = 0.01
+        dtOut = 0.2
         
         # Line Type Properties
         BA = -1.0
@@ -963,6 +964,7 @@ class System():
         Cat = 0.25
         Cdn = 2.0
         Cdt = 0.4
+        EI = 0.0
         
         # Point Properties
         CdA = 0
@@ -976,9 +978,39 @@ class System():
             #print('Using Custom value for', key,kwargs[key])
         
         # Outputs List
-        Outputs = ["FairTen1","FairTen2","FairTen3"];
+        Outputs = ["L3N1T" , "L10N1T", "L17N1T","L7N1T" , "L14N1T", "L21N1T" ,"L4N10Pz", "L11N10Pz", "L18N10Pz", "L4N10T", "L11N10T", "L18N10T"];
+
+        for i in range(24, 54, 3): #iterate through rope anchor lines
+            Outputs.append("L" + str(i)+ "N1Pz")
+            Outputs.append("L" +str(i) +"N20T")
+        for i in range(25,65,4): #iterate through fixed points
+            Outputs.append("Con" +str(i) +"Fx")
+            Outputs.append("Con" +str(i) +"Fy")
+            Outputs.append("Con" +str(i) +"Fz")
+        # for i in range(25, 75, 5): #iterate through chain lines
+        #     Outputs.append("Con" +str(i) +"Fx")
+        #     Outputs.append("Con" +str(i) +"Fy")
+        #     Outputs.append("Con" +str(i) +"Fz")   
+       
+        # for i in range(25, 65, 4): #iterate through rope anchor lines
+        #     Outputs.append("L" + str(i)+ "N1Pz")
+        #     Outputs.append("L" +str(i) +"N14T")
+        # for i in range(22,62,4): #iterate through fixed points
+        #     Outputs.append("L" +str(i) +"N12T")
         
-        
+        # for i in range(66, 132, 3): #iterate through rope anchor lines
+        #     Outputs.append("L" + str(i)+ "N1Pz")
+        #     Outputs.append("L" +str(i) +"N20T")
+        # for i in range(73,161,4): #iterate through fixed points
+        #     Outputs.append("Con" +str(i) +"Fx")
+        #     Outputs.append("Con" +str(i) +"Fy")
+        #     Outputs.append("Con" +str(i) +"Fz")
+        # for i in range(4,67, 7):
+        #     Outputs.append("L" + str(i)+ "N10Pz")
+        #     Outputs.append("L" +str(i) +"N10T")
+        # for i in range(3, 59,7):
+        #     Outputs.append("L" +str(i) +"N1T")
+        #     Outputs.append("L" +str(i+4) +"N1T")
         print('attempting to write '+fileName +' for MoorDyn FAST.Farm input file')
         
         # Array to add strings to for each line of moordyn input file
@@ -992,20 +1024,20 @@ class System():
             
         # Line Dictionary Header
         L.append("---------------------- LINE TYPES -----------------------------------------------------")
-        L.append(f"{len(self.lineTypes)}    NTypes   - number of LineTypes")
-        L.append("LineType         Diam     MassDen   EA        BA/-zeta     Can    Cat    Cdn    Cdt")
-        L.append("   (-)           (m)      (kg/m)    (N)       (N-s/-)      (-)    (-)    (-)    (-)")
+        #L.append(f"{len(self.lineTypes)}    NTypes   - number of LineTypes")
+        L.append("LineType     Diam     MassDen   EA        BA/-zeta        EI     Can    Cat    Cdn    Cdt")
+        L.append("   (-)        (m)      (kg/m)    (N)       (N-s/-)      (N-m^2)  (-)    (-)    (-)    (-)    (-)")
         
         # Line Dictionary Table
         for key in self.lineTypes:
             L.append("{:<15} {:7.4f} {:8.3f} {:<10.1f} "
                      .format(key, self.lineTypes[key].d, self.lineTypes[key].mlin, self.lineTypes[key].EA)
-                      + "{:<7.1f} {:<7.1f} {:<7.2f} {:<7.1f} {:<7.2f}"
-                     .format(BA, Can, Cat, Cdn, Cdt))
+                      + "{:<7.1f} {:<7.1f} {:<7.1f} {:<7.2f} {:<7.1f} {:<7.2f}"
+                     .format(BA,EI, Can, Cat, Cdn, Cdt))
         
         # Point Properties Header
         L.append("---------------------- POINTS ---------------------------------------------------------")
-        L.append(f"{len(self.pointList)}    NConnects   - number of connections including anchors and fairleads")
+       # L.append(f"{len(self.pointList)}    NConnects   - number of connections including anchors and fairleads")
         L.append("Node    Type         X        Y        Z        M      V      FX     FY     FZ    CdA    Ca ")
         L.append("(-)     (-)         (m)      (m)      (m)      (kg)   (m^3)  (kN)   (kN)   (kN)  (m^2)   ()")
         
@@ -1032,7 +1064,7 @@ class System():
         
         # Line Properties Header
         L.append("---------------------- LINES -----------------------------------------------------")
-        L.append(f"{len(self.lineList)}    NLines   - number of line objects")
+       # L.append(f"{len(self.lineList)}    NLines   - number of line objects")
         L.append("Line      LineType   UnstrLen  NumSegs  NodeAnch  NodeFair  Outputs  CtrlChan")
         L.append("(-)         (-)       (m)        (-)      (-)       (-)       (-)       (-)")
         
@@ -1059,14 +1091,15 @@ class System():
         L.append("---------------------- OPTIONS ----------------------------------------")
         
         #Solver Options
-        L.append("{:<9.3f}dtM          - time step to use in mooring integration (s)".format(float(dtm)))
-        L.append("{:<9.1f}depth        - water depth (m) <<< must be specified for farm-level mooring".format(float(depth)))
+        L.append("{:<9.5f}dtM          - time step to use in mooring integration (s)".format(float(dtm)))
+        L.append("{:<9.1f}WtrDpth        - water depth (m) <<< must be specified for farm-level mooring".format(float(depth)))
         L.append("{:<9.1e}kbot         - bottom stiffness (Pa/m)".format(kbot))
         L.append("{:<9.1e}cbot         - bottom damping (Pa-s/m)".format(cbot))
         L.append("{:<9.1f}dtIC         - time interval for analyzing convergence during IC gen (s)".format(int(dtIC)))
         L.append("{:<9.1f}TmaxIC       - max time for ic gen (s)".format(int(TmaxIC)))
         L.append("{:<9.1f}CdScaleIC    - factor by which to scale drag coefficients during dynamic relaxation (-)".format(int(CdScaleIC)))
         L.append("{:<9.2f}threshIC     - threshold for IC convergence (-)".format(threshIC))
+        L.append("{:<9.2f}dtOut     - Output time step (-)".format(dtOut))
         
         #Outputs Header
         L.append("----------------------------OUTPUTS--------------------------------------------")
