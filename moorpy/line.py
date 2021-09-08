@@ -294,7 +294,7 @@ class Line():
 
     
 
-    def drawLine(self, Time, ax, color="k", endpoints = False):
+    def drawLine(self, Time, ax, color="k", endpoints=False, shadow=True):
         '''Draw the line in 3D
         Parameters
         ----------
@@ -334,6 +334,9 @@ class Line():
             Xs, Ys, Zs, Ts = self.getLineCoords(Time)
             
             linebit.append(ax.plot(Xs, Ys, Zs, color=color))
+            
+            if shadow:
+                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.sys.depth, color=[0.5, 0.5, 0.5, 0.2], zorder = 1.5) # draw shadow
             
             if endpoints == True:
                 linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))

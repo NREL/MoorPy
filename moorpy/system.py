@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import yaml
 
+from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import spsolve
+
 from moorpy.body import Body
 from moorpy.point import Point
 from moorpy.line import Line
@@ -1681,30 +1684,41 @@ class System():
             
             # adjust positions according to stiffness matrix to move toward net zero forces
             
-            if np.linalg.det(K) == 0.0:                 # if the stiffness matrix is singular, we will modify the approach
-                
-                # first try ignoring any DOFs with zero stiffness
-                indices = list(range(n))                # list of DOF indices that will remain active for this step
-                mask = [True]*n                         # this is a mask to be applied to the array K indices
-                
-                for i in range(n-1, -1, -1):            # go through DOFs and flag any with zero stiffness for exclusion
-                    if K[i,i] == 0:
-                        mask[i] = False
-                        del indices[i]
-                
-                K_select = K[mask,:][:,mask]
-                Y_select = Y[mask]
-                
-                dX = np.zeros(n)
-                
-                if np.linalg.det(K_select) == 0.0:      
-                    dX_select = Y_select/np.diag(K_select)   # last-ditch attempt to get a step despite matrix singularity
+
+            #else:                                       # Normal case where all DOFs are adjusted
+            try:               # try the normal solve first to avoid calculating the determinant every time
+                if n > 20: # if huge, count on the system being sparse and use a sparse solver
+                    Kcsr = csr_matrix(K)
+                    dX = spsolve(Kcsr, Y)
                 else:
-                    dX_select = np.linalg.solve(K_select, Y_select)
-                dX[indices] = dX_select                 # assign active step DOFs, other DOFs will be zero
+                    dX = np.linalg.solve(K, Y)              # calculate position adjustment according to Newton's method
+            except:
             
-            else:                                       # Normal case where all DOFs are adjusted
-                dX = np.linalg.solve(K, Y)              # calculate position adjustment according to Newton's method
+                if np.linalg.det(K) == 0.0:                 # if the stiffness matrix is singular, we will modify the approach
+                
+                    # first try ignoring any DOFs with zero stiffness
+                    indices = list(range(n))                # list of DOF indices that will remain active for this step
+                    mask = [True]*n                         # this is a mask to be applied to the array K indices
+                    
+                    for i in range(n-1, -1, -1):            # go through DOFs and flag any with zero stiffness for exclusion
+                        if K[i,i] == 0:
+                            mask[i] = False
+                            del indices[i]
+                    
+                    K_select = K[mask,:][:,mask]
+                    Y_select = Y[mask]
+                    
+                    dX = np.zeros(n)
+                    
+                    if np.linalg.det(K_select) == 0.0:      
+                        dX_select = Y_select/np.diag(K_select)   # last-ditch attempt to get a step despite matrix singularity
+                    else:
+                        dX_select = np.linalg.solve(K_select, Y_select)
+                    dX[indices] = dX_select                 # assign active step DOFs, other DOFs will be zero
+                
+                else:
+                    raise Exception("why did it fail even though det isn't zero?")
+            
             
             # but limit adjustment magnitude (still preserve direction) to keep things under control
             overratio = np.max(np.abs(dX)/db)            
@@ -1972,6 +1986,8 @@ class System():
             nCpldDOF x nCpldDOF stiffness matrix of the system
 
         '''
+        self.nDOF, self.nCpldDOF = self.getDOFs()
+        
         if self.display > 2:
             print("Getting mooring system stiffness matrix...")
 
@@ -1991,7 +2007,7 @@ class System():
         
         if tensions:
             T1 = self.getTensions()
-            J = np.zeros([self.nCpldDOF, len(T1)])   # allocate Jacobian of tensions w.r.t. coupled DOFs
+            J = np.zeros([len(T1), self.nCpldDOF])   # allocate Jacobian of tensions w.r.t. coupled DOFs
                 
         if plots > 0:
             self.cpldDOFs.clear()  # clear the positions history to refill if animating this process
@@ -2015,7 +2031,7 @@ class System():
                     self.cpldDOFs.append(X2)
                 
                 K[:,i] = -(F2p-F1)/dX[i]                # take finite difference of force w.r.t perturbation
-                if tensions:  J[i,:] = (T2p-T1)/dX[i]
+                if tensions:  J[:,i] = (T2p-T1)/dX[i]
             
         elif solveOption==1:  # ::: adaptive central difference approach :::
         
@@ -2078,7 +2094,7 @@ class System():
                     
                     
                 K[:,i] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
-                if tensions:  J[i,:] = 0.5*(T2p-T2m)/dX[i]
+                if tensions:  J[:,i] = 0.5*(T2p-T2m)/dX[i]
                 
         else:
             raise ValueError("getSystemStiffness was called with an invalid solveOption (only 0 and 1 are supported)")
@@ -2132,19 +2148,19 @@ class System():
         
         
         # find the total number of free and coupled DOFs in case any object types changed
-        nDOF, nCpldDOF = self.getDOFs()
+        self.nDOF, self.nCpldDOF = self.getDOFs()
         
         #self.solveEquilibrium3()   # should we make sure the system is in equilibrium?
         
         # allocate stiffness matrix according to the DOFtype specified
         if DOFtype=="free":
-            K = np.zeros([nDOF,nDOF])
+            K = np.zeros([self.nDOF, self.nDOF])
             d = [0]
         elif DOFtype=="coupled":
-            K = np.zeros([nCpldDOF, nCpldDOF])
+            K = np.zeros([self.nCpldDOF, self.nCpldDOF])
             d = [-1]
         elif DOFtype=="both":
-            K = np.zeros([nDOF+nCpldDOF, nDOF+nCpldDOF])
+            K = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
             d = [0,-1]
         else:
             raise ValueError("getSystemStiffnessA called with invalid DOFtype input. Must be free, coupled, or both")
