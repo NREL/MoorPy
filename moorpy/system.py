@@ -3,6 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from mpl_toolkits.mplot3d import Axes3D
 import yaml
 
 from scipy.sparse import csr_matrix
@@ -346,6 +347,9 @@ class System():
                             pointType = 1
                             # attach to body here
                             BodyID = int("".join(filter(str.isdigit, entry1)))
+                            if len(self.bodyList) < BodyID:
+                                self.bodyList.append( Body(self, 1, 0, np.zeros(6)))
+                            
                             rRel = np.array(entries[2:5], dtype=float)
                             self.bodyList[BodyID-1].attachPoint(num, rRel)
                             
@@ -2504,9 +2508,9 @@ class System():
         
         # first draw a plot of DOFs and forces
         x = np.array(self.Xs)
-        f = np.array(self.Fs)
+        f = np.array(self.Es)
         fig,ax = plt.subplots(2,1,sharex=True)
-        for i in range(len(self.Fs[0])):
+        for i in range(len(self.Es[0])):
             ax[0].plot(x[:,i])   # <<< warning this is before scale and offset!
             ax[1].plot(f[:,i], label=i+1)
         ax[1].legend()
@@ -2583,6 +2587,83 @@ class System():
         # eventually could show net forces too? <<< if using a non MINPACK method, use callback and do this
             
         pass #I added this line to get the above commented lines (^^^) to be included in the animate method 
+    
+    
+    
+    
+    
+    def animatelines(self, dirname, rootname, interval=200, repeat=True, delay=0):
+        '''
+        Parameters
+        ----------
+        dirname : string
+            The name of the directory folder you are in.
+        rootname : string
+            The name of the front portion of the main file name, like spar_WT1, or DTU_10MW_NAUTILUS_GoM.
+        interval : int, optional
+            The time between animation frames in milliseconds. The default is 200.
+        repeat : bool, optional
+            Whether or not to repeat the animation. The default is True.
+        delay : int, optional
+            The time between consecutive animation runs in milliseconds. The default is 0.
+
+        Returns
+        -------
+        line_ani : animation
+            an animation of the mooring lines based off of MoorDyn data.
+            Needs to be stored, returned, and referenced in a variable
+        '''
+        
+        # load in the MoorDyn data for each line to set the xp,yp,zp positions of each node in the line
+        # Each row in the xp matrix is a time step and each column is a node in the line
+        for line in self.lineList:
+            try:
+                line.loadData(dirname, rootname)
+            except:
+                raise ValueError("There is likely not a .MD.Line#.out file in the directory. Make sure Line outputs are set to 'p'")
+            
+            
+        # update animation function. This gets called every iteration of the animation and redraws the line in its next position
+        def update_Coords(tStep, tempLineList, tempax):     # not sure why it needs a 'tempax' input but it works better with it
+            
+            for imooring in tempLineList:
+                imooring.redrawLine(-tStep)
+                
+            return 
+
+        # create the figure and axes to draw the animation
+        fig, ax = self.plot()
+        '''
+        # can do this section instead of self.plot(). They do the same thing
+        fig = plt.figure(figsize=(20/2.54,12/2.54))
+        ax = Axes3D(fig)
+        for imooring in self.lineList:
+            imooring.drawLine(0, ax)
+        '''
+        # set figure x/y/z bounds
+        d = 1600                # can make this an input later
+        ax.set_xlim((-d,d))
+        ax.set_ylim((-d,d)); 
+        ax.set_zlim((-self.depth, 300))
+        ax.set_xlabel('x');    ax.set_ylabel('y');      ax.set_zlabel('z');
+        
+        # make the axes scaling equal
+        rangex = np.diff(ax.get_xlim3d())[0]
+        rangey = np.diff(ax.get_ylim3d())[0]
+        rangez = np.diff(ax.get_zlim3d())[0]
+        ax.set_box_aspect([rangex, rangey, rangez]) 
+        
+        nFrames = len(self.lineList[0].Tdata)
+        
+        # Animation: update the figure with the updated coordinates from update_Coords function
+        # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()
+        line_ani = animation.FuncAnimation(fig, update_Coords, np.arange(1,nFrames-1,10), fargs=(self.lineList, ax),
+                                           interval=1, repeat=repeat, repeat_delay=delay, blit=False)
+                                            # works well when np.arange(...nFrames...) is used. Others iterable ways to do this
+        
+        return line_ani
+    
+    
     
     def colortensions(self, bounds='default', ax=None, hidebox=False, rbound=0, title="", linelabels=False, pointlabels=False):
         '''Plots the mooring system objects in their current positions

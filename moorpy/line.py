@@ -68,17 +68,18 @@ class Line():
         #print("Created Line "+str(self.number))
         
         
-        
-    def loadData(self, dirname):
-        '''Loads line-specific time series data from a MoorDyn output file'''
+
     
+    def loadData(self, dirname, rootname):
+        '''Loads line-specific time series data from a MoorDyn output file'''
+        
         self.qs = 0 # signals time series data
     
         # load time series data
         if self.isRod > 0:
-            data, ch, channels, units = read_mooring_file(dirname, "Rod"+str(self.number)+".out") # remember number starts on 1 rather than 0
+            data, ch, channels, units = self.read_mooring_file(dirname+rootname+".MD.", "Rod"+str(self.number)+".out") # remember number starts on 1 rather than 0
         else:
-            data, ch, channels, units = read_mooring_file(dirname, "Line"+str(self.number)+".out") # remember number starts on 1 rather than 0
+            data, ch, channels, units = self.read_mooring_file(dirname+rootname+".MD.", "Line"+str(self.number)+".out") # remember number starts on 1 rather than 0
                 
         # get time info
         if ("Time" in ch):
@@ -133,7 +134,56 @@ class Line():
         
         # check for tension data <<<<<<<
         
+    def read_mooring_file(self, dirName,fileName):
+
+        # load data from time series for single mooring line
         
+        print('attempting to load '+dirName+fileName)
+        
+        f = open(dirName+fileName, 'r')
+        
+        channels = []
+        units = []
+        data = []
+        i=0
+        
+        for line in f:          # loop through lines in file
+        
+            if (i == 0):
+                for entry in line.split():      # loop over the elemets, split by whitespace
+                    channels.append(entry)      # append to the last element of the list
+                    
+            elif (i == 1):
+                for entry in line.split():      # loop over the elemets, split by whitespace
+                    units.append(entry)         # append to the last element of the list
+            
+            elif len(line.split()) > 0:
+                data.append([])  # add a new sublist to the data matrix
+                import re
+                r = re.compile(r"(?<=\d)\-(?=\d)")  # catch any instances where a large negative exponent has been written with the "E"
+                line2 = r.sub("E-",line)            # and add in the E
+                
+                
+                for entry in line2.split():      # loop over the elemets, split by whitespace
+                    data[-1].append(entry)      # append to the last element of the list
+                
+            else:
+                break
+        
+            i+=1
+        
+        f.close()  # close data file
+        
+        # use a dictionary for convenient access of channel columns (eg. data[t][ch['PtfmPitch'] )
+        ch = dict(zip(channels, range(len(channels))))
+        
+        data2 = np.array(data)
+        
+        data3 = data2.astype(float)
+        
+        return data3, ch, channels, units
+    
+    
         
     def getTimestep(self, Time):
         '''Get the time step to use for showing time series data'''
@@ -157,7 +207,7 @@ class Line():
 
     def getLineCoords(self, Time, n=0):    # formerly UpdateLine
         '''Gets the updated line coordinates for drawing and plotting purposes.'''
-    
+        
         if n==0: n = self.nNodes
     
         # if a quasi-static analysis, just call the catenary function to return the line coordinates
@@ -202,7 +252,7 @@ class Line():
                 
                 # make points for appropriately sized cylinder
                 d = self.sys.lineTypes[self.type].d
-                Xs, Ys, Zs = makeTower(self.length, np.array([d, d]))
+                Xs, Ys, Zs = makeTower(self.length, np.array([d, d]))   # add in makeTower method once you start using Rods
                 
                 # translate and rotate into proper position for Rod
                 coords = np.vstack([Xs, Ys, Zs])
@@ -216,7 +266,7 @@ class Line():
             # drawing lines
             else:
                 
-                return self.xp[ts,:], self.yp[ts,:], self.zp[ts,:]
+                return self.xp[ts,:], self.yp[ts,:], self.zp[ts,:], self.Tdata[ts:]
     
     
     def getCoordinate(self, s, n=100):
@@ -296,6 +346,7 @@ class Line():
 
     def drawLine(self, Time, ax, color="k", endpoints=False, shadow=True):
         '''Draw the line in 3D
+        
         Parameters
         ----------
         Time : float
@@ -308,6 +359,7 @@ class Line():
             plane at which the x-axis is desired. The default is [1,0,0].
         Yuvec : lsit, optional
             plane at which the y-axis is desired. The default is [0,0,1].
+            
         Returns
         -------
         linebit : list
@@ -356,7 +408,10 @@ class Line():
         
             
         return linebit
-        '''Draw the line in 3D
+    
+    
+    def drawLineB(self, Time, ax, color="k", endpoints = False):
+        '''Draw the line in 3D. Second version that Ericka was using for color tensions I think
 
         Parameters
         ----------
@@ -377,6 +432,7 @@ class Line():
             list of axes and points on which the line can be plotted
 
         '''
+        
         
         linebit = []  # make empty list to hold plotted lines, however many there are
 
@@ -417,7 +473,7 @@ class Line():
         
             
         return linebit
-
+        
         
     def redrawLine(self, Time):  #, linebit):
         '''Update 3D line drawing based on instantaneous position'''
@@ -451,8 +507,8 @@ class Line():
                 Ux = self.Ux[ts,:]
                 Uy = self.Uy[ts,:]
                 Uz = self.Uz[ts,:]                  
-                segments = quiver_data_to_segments(Xs, Ys, Zs, Ux, Uy, Uz, scale=2)
-                self.Ubits.set_segments(segments)
+                #segments = quiver_data_to_segments(Xs, Ys, Zs, Ux, Uy, Uz, scale=2)
+                #self.Ubits.set_segments(segments)
         
         return linebit
         
@@ -638,10 +694,8 @@ class Line():
         return KA_rot, KB_rot
 
     
-    def getLineTens(self, Time):    # formerly UpdateLine
-        '''Gets the updated line coordinates for drawing and plotting purposes.'''
-    
-        #quasi-static analysis, just call the catenary function to return the tensions
+    def getLineTens(self):
+        '''Calls the catenary function to return the tensions of the Line for a quasi-static analysis'''
 
         depth = self.sys.depth
     
@@ -662,6 +716,14 @@ class Line():
 
         Ts = info["Te"]
         return Ts
+    
+    
+    def maxtension(self):
+        '''Returns the maximum and minimum tension that comes out of getLineTens''' # do we need this?
+        
+        Ts = self.getLineTens()
+        
+        return max(Ts), min(Ts)
 
 
     def drawColorTensionLine(self, Time, ax, maxt, mint):
@@ -732,7 +794,4 @@ class Line():
         return linebit
 
     
-    def maxtension(self, Time):
-        Ts = self.getLineTens(Time)
-        return max(Ts), min(Ts)
-#
+    
