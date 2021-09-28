@@ -385,7 +385,7 @@ class Line():
         
             Xs, Ys, Zs, Ts = self.getLineCoords(Time)
             
-            linebit.append(ax.plot(Xs, Ys, Zs, color=color))
+            linebit.append(ax.plot(Xs, Ys, Zs, color=color, zorder=100))
             
             if shadow:
                 ax.plot(Xs, Ys, np.zeros_like(Xs)-self.sys.depth, color=[0.5, 0.5, 0.5, 0.2], zorder = 1.5) # draw shadow

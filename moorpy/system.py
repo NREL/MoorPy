@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import yaml
 
 from scipy.sparse import csr_matrix
@@ -552,7 +553,32 @@ class System():
             self.rho = data['water_density']
             
         
+    def readBathymetryFile(self, filename):
+        f = open(filename, 'r')
 
+        # skip the header
+        line = next(f)
+        # collect the number of grid values in the x and y directions from the second and third lines
+        line = next(f)
+        nGridX = int(line.split()[1])
+        line = next(f)
+        nGridY = int(line.split()[1])
+        # allocate the Xs, Ys, and main bathymetry grid arrays
+        bathGrid_Xs = np.zeros(nGridX)
+        bathGrid_Ys = np.zeros(nGridY)
+        bathGrid = np.zeros([nGridX, nGridY])
+        # read in the fourth line to the Xs array
+        line = next(f)
+        bathGrid_Xs = [float(line.split()[i]) for i in range(nGridX)]
+        # read in the remaining lines in the file into the Ys array (first entry) and the main bathymetry grid
+        for i in range(nGridY):
+            line = next(f)
+            entries = line.split()
+            bathGrid_Ys[i] = entries[0]
+            bathGrid[i,:] = entries[1:]
+        
+        return bathGrid_Xs, bathGrid_Ys, bathGrid
+    
     
         
     def unload(self, fileName, MDversion=2, **kwargs):
@@ -1067,7 +1093,7 @@ class System():
         
         #Solver Options
         L.append("{:<9.3f}dtM          - time step to use in mooring integration (s)".format(float(dtm)))
-        L.append("{:<9.1f}depth        - water depth (m) <<< must be specified for farm-level mooring".format(float(depth)))
+        L.append("{:<9.1f}wtrdpth        - water depth (m) <<< must be specified for farm-level mooring".format(float(depth)))
         L.append("{:<9.1e}kbot         - bottom stiffness (Pa/m)".format(kbot))
         L.append("{:<9.1e}cbot         - bottom damping (Pa-s/m)".format(cbot))
         L.append("{:<9.1f}dtIC         - time interval for analyzing convergence during IC gen (s)".format(int(dtIC)))
@@ -1606,7 +1632,7 @@ class System():
         
         '''
         
-        
+        self.DOFtype_solve_for = DOFtype
         # create arrays for the initial positions of the objects that need to find equilibrium, and the max step sizes
         X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[100, 0.3])
         
@@ -1762,8 +1788,8 @@ class System():
             print(X)
             print(Y)
         
-        self.Xs = info['Xs']    # List of positions as it finds equilibrium for every iteration
-        self.Es = info['Es']    # List of errors that the forces are away from 0, which in this case, is the same as the forces
+        self.Xs2 = info['Xs']    # List of positions as it finds equilibrium for every iteration
+        self.Es2 = info['Es']    # List of errors that the forces are away from 0, which in this case, is the same as the forces
         
         # Update equilibrium position at converged X values
         F = self.mooringEq(X, DOFtype=DOFtype, tol=lineTol)
@@ -1803,19 +1829,19 @@ class System():
     def plotEQsolve(self, iter=-1):
         '''Plots trajectories of solving equilibrium from solveEquilibrium.'''
         
-        n = self.Xs.shape[1]
+        n = self.Xs2.shape[1]
         
         if n < 8:
             fig, ax = plt.subplots(2*n, 1, sharex=True)
             for i in range(n):
-                ax[  i].plot(self.Xs[:iter, i])
-                ax[n+i].plot(self.Es[:iter, i])
+                ax[  i].plot(self.Xs2[:iter, i])
+                ax[n+i].plot(self.Es2[:iter, i])
             ax[-1].set_xlabel("iteration")
         else:
             fig, ax = plt.subplots(n, 2, sharex=True)
             for i in range(n):
-                ax[i,0].plot(self.Xs[:iter, i])
-                ax[i,1].plot(self.Es[:iter, i])
+                ax[i,0].plot(self.Xs2[:iter, i])
+                ax[i,1].plot(self.Es2[:iter, i])
             ax[-1,0].set_xlabel("iteration, X")
             ax[-1,1].set_xlabel("iteration, Error")
         plt.show()
@@ -2322,7 +2348,7 @@ class System():
     
     
 
-    def plot(self, bounds='default', ax=None, color=None, hidebox=False, rbound=0, title="", linelabels=False, pointlabels=False, endpoints=False):
+    def plot(self, ax=None, bounds='default', rbound=0, color=None, **kwargs):
         '''Plots the mooring system objects in their current positions
         Parameters
         ----------
@@ -2338,8 +2364,15 @@ class System():
             A bound to be placed on each axis of the plot. If 0, the bounds will be the max values on each axis. The default is 0.
         title : string, optional
             A title of the plot. The default is "".
-        linelabels : adds line numbers to plot cooresponding to MoorDyn file 
-         pointlabels: adds line numbers to plot cooresponding to MoorDyn file 
+        linelabels : bool, optional
+            Adds line numbers to plot in text. Default is False.
+        pointlabels: bool, optional
+            Adds point numbers to plot in text. Default is False.
+        endpoints: bool, optional
+            Adds visible end points to lines. Default is False.
+        bathymetry: bool, optional
+            Creates a bathymetry map of the seabed based on an input file. Default is False.
+            
         Returns
         -------
         fig : figure object
@@ -2348,6 +2381,15 @@ class System():
             To hold the points and drawing of the plot
             
         '''
+        
+        hidebox         = kwargs.get('hidebox'        , False     )
+        title           = kwargs.get('title'          , ""        )
+        linelabels      = kwargs.get('linelabels'     , False     )
+        pointlabels     = kwargs.get('pointlabels'    , False     )
+        endpoints       = kwargs.get('endpoints'      , False     )
+        bathymetry      = kwargs.get("bathymetry"     , False     )
+        colormap        = kwargs.get("cmap"           , 'ocean'   )
+        alpha           = kwargs.get("opacity"        , 1.0       )
         
         # sort out bounds
         xs = []
@@ -2397,7 +2439,7 @@ class System():
                 elif 'rope' in line.type:
                     line.drawLine(0, ax, color=[.3,.5,.5], endpoints = endpoints)
                 else:
-                    line.drawLine(0, ax, color=[0.3,0.3,0.3], endpoints = endpoints)
+                    line.drawLine(0, ax, color=[0.2,0.2,0.2], endpoints = endpoints)
             else:
                 line.drawLine(0, ax, color=color, endpoints = endpoints)
                 
@@ -2406,11 +2448,48 @@ class System():
                 ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
             
         #Add point labels
-        i = 0 
+        i = 0
         for point in self.pointList:
+            points = []
             i = i + 1
             if pointlabels == True:
                 ax.text(point.r[0], point.r[1], point.r[2], i, c = 'r')
+            
+            if bathymetry==True:     # if bathymetry is true, then make squares at each anchor point
+                if point.attachedEndB[0] == 0 and point.r[2] < -400:
+                    points.append([point.r[0]+250, point.r[1]+250, point.r[2]])
+                    points.append([point.r[0]+250, point.r[1]-250, point.r[2]])
+                    points.append([point.r[0]-250, point.r[1]-250, point.r[2]])
+                    points.append([point.r[0]-250, point.r[1]+250, point.r[2]])
+                    
+                    Z = np.array(points)
+                    verts = [[Z[0],Z[1],Z[2],Z[3]]]
+                    ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=alpha))
+            
+        if isinstance(bathymetry, str):   # or, if it's a string, load in the bathymetry file
+
+            # parse through the MoorDyn bathymetry file
+            bathGrid_Xs, bathGrid_Ys, bathGrid = self.readBathymetryFile(bathymetry)
+            '''
+            # First method: plot nice 2D squares using Poly3DCollection
+            nX = len(bathGrid_Xs)
+            nY = len(bathGrid_Ys)
+            # store a list of points in the grid
+            Z = [[bathGrid_Xs[j],bathGrid_Ys[i],-bathGrid[i,j]] for i in range(nY) for j in range(nX)]
+            # plot every square in the grid (e.g. 16 point grid yields 9 squares)
+            verts = []
+            for i in range(nY-1):
+                for j in range(nX-1):
+                    verts.append([Z[j+nX*i],Z[(j+1)+nX*i],Z[(j+1)+nX*(i+1)],Z[j+nX*(i+1)]])
+                    ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=0.5))
+                    verts = []
+            '''
+            # Second method: plot a 3D surface, either plot_surface or contourf
+            X, Y = np.meshgrid(bathGrid_Xs, bathGrid_Ys)
+            ax.plot_surface(X,Y,-bathGrid, cmap=colormap, vmin=-1000, vmax=-200, alpha=alpha)
+            #ax.contourf(X,Y,-bathGrid, cmap='ocean', vmin=-1000, vmax=-200, alpha=0.4)
+            
+
         
         fig.suptitle(title)
         
@@ -2497,7 +2576,7 @@ class System():
         return fig, ax  # return the figure and axis object in case it will be used later to update the plot
         
         
-    def animateSolution(self):
+    def animateSolution(self, DOFtype="free"):
         '''Creates an animation of the system
 
         Returns
@@ -2516,41 +2595,46 @@ class System():
         ax[1].legend()
         
         
-        self.mooringEq(self.freeDOFs[0])   # set positions back to the first ones of the iteration process
-        # ^^^^^^^ this only works for free DOF animation cases (not coupled DOF ones) <<<<<
+        #self.mooringEq(self.freeDOFs[0])   # set positions back to the first ones of the iteration process
+        self.mooringEq(self.Xs[0], DOFtype=self.DOFtype_solve_for)   # set positions back to the first ones of the iteration process
+        # ^^^^^^^ this only works for free DOF animation cases (not coupled DOF ones) <<<<< ...should be good now
         
         fig, ax = self.plot()    # make the initial plot to then animate
         
-        ms_delay = 10000/len(self.freeDOFs)  # time things so the animation takes 10 seconds
+        nFreeDOF, nCpldDOF = self.getDOFs()
+        if DOFtype=="free":
+            nDOF = nFreeDOF
+        elif DOFtype=="coupled":
+            nDOF = nCpldDOF
+        elif DOFtype=="both":
+            nDOF = nFreeDOF+nCpldDOF
         
-        line_ani = animation.FuncAnimation(fig, self.animate, len(self.freeDOFs),
-                                           interval=ms_delay, blit=False, repeat_delay=2000)
+        #ms_delay = 10000/len(self.freeDOFs)  # time things so the animation takes 10 seconds
+        
+        line_ani = animation.FuncAnimation(fig, self.animate, np.arange(0,len(self.Xs),1), #fargs=(ax),
+                                           interval=1000, blit=False, repeat_delay=2000)
     
-        plt.show()
+        return line_ani
     
     
     def animate(self, ts):
         '''Redraws mooring system positions at step ts. Currently set up in a hack-ish way to work for animations
         involving movement of either free DOFs or coupled DOFs (but not both)
-
-        Parameters
-        ----------
-        ts : TYPE
-            DESCRIPTION.
-
-        Raises
-        ------
-        ValueError
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
         '''
 
         # following sets positions of all objects and may eventually be made into self.setPositions(self.positions[i])
         
+        X = self.Xs[ts]         # Xs are already specified in solveEquilibrium's DOFtype
+        
+        if self.DOFtype_solve_for == "free":
+            types = [0]
+        elif self.DOFtype_solve_for == "coupled":
+            types = [-1]
+        elif self.DOFtype_solve_for == "both":
+            types = [0,-1]
+        else:
+            raise ValueError("System.animate called but there is an invalid DOFtype being used")
+        '''
         if len(self.freeDOFs) > 0:
             X = self.freeDOFs[ts]   # get freeDOFs of current instant
             type = 0
@@ -2559,7 +2643,7 @@ class System():
             type = -1
         else:
             raise ValueError("System.animate called but no animation data is saved in freeDOFs or cpldDOFs")
-        
+        '''
         
         #print(ts)
         
@@ -2567,14 +2651,14 @@ class System():
         
         # update position of free Bodies
         for body in self.bodyList:
-            if body.type==type:
+            if body.type in types:
                 body.setPosition(X[i:i+6])  # update position of free Body
                 i += 6
             body.redraw()                   # redraw Body
                 
         # update position of free Points
         for point in self.pointList:
-            if point.type==type:
+            if point.type in types:
                 point.setPosition(X[i:i+3])  # update position of free Point
                 i += 3
                 # redraw Point?
@@ -2592,7 +2676,7 @@ class System():
     
     
     
-    def animatelines(self, dirname, rootname, interval=200, repeat=True, delay=0):
+    def animatelines(self, dirname, rootname, interval=200, repeat=True, delay=0, bathymetry=False):
         '''
         Parameters
         ----------
@@ -2632,7 +2716,7 @@ class System():
             return 
 
         # create the figure and axes to draw the animation
-        fig, ax = self.plot()
+        fig, ax = self.plot(bathymetry=bathymetry)
         '''
         # can do this section instead of self.plot(). They do the same thing
         fig = plt.figure(figsize=(20/2.54,12/2.54))
