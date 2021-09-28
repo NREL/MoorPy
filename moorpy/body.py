@@ -268,6 +268,7 @@ class Body():
             K[:3,:3] += K3
             K[:3,3:] += np.matmul(K3, H)                        # only add up one off-diagonal sub-matrix for now, then we'll mirror at the end
             K[3:,3:] += np.matmul(np.matmul(H, K3), H.T) + np.matmul( getH(f3), H.T)
+            #K[3:,3:] += np.matmul(np.matmul(H, K3), H.T) - np.matmul( getH(f3), H)  # <<< should be the same
                 
         K[3:,:3] = K[:3,3:].T                                   # copy over other off-diagonal sub-matrix
         

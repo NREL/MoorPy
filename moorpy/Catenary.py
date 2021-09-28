@@ -556,15 +556,64 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             # get stiffnesses    (check sign of A!)
             K1 = info1['stiffnessB']
             K2 = info2['stiffnessB']        
-            dH_dX = 1./(1./K1[0,0] + 1./K2[0,0])
+            dH_dX = 1./(1./K1[0,0] + 1./K2[0,0])  # = K1[0,0]*K2[0,0]/(K1[0,0] + K2[0,0])
             Kmid = infoU['oths']['dH_dX']
             
-            info['stiffnessA'] = np.array([[ dH_dX, K1[0,1] - K1[0,1]/Kmid*K1[0,0]], 
-                                                   [K1[1,0] - K1[0,0]/Kmid*K1[1,0] , K1[1,1] - K1[0,1]/Kmid*K1[1,0]]])
+            info['stiffnessA'] = np.array([[ dH_dX                         , K1[0,1] - K1[0,1]/Kmid*K1[0,0]], 
+                                           [K1[1,0] - K1[0,0]/Kmid*K1[1,0] , K1[1,1] - K1[0,1]/Kmid*K1[1,0]]])
             
-            info['stiffnessB'] = np.array([[ dH_dX, K2[0,1] - K2[0,1]/Kmid*K2[0,0]], 
-                                                   [K2[1,0] - K2[0,0]/Kmid*K2[1,0] , K2[1,1] - K2[0,1]/Kmid*K2[1,0]]])
-                                                   
+            info['stiffnessB'] = np.array([[ dH_dX                         , K2[0,1] - K2[0,1]/Kmid*K2[0,0]], 
+                                           [K2[1,0] - K2[0,0]/Kmid*K2[1,0] , K2[1,1] - K2[0,1]/Kmid*K2[1,0]]])
+                                     
+
+            dxdH = 1/Kmid #= 1/(K1[0,0] + K2[0,0])
+            
+            #                         xA                              zA                             xB                                 zB
+            
+            K  =  np.array([[  K1[0,0] *K2[0,0]*dxdH,    K1[0,1] *K2[0,0]*dxdH        ,   -K2[0,0] *K1[0,0]*dxdH,   -K2[0,1] *K1[0,0]*dxdH          ],  # HA
+                            [  K1[1,0] *K2[0,0]*dxdH,    K1[1,1] -K1[1,0]*dxdH*K1[0,1],   -K2[0,0] *dxdH*K1[1,0],   -K2[0,1] *dxdH*K1[1,0]          ],  # VA
+                            [ -K1[0,0] *K2[0,0]*dxdH,   -K1[0,1] *K2[0,0]*dxdH        ,    K2[0,0] *K1[0,0]*dxdH,    K2[0,1] *K1[0,0]*dxdH          ],  # HB
+                            [ -K1[0,0] *dxdH*K2[1,0],   -K1[0,1] *dxdH*K2[1,0]        ,    K2[1,0] *K1[0,0]*dxdH,    K2[1,1] -K2[1,0]*dxdH*K2[0,1]  ]]) # VB
+            '''                
+                            
+                            \frac{  \pderiv{H_A}{x_A}\pderiv{H_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &\frac{ \pderiv{H_A}{z_A}\pderiv{H_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &-\frac{\pderiv{H_A}{x_A}\pderiv{H_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &-\frac{\pderiv{H_A}{x_A}\pderiv{H_B}{z_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}} \\
+                            
+                            \frac{  \pderiv{V_A}{x_A}\pderiv{H_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &\pderiv{V_A}{z_A} - \frac{ \pderiv{H_A}{z_A}\pderiv{V_A}{x_A}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &-\frac{\pderiv{V_A}{x_A}\pderiv{H_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &-\frac{\pderiv{V_A}{x_A}\pderiv{H_B}{z_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}} \\
+                            
+                            -\frac{ \pderiv{H_A}{x_A}\pderiv{H_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &-\frac{\pderiv{H_A}{z_A}\pderiv{H_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &\frac{ \pderiv{H_A}{x_A}\pderiv{H_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &\frac{ \pderiv{H_A}{x_A}\pderiv{H_B}{z_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}} \\
+                            
+                            -\frac{ \pderiv{H_A}{x_A}\pderiv{V_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &-\frac{\pderiv{H_A}{z_A}\pderiv{V_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &\frac{ \pderiv{H_A}{x_A}\pderiv{V_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            &\pderiv{V_B}{z_B} - \frac{ \pderiv{H_B}{z_B}\pderiv{V_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
+                            
+                            
+                                         
+                            for a normal line
+                            
+                            \pderiv{H_B}{x_B}   &?                  & -\pderiv{H_B}{x_B} & \pderiv{H_B}{z_B}\\  # HA
+                            ?                   & ?                 &      0             &   0              \\  # VA
+                            -\pderiv{H_B}{x_B}+  &    0ish          & \pderiv{H_B}{x_B}  & \pderiv{H_B}{z_B}\\  # HB
+                            -\pderiv{V_B}{x_B}+  &    0ish          & \pderiv{V_B}{x_B}  & \pderiv{V_B}{z_B}    # VB
+                        
+
+            # sorted
+            K  =  np.array([[                  dH_dX,    K1[0,1] *K2[0,0]*dxdH        ,                   -dH_dX,   -K2[0,1] *K1[0,0]*dxdH          ],  # HA
+                            [  K1[1,0] *K2[0,0]*dxdH,    K1[1,1] -K1[1,0]*dxdH*K1[0,1],   -K2[0,0] *dxdH*K1[1,0],   -K2[0,1] *dxdH*K1[1,0]          ],  # VA
+                            [                 -dH_dX,   -K1[0,1] *K2[0,0]*dxdH        ,                    dH_dX,    K2[0,1] *K1[0,0]*dxdH          ],  # HB
+                            [ -K1[0,0] *dxdH*K2[1,0],   -K1[0,1] *dxdH*K2[1,0]        ,    K2[1,0] *K1[0,0]*dxdH,    K2[1,1] -K2[1,0]*dxdH*K2[0,1]  ]]) # VB
+            '''
+
+                                     
             info['LBot'] = info1['LBot'] + info2['LBot']
             # not very useful outputs for this case:
             info["Sextreme"] = L1 - info1['LBot']

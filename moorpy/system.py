@@ -2264,6 +2264,7 @@ class System():
                                         r2 = rotatePosition(rPointRel2, body2.r6[3:])   # relative position of Point about body ref point in unrotated reference frame  
                                         H2 = getH(r2)
                                         
+                                        # check signs/transposes below
                                         K66 = np.block([[   KB        , np.matmul(KB, H1)],
                                                   [np.matmul(H2.T, KB), np.matmul(np.matmul(H2, KB), H1.T)]])
                                         
