@@ -26,7 +26,7 @@ class System():
     # >>> note: system module will need to import Line, Point, Body for its add/creation routines 
     #     (but line/point/body modules shouldn't import system) <<<
     
-    def __init__(self, file="", depth=0, rho=1025, g=9.81):
+    def __init__(self, moordyn_file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1):
         '''Creates an empty MoorPy mooring system data structure and will read an input file if provided.
 
         Parameters
@@ -70,8 +70,22 @@ class System():
         self.display = 0    # a flag that controls how much printing occurs in methods within the System (Set manually. Values > 0 cause increasing output.)
         
         # read in data from an input file if a filename was provided
-        if len(file) > 0:
-            self.load(file)
+        if len(moordyn_file) > 0:
+            self.load(moordyn_file)
+        
+        # set the quasi-static/dynamic toggle for the entire mooring system
+        self.qs = qs
+        if self.qs==0:  # if the mooring system is desired to be used as a portrayal of MoorDyn data
+            if len(moordyn_file)==0 or len(dirname)==0 or len(rootname)==0:
+                raise ValueError("The directory location of the MoorDyn output files needs to be given OR the name of the .fst file needs to be given, without the .fst")
+            # load in the MoorDyn data for each line to set the xp,yp,zp positions of each node in the line
+            # Each row in the xp matrix is a time step and each column is a node in the line
+            for line in self.lineList:
+                try:
+                    line.loadData(dirname, rootname)
+                except:
+                    raise ValueError("There is likely not a .MD.Line#.out file in the directory. Make sure Line outputs are set to 'p' in the MoorDyn input file")
+                
     
     
     def addBody(self, mytype, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), f6Ext=np.zeros(6)):
@@ -1818,11 +1832,11 @@ class System():
                 raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {info['iter']} iterations, with residual forces of {F}")
 
 
-            
+        
         # show an animation of the equilibrium solve if applicable
         if plots > 0:   
             self.animateSolution()
-    
+        
         return True
     
     
@@ -2382,14 +2396,24 @@ class System():
             
         '''
         
-        hidebox         = kwargs.get('hidebox'        , False     )
-        title           = kwargs.get('title'          , ""        )
-        linelabels      = kwargs.get('linelabels'     , False     )
-        pointlabels     = kwargs.get('pointlabels'    , False     )
-        endpoints       = kwargs.get('endpoints'      , False     )
-        bathymetry      = kwargs.get("bathymetry"     , False     )
-        colormap        = kwargs.get("cmap"           , 'ocean'   )
-        alpha           = kwargs.get("opacity"        , 1.0       )
+        hidebox         = kwargs.get('hidebox'        , False     )     # toggles whether to show the axes or not
+        title           = kwargs.get('title'          , ""        )     # optional title for the plot
+        time            = kwargs.get("time"           , 0         )     # the time in seconds of when you want to plot
+        linelabels      = kwargs.get('linelabels'     , False     )     # toggle to include line number labels in the plot
+        pointlabels     = kwargs.get('pointlabels'    , False     )     # toggle to include point number labels in the plot
+        endpoints       = kwargs.get('endpoints'      , False     )     # toggle to include the line end points in the plot
+        bathymetry      = kwargs.get("bathymetry"     , False     )     # toggle (and string) to include bathymetry or not. Can do full map based on text file, or simple squares
+        colormap        = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
+        alpha           = kwargs.get("opacity"        , 1.0       )     # the transparency of the bathymetry plot_surface
+        draw_body       = kwargs.get("draw_body"      , True      )     # toggle to draw the Bodies or not
+        shadow          = kwargs.get("shadow"         , True      )     # toggle to draw the mooring line shadows or not
+        rang            = kwargs.get('rang'           , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
+        colorbar        = kwargs.get('colorbar'       , False     )     # toggle to include a colorbar for a plot or not
+        colorbar_size   = kwargs.get('colorbar_size'  , 1.0       )     # the scale of the colorbar. Not the same as aspect. Aspect adjusts proportions
+        colorbar_label  = kwargs.get('colorbar_label' , ""        )     # the label of the colorbar
+        colortensions   = kwargs.get("colortensions"  , False     )
+        
+
         
         # sort out bounds
         xs = []
@@ -2427,21 +2451,22 @@ class System():
             ax.set_zlim([-self.depth, 0])
             
         # draw things
-        for body in self.bodyList:
-            body.draw(ax)
+        if draw_body:
+            for body in self.bodyList:
+                body.draw(ax)
         
         j = 0
         for line in self.lineList:
             j = j + 1
             if color==None and isinstance(line.type, str):       
                 if 'chain' in line.type:
-                    line.drawLine(0, ax, color=[.1, 0, 0], endpoints = endpoints)
+                    line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow)
                 elif 'rope' in line.type:
-                    line.drawLine(0, ax, color=[.3,.5,.5], endpoints = endpoints)
+                    line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow)
                 else:
-                    line.drawLine(0, ax, color=[0.2,0.2,0.2], endpoints = endpoints)
+                    line.drawLine(time, ax, color=[0.2,0.2,0.2], endpoints=endpoints, shadow=shadow)
             else:
-                line.drawLine(0, ax, color=color, endpoints = endpoints)
+                line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow)
                 
             #Add line labels 
             if linelabels == True:
@@ -2470,6 +2495,8 @@ class System():
 
             # parse through the MoorDyn bathymetry file
             bathGrid_Xs, bathGrid_Ys, bathGrid = self.readBathymetryFile(bathymetry)
+            if rang=='hold':
+                rang = (np.min(-bathGrid), np.max(-bathGrid))
             '''
             # First method: plot nice 2D squares using Poly3DCollection
             nX = len(bathGrid_Xs)
@@ -2484,12 +2511,16 @@ class System():
                     ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=0.5))
                     verts = []
             '''
-            # Second method: plot a 3D surface, either plot_surface or contourf
+            # Second method: plot a 3D surface, plot_surface
             X, Y = np.meshgrid(bathGrid_Xs, bathGrid_Ys)
-            ax.plot_surface(X,Y,-bathGrid, cmap=colormap, vmin=-1000, vmax=-200, alpha=alpha)
-            #ax.contourf(X,Y,-bathGrid, cmap='ocean', vmin=-1000, vmax=-200, alpha=0.4)
+            bath = ax.plot_surface(X,Y,-bathGrid, cmap=colormap, vmin=rang[0], vmax=rang[1], alpha=alpha)
             
-
+            if colorbar_size!=1.0 or colorbar_label!="":    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
+                colorbar=True
+            if colorbar:
+                fig.colorbar(bath, shrink=colorbar_size, label=colorbar_label)
+            
+        
         
         fig.suptitle(title)
         
@@ -2500,13 +2531,13 @@ class System():
         if hidebox:
             ax.axis('off')
         
-        #plt.show()
+        plt.show()
         
         return fig, ax  # return the figure and axis object in case it will be used later to update the plot
         
         
         
-    def plot2d(self, Xuvec=[1,0,0], Yuvec=[0,0,1], ax=None, color=None, title="", linelabels=False, pointlabels=False):
+    def plot2d(self, Xuvec=[1,0,0], Yuvec=[0,0,1], ax=None, color=None, **kwargs):
         '''Makes a 2D plot of the mooring system objects in their current positions
 
         Parameters
@@ -2531,6 +2562,23 @@ class System():
 
         '''
         
+        title           = kwargs.get('title'          , ""        )     # optional title for the plot
+        time            = kwargs.get("time"           , 0         )     # the time in seconds of when you want to plot
+        linelabels      = kwargs.get('linelabels'     , False     )     # toggle to include line number labels in the plot
+        pointlabels     = kwargs.get('pointlabels'    , False     )     # toggle to include point number labels in the plot
+        bathymetry      = kwargs.get("bathymetry"     , False     )     # toggle (and string) to include bathymetry contours or not based on text file
+        colormap        = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
+        alpha           = kwargs.get("opacity"        , 1.0       )     # the transparency of the bathymetry plot_surface
+        levels          = kwargs.get("levels"         , 7         )     # the number (or array) of levels in the contour plot
+        rang            = kwargs.get('rang'           , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
+        colorbar        = kwargs.get('colorbar'       , False     )     # toggle to include a colorbar for a plot or not
+        colorbar_aspect = kwargs.get('colorbar_aspect', 20        )     # the proportion of the colorbar. Default is 20 height x 1 width
+        colorbar_label  = kwargs.get('colorbar_label' , ""        )     # the label of the colorbar
+        colorbar_ticks  = kwargs.get('colorbar_ticks' , None      )     # the desired tick labels on the colorbar (can be an array)
+        colortensions   = kwargs.get("colortensions"  , False     )     
+        
+        
+        
         # if axes not passed in, make a new figure
         if ax == None:
             fig, ax = plt.subplots(1,1)
@@ -2546,13 +2594,13 @@ class System():
             j = j + 1
             if color==None and isinstance(line.type, str):            
                 if 'chain' in line.type:
-                    line.drawLine2d(0, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec)
+                    line.drawLine2d(time, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec)
                 elif 'rope' in line.type:
-                    line.drawLine2d(0, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec)
+                    line.drawLine2d(time, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec)
                 else:
-                    line.drawLine2d(0, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec)
+                    line.drawLine2d(time, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec)
             else:
-                line.drawLine2d(0, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec)
+                line.drawLine2d(time, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec)
             
             # Add Line labels
             if linelabels == True:
@@ -2569,9 +2617,31 @@ class System():
                 yloc = np.dot([point.r[0], point.r[1], point.r[2]], Yuvec)
                 ax.text(xloc, yloc, i, c = 'r')
         
+        if isinstance(bathymetry, str):   # or, if it's a string, load in the bathymetry file
+
+            # parse through the MoorDyn bathymetry file
+            bathGrid_Xs, bathGrid_Ys, bathGrid = self.readBathymetryFile(bathymetry)
+            
+            X, Y = np.meshgrid(bathGrid_Xs, bathGrid_Ys)
+            Z = -bathGrid
+            if rang=='hold':
+                rang = (np.min(Z), np.max(Z))
+            
+            Xind = Xuvec.index(1); Yind = Yuvec.index(1); Zind = int(3-Xind-Yind)
+            W = [X,Y,Z]
+            
+            # plot a contour profile of the bathymetry
+            bath = ax.contourf(W[Xind],W[Yind],W[Zind], cmap=colormap, levels=levels, alpha=alpha, vmin=rang[0], vmax=rang[1])
+            
+            if colorbar_aspect!=20 or colorbar_label!="" or colorbar_ticks!=None:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
+                colorbar=True
+            if colorbar:
+                fig.colorbar(bath, label=colorbar_label, aspect=colorbar_aspect, ticks=colorbar_ticks)
+            
+        
         ax.axis("equal")
         ax.set_title(title)
-        #plt.show()
+        plt.show()
         
         return fig, ax  # return the figure and axis object in case it will be used later to update the plot
         
@@ -2676,7 +2746,7 @@ class System():
     
     
     
-    def animatelines(self, dirname, rootname, interval=200, repeat=True, delay=0, bathymetry=False):
+    def animatelines(self, interval=200, repeat=True, delay=0, runtime=-1, **kwargs):
         '''
         Parameters
         ----------
@@ -2698,14 +2768,12 @@ class System():
             Needs to be stored, returned, and referenced in a variable
         '''
         
-        # load in the MoorDyn data for each line to set the xp,yp,zp positions of each node in the line
-        # Each row in the xp matrix is a time step and each column is a node in the line
-        for line in self.lineList:
-            try:
-                line.loadData(dirname, rootname)
-            except:
-                raise ValueError("There is likely not a .MD.Line#.out file in the directory. Make sure Line outputs are set to 'p'")
-            
+        bathymetry      = kwargs.get('bathymetry'     , False     )
+        opacity         = kwargs.get('opacity'        , 1.0       )
+        hidebox         = kwargs.get('hidebox'        , False     )
+        rang            = kwargs.get('rang'           , 'hold'    )
+        # can use any other kwargs that go into self.plot()
+        
             
         # update animation function. This gets called every iteration of the animation and redraws the line in its next position
         def update_Coords(tStep, tempLineList, tempax):     # not sure why it needs a 'tempax' input but it works better with it
@@ -2716,7 +2784,7 @@ class System():
             return 
 
         # create the figure and axes to draw the animation
-        fig, ax = self.plot(bathymetry=bathymetry)
+        fig, ax = self.plot(bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang)
         '''
         # can do this section instead of self.plot(). They do the same thing
         fig = plt.figure(figsize=(20/2.54,12/2.54))
@@ -2735,13 +2803,17 @@ class System():
         rangex = np.diff(ax.get_xlim3d())[0]
         rangey = np.diff(ax.get_ylim3d())[0]
         rangez = np.diff(ax.get_zlim3d())[0]
-        ax.set_box_aspect([rangex, rangey, rangez]) 
+        ax.set_box_aspect([rangex, rangey, rangez])
         
-        nFrames = len(self.lineList[0].Tdata)
+        if runtime==-1:
+            nFrames = len(self.lineList[0].Tdata)
+        else:
+            itime = int(np.where(self.lineList[0].Tdata==runtime)[0])
+            nFrames = len(self.lineList[0].Tdata[0:itime])
         
         # Animation: update the figure with the updated coordinates from update_Coords function
         # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()
-        line_ani = animation.FuncAnimation(fig, update_Coords, np.arange(1,nFrames-1,10), fargs=(self.lineList, ax),
+        line_ani = animation.FuncAnimation(fig, update_Coords, np.arange(1, nFrames-1, 10), fargs=(self.lineList, ax),
                                            interval=1, repeat=repeat, repeat_delay=delay, blit=False)
                                             # works well when np.arange(...nFrames...) is used. Others iterable ways to do this
         
