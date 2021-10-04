@@ -480,12 +480,13 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         
             # we will solve this as two separate lines to form the U shape
             info['ProfileType'] = 'U'
+            ProfileType = 'U'
             
             X1_0 = info['Xextreme']   # define fake anchor point as lowest point of line (if the seabed wasn't there)
             X2_0 = XF - X1_0
             L1 = info['Sextreme']
             L2 = L-L1
-            Z1 = CB     # height from seabed to original 'anchor' end
+            Z1 = CB                         # negative of height from seabed to original 'anchor' end [m]
             Z2 = -Z1 + ZF  # height from seabed to fairlead end 
             
             # set up a 1D solve for the correct choice of the anchor point so that horizontal tensions balance
@@ -554,7 +555,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                 
             
             # get stiffnesses    (check sign of A!)
-            K1 = info1['stiffnessB']
+            K1 = info1['stiffnessA']    # note: this refers to the upper end of this half of the line (since it is called with Z<0)
             K2 = info2['stiffnessB']        
             dH_dX = 1./(1./K1[0,0] + 1./K2[0,0])  # = K1[0,0]*K2[0,0]/(K1[0,0] + K2[0,0])
             Kmid = infoU['oths']['dH_dX']
@@ -570,10 +571,11 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             
             #                         xA                              zA                             xB                                 zB
             
-            K  =  np.array([[  K1[0,0] *K2[0,0]*dxdH,    K1[0,1] *K2[0,0]*dxdH        ,   -K2[0,0] *K1[0,0]*dxdH,   -K2[0,1] *K1[0,0]*dxdH          ],  # HA
+            info['K'] = np.array([[  K1[0,0] *K2[0,0]*dxdH,    K1[0,1] *K2[0,0]*dxdH        ,   -K2[0,0] *K1[0,0]*dxdH,   -K2[0,1] *K1[0,0]*dxdH          ],  # HA
                             [  K1[1,0] *K2[0,0]*dxdH,    K1[1,1] -K1[1,0]*dxdH*K1[0,1],   -K2[0,0] *dxdH*K1[1,0],   -K2[0,1] *dxdH*K1[1,0]          ],  # VA
                             [ -K1[0,0] *K2[0,0]*dxdH,   -K1[0,1] *K2[0,0]*dxdH        ,    K2[0,0] *K1[0,0]*dxdH,    K2[0,1] *K1[0,0]*dxdH          ],  # HB
                             [ -K1[0,0] *dxdH*K2[1,0],   -K1[0,1] *dxdH*K2[1,0]        ,    K2[1,0] *K1[0,0]*dxdH,    K2[1,1] -K2[1,0]*dxdH*K2[0,1]  ]]) # VB
+
             '''                
                             
                             \frac{  \pderiv{H_A}{x_A}\pderiv{H_B}{x_B}}{\pderiv{H_A}{x_A}+\pderiv{H_B}{x_B}}
@@ -630,7 +632,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             VF = -fBV2
             
             if plots > 3:
-                plt.plot(info['X'], info['Z'])
+                plt.plot(Xs, Zs)
                 plt.show()
 
         # the normal case
@@ -768,8 +770,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
         
         # TODO <<< should add more info <<<
-
-        
 
     # return horizontal and vertical (positive-up) tension components at each end, and length along seabed
     return (FxA, FzA, FxB, FzB, info) 
@@ -1042,14 +1042,11 @@ if __name__ == "__main__":
     #(fAH, fAV, fBH, fBV, info) = catenary(205, -3.9, 250, 1229760000.0, 2442, CB=-55, Tol=1e-06, MaxIter=50, plots=3)
     
     
-    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary( 400, 50,  700, 1e12, 100.0, CB=-100, Tol=0.001, MaxIter=50, plots=4)
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary( 400, 50,  590, 1e12, 100.0, CB=-100, Tol=0.001, MaxIter=50, plots=4)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(2306.4589923684835, 1.225862496312402e-05, 1870.0799339749528, 203916714.02425563, 405.04331583394304, CB=0.0, HF0=58487689.78903873, VF0=0.0, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(459.16880261639346, 0.0004792939078015479, 447.67890341877506, 2533432597.6567926, 5032.201233267459, CB=0.0, HF0=65021800.32966018, VF0=17487.252675845888, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.00040612281105723014, 391.558570722038, 400.0, 3300142385.3140063, 6555.130220040344, CB=-287.441429277962, HF0=2127009.4122708915, VF0=10925834.69512347, Tol=4.000000000000001e-06, MaxIter=100, plots=1)
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.0004959907076624859, 69.87150531147275, 110.89397565668423, 80297543.26800226, 146.26820268238743, CB=-509.12849468852727, HF0=1322712.3676957292, VF0=1045583.1849462093, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
-
-    print(info1['stiffnessA'])
-    print(info1['stiffnessB'])
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.0004959907076624859, 69.87150531147275, 110.89397565668423, 80297543.26800226, 146.26820268238743, CB=-509.12849468852727, HF0=1322712.3676957292, VF0=1045583.1849462093, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
     
     
     plt.plot(info1['X'], info1['Z'] )
@@ -1062,5 +1059,13 @@ if __name__ == "__main__":
     '''
     
     print(fAH1, fAV1, fBH1, fBV1)
+    print('')
+    
+    from moorpy.helpers import printMat
+    printMat(info1['K'])
+    print('')
+    printMat(info1['stiffnessA'])
+    print('')
+    printMat(info1['stiffnessB'])
     
     plt.show()
