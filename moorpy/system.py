@@ -2702,7 +2702,7 @@ class System():
         #ms_delay = 10000/len(self.freeDOFs)  # time things so the animation takes 10 seconds
         
         line_ani = animation.FuncAnimation(fig, self.animate, np.arange(0,len(self.Xs),1), #fargs=(ax),
-                                           interval=1000, blit=False, repeat_delay=2000)
+                                           interval=1000, blit=False, repeat_delay=2000, repeat=True)
     
         return line_ani
     

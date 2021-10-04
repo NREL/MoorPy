@@ -25,7 +25,8 @@ ms = mp.System('IEA-15-240-RWT-UMaineSemi_MoorDyn_PPI.dat', depth=850)
 ms.initialize(plots=0)
 ms.bodyList[0].type=1
 ms.solveEquilibrium3(plots=0)
-ms.plot(colortension=True, cbar_tension=True)
+anim = ms.animateSolution()
+#ms.plot(colortension=True, cbar_tension=True)
 #ms.plot2d(colortension=True)
 
 

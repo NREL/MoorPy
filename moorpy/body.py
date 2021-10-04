@@ -338,13 +338,17 @@ class Body():
         ry = transformPosition(np.array([0,5,0]),self.r6)
         rz = transformPosition(np.array([0,0,5]),self.r6)
         
+        linebit[0][0].set_data_3d([self.r6[0], rx[0]], [self.r6[1], rx[1]], [self.r6[2], rx[2]])
+        linebit[1][0].set_data_3d([self.r6[0], ry[0]], [self.r6[1], ry[1]], [self.r6[2], ry[2]])
+        linebit[2][0].set_data_3d([self.r6[0], rz[0]], [self.r6[1], rz[1]], [self.r6[2], rz[2]])
+        '''
         linebit[0][0].set_data([self.r6[0], rx[0]], [self.r6[1], rx[1]])
         linebit[0][0].set_3d_properties([self.r6[2], rx[2]])
         linebit[1][0].set_data([self.r6[0], ry[0]], [self.r6[1], ry[1]]) 
         linebit[1][0].set_3d_properties([self.r6[2], ry[2]])
         linebit[2][0].set_data([self.r6[0], rz[0]], [self.r6[1], rz[1]]) 
         linebit[2][0].set_3d_properties([self.r6[2], rz[2]])
-        
+        '''
         return linebit
     
     
