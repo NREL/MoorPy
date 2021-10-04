@@ -3,6 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import yaml
@@ -2403,16 +2404,16 @@ class System():
         pointlabels     = kwargs.get('pointlabels'    , False     )     # toggle to include point number labels in the plot
         endpoints       = kwargs.get('endpoints'      , False     )     # toggle to include the line end points in the plot
         bathymetry      = kwargs.get("bathymetry"     , False     )     # toggle (and string) to include bathymetry or not. Can do full map based on text file, or simple squares
-        colormap        = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
+        cmap_bath       = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
         alpha           = kwargs.get("opacity"        , 1.0       )     # the transparency of the bathymetry plot_surface
         draw_body       = kwargs.get("draw_body"      , True      )     # toggle to draw the Bodies or not
         shadow          = kwargs.get("shadow"         , True      )     # toggle to draw the mooring line shadows or not
         rang            = kwargs.get('rang'           , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
-        colorbar        = kwargs.get('colorbar'       , False     )     # toggle to include a colorbar for a plot or not
-        colorbar_size   = kwargs.get('colorbar_size'  , 1.0       )     # the scale of the colorbar. Not the same as aspect. Aspect adjusts proportions
-        colorbar_label  = kwargs.get('colorbar_label' , ""        )     # the label of the colorbar
-        colortensions   = kwargs.get("colortensions"  , False     )
-        
+        cbar_bath       = kwargs.get('cbar_bath'      , False     )     # toggle to include a colorbar for a plot or not
+        cbar_bath_size  = kwargs.get('colorbar_size'  , 1.0       )     # the scale of the colorbar. Not the same as aspect. Aspect adjusts proportions
+        colortension    = kwargs.get("colortension"   , False     )     # toggle to draw the mooring lines in colors based on node tensions
+        cmap_tension    = kwargs.get('cmap_tension'   , 'rainbow' )     # the type of color spectrum desired for colortensions
+        cbar_tension    = kwargs.get('cbar_tension'   , False     )     # toggle to include a colorbar of the tensions when colortension=True
 
         
         # sort out bounds
@@ -2460,19 +2461,28 @@ class System():
             j = j + 1
             if color==None and isinstance(line.type, str):       
                 if 'chain' in line.type:
-                    line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow)
-                elif 'rope' in line.type:
-                    line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow)
+                    line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                elif 'rope' in line.type or 'polyester' in line.type:
+                    line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 else:
-                    line.drawLine(time, ax, color=[0.2,0.2,0.2], endpoints=endpoints, shadow=shadow)
+                    line.drawLine(time, ax, color=[0.2,0.2,0.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
             else:
-                line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow)
-                
-            #Add line labels 
+                line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+            
+            
+            # Add line labels 
             if linelabels == True:
                 ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
+        
+        if cbar_tension:
+            maxten = max([max(line.getLineTens()) for line in self.lineList])   # find the max tension in the System
+            minten = min([min(line.getLineTens()) for line in self.lineList])   # find the min tension in the System
+            bounds = range(int(minten),int(maxten), int((maxten-minten)/256)) 
+            norm = mpl.colors.BoundaryNorm(bounds, 256)     # set the bounds in a norm object, with 256 being the length of all colorbar strings
+            fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap_tension), label='Tension (N)')  # add the colorbar
+            fig.tight_layout()
             
-        #Add point labels
+        # Add point labels
         i = 0
         for point in self.pointList:
             points = []
@@ -2513,12 +2523,12 @@ class System():
             '''
             # Second method: plot a 3D surface, plot_surface
             X, Y = np.meshgrid(bathGrid_Xs, bathGrid_Ys)
-            bath = ax.plot_surface(X,Y,-bathGrid, cmap=colormap, vmin=rang[0], vmax=rang[1], alpha=alpha)
+            bath = ax.plot_surface(X,Y,-bathGrid, cmap=cmap_bath, vmin=rang[0], vmax=rang[1], alpha=alpha)
             
-            if colorbar_size!=1.0 or colorbar_label!="":    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
-                colorbar=True
-            if colorbar:
-                fig.colorbar(bath, shrink=colorbar_size, label=colorbar_label)
+            if cbar_bath_size!=1.0:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
+                cbar_bath=True
+            if cbar_bath:
+                fig.colorbar(bath, shrink=cbar_bath_size, label='depth (m)')
             
         
         
@@ -2562,21 +2572,22 @@ class System():
 
         '''
         
-        title           = kwargs.get('title'          , ""        )     # optional title for the plot
-        time            = kwargs.get("time"           , 0         )     # the time in seconds of when you want to plot
-        linelabels      = kwargs.get('linelabels'     , False     )     # toggle to include line number labels in the plot
-        pointlabels     = kwargs.get('pointlabels'    , False     )     # toggle to include point number labels in the plot
-        bathymetry      = kwargs.get("bathymetry"     , False     )     # toggle (and string) to include bathymetry contours or not based on text file
-        colormap        = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
-        alpha           = kwargs.get("opacity"        , 1.0       )     # the transparency of the bathymetry plot_surface
-        levels          = kwargs.get("levels"         , 7         )     # the number (or array) of levels in the contour plot
-        rang            = kwargs.get('rang'           , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
-        colorbar        = kwargs.get('colorbar'       , False     )     # toggle to include a colorbar for a plot or not
-        colorbar_aspect = kwargs.get('colorbar_aspect', 20        )     # the proportion of the colorbar. Default is 20 height x 1 width
-        colorbar_label  = kwargs.get('colorbar_label' , ""        )     # the label of the colorbar
-        colorbar_ticks  = kwargs.get('colorbar_ticks' , None      )     # the desired tick labels on the colorbar (can be an array)
-        colortensions   = kwargs.get("colortensions"  , False     )     
-        
+        title            = kwargs.get('title'           , ""        )     # optional title for the plot
+        time             = kwargs.get("time"            , 0         )     # the time in seconds of when you want to plot
+        linelabels       = kwargs.get('linelabels'      , False     )     # toggle to include line number labels in the plot
+        pointlabels      = kwargs.get('pointlabels'     , False     )     # toggle to include point number labels in the plot
+        bathymetry       = kwargs.get("bathymetry"      , False     )     # toggle (and string) to include bathymetry contours or not based on text file
+        draw_body        = kwargs.get("draw_body"       , False     )     # toggle to draw the Bodies or not
+        cmap_bath        = kwargs.get("cmap_bath"       , 'ocean'   )     # matplotlib colormap specification
+        alpha            = kwargs.get("opacity"         , 1.0       )     # the transparency of the bathymetry plot_surface
+        levels           = kwargs.get("levels"          , 7         )     # the number (or array) of levels in the contour plot
+        rang             = kwargs.get('rang'            , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
+        cbar_bath        = kwargs.get('colorbar'        , False     )     # toggle to include a colorbar for a plot or not
+        cbar_bath_aspect = kwargs.get('cbar_bath_aspect', 20        )     # the proportion of the colorbar. Default is 20 height x 1 width
+        cbar_bath_ticks  = kwargs.get('cbar_bath_ticks' , None      )     # the desired tick labels on the colorbar (can be an array)
+        colortension     = kwargs.get("colortension"    , False     )     # toggle to draw the mooring lines in colors based on node tensions
+        cmap_tension     = kwargs.get('cmap_tension'    , 'rainbow' )     # the type of color spectrum desired for colortensions
+        cbar_tension     = kwargs.get('cbar_tension'    , False     )     # toggle to include a colorbar of the tensions when colortension=True
         
         
         # if axes not passed in, make a new figure
@@ -2585,22 +2596,23 @@ class System():
         else:
             fig = plt.gcf()   # will this work like this? <<<
         
-        #for body in self.bodyList:
-        #    #body.draw(ax)
-        #    plt.plot(body.r6[0],body.r6[1],'ko',markersize = 2)
+        if draw_body:
+            for body in self.bodyList:
+                #body.draw(ax)
+                plt.plot(body.r6[0],body.r6[1],'ko',markersize=5)
         
         j = 0
         for line in self.lineList:
             j = j + 1
             if color==None and isinstance(line.type, str):            
                 if 'chain' in line.type:
-                    line.drawLine2d(time, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec)
-                elif 'rope' in line.type:
-                    line.drawLine2d(time, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec)
+                    line.drawLine2d(time, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension)
+                elif 'rope' in line.type or 'polyester' in line.type:
+                    line.drawLine2d(time, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension)
                 else:
-                    line.drawLine2d(time, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec)
+                    line.drawLine2d(time, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension)
             else:
-                line.drawLine2d(time, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec)
+                line.drawLine2d(time, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension)
             
             # Add Line labels
             if linelabels == True:
@@ -2608,7 +2620,15 @@ class System():
                 yloc = np.dot([(line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2],Yuvec)
                 ax.text(xloc,yloc,j)
         
-        #Add point labels
+        if cbar_tension:
+            maxten = max([max(line.getLineTens()) for line in self.lineList])   # find the max tension in the System
+            minten = min([min(line.getLineTens()) for line in self.lineList])   # find the min tension in the System
+            bounds = range(int(minten),int(maxten), int((maxten-minten)/256)) 
+            norm = mpl.colors.BoundaryNorm(bounds, 256)     # set the bounds in a norm object, with 256 being the length of all colorbar strings
+            fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap_tension), label='Tension (N)')  # add the colorbar
+            fig.tight_layout()
+        
+        # Add point labels
         i = 0 
         for point in self.pointList:
             i = i + 1
@@ -2631,12 +2651,12 @@ class System():
             W = [X,Y,Z]
             
             # plot a contour profile of the bathymetry
-            bath = ax.contourf(W[Xind],W[Yind],W[Zind], cmap=colormap, levels=levels, alpha=alpha, vmin=rang[0], vmax=rang[1])
+            bath = ax.contourf(W[Xind],W[Yind],W[Zind], cmap=cmap_bath, levels=levels, alpha=alpha, vmin=rang[0], vmax=rang[1])
             
-            if colorbar_aspect!=20 or colorbar_label!="" or colorbar_ticks!=None:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
-                colorbar=True
-            if colorbar:
-                fig.colorbar(bath, label=colorbar_label, aspect=colorbar_aspect, ticks=colorbar_ticks)
+            if cbar_bath_aspect!=20 or cbar_bath_ticks!=None:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
+                cbar_bath=True
+            if cbar_bath:
+                fig.colorbar(bath, label='depth (m)', aspect=cbar_bath_aspect, ticks=cbar_bath_ticks)
             
         
         ax.axis("equal")
@@ -2768,23 +2788,30 @@ class System():
             Needs to be stored, returned, and referenced in a variable
         '''
         
-        bathymetry      = kwargs.get('bathymetry'     , False     )
-        opacity         = kwargs.get('opacity'        , 1.0       )
-        hidebox         = kwargs.get('hidebox'        , False     )
-        rang            = kwargs.get('rang'           , 'hold'    )
+        bathymetry       = kwargs.get('bathymetry'     , False     )     # toggles whether to show the axes or not
+        opacity          = kwargs.get('opacity'        , 1.0       )     # the transparency of the bathymetry plot_surface
+        hidebox          = kwargs.get('hidebox'        , False     )     # toggles whether to show the axes or not
+        rang             = kwargs.get('rang'           , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
+        res              = kwargs.get('res'            , 10        )     # the resolution of the animation; how fluid the animation is. Higher res means spottier animation. counter-intuitive
+        colortension     = kwargs.get("colortension"   , False     )     # toggle to draw the mooring lines in colors based on node tensions
+        cmap_tension     = kwargs.get('cmap_tension'   , 'rainbow' )     # the type of color spectrum desired for colortensions
+
+        # not adding cbar_tension colorbar yet since the tension magnitudes might change in the animation and the colorbar won't reflect that
         # can use any other kwargs that go into self.plot()
         
+        if self.qs==1:
+            raise ValueError("This System is set to be quasi-static. Import MoorDyn data and make qs=0 to use this method")
             
         # update animation function. This gets called every iteration of the animation and redraws the line in its next position
-        def update_Coords(tStep, tempLineList, tempax):     # not sure why it needs a 'tempax' input but it works better with it
+        def update_Coords(tStep, tempLineList, tempax, colortension, cmap_tension):     # not sure why it needs a 'tempax' input but it works better with it
             
             for imooring in tempLineList:
-                imooring.redrawLine(-tStep)
+                imooring.redrawLine(-tStep, colortension=colortension, cmap_tension=cmap_tension)
                 
             return 
 
         # create the figure and axes to draw the animation
-        fig, ax = self.plot(bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang)
+        fig, ax = self.plot(bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, colortension=colortension)
         '''
         # can do this section instead of self.plot(). They do the same thing
         fig = plt.figure(figsize=(20/2.54,12/2.54))
@@ -2811,9 +2838,10 @@ class System():
             itime = int(np.where(self.lineList[0].Tdata==runtime)[0])
             nFrames = len(self.lineList[0].Tdata[0:itime])
         
+        
         # Animation: update the figure with the updated coordinates from update_Coords function
         # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()
-        line_ani = animation.FuncAnimation(fig, update_Coords, np.arange(1, nFrames-1, 10), fargs=(self.lineList, ax),
+        line_ani = animation.FuncAnimation(fig, update_Coords, np.arange(1, nFrames-1, res), fargs=(self.lineList, ax, colortension, cmap_tension),
                                            interval=1, repeat=repeat, repeat_delay=delay, blit=False)
                                             # works well when np.arange(...nFrames...) is used. Others iterable ways to do this
         
@@ -2821,113 +2849,3 @@ class System():
     
     
     
-    def colortensions(self, bounds='default', ax=None, hidebox=False, rbound=0, title="", linelabels=False, pointlabels=False):
-        '''Plots the mooring system objects in their current positions
-
-        Parameters
-        ----------
-        bounds : string, optional
-            signifier for the type of bounds desired in the plot. The default is "default".
-        ax : axes, optional
-            Plot on an existing set of axes
-        color : string, optional
-            Some way to control the color of the plot ... TBD <<<
-        hidebox : bool, optional
-            If true, hides the axes and box so just the plotted lines are visible.
-        rbound : float, optional
-            A bound to be placed on each axis of the plot. If 0, the bounds will be the max values on each axis. The default is 0.
-        title : string, optional
-            A title of the plot. The default is "".
-
-        Returns
-        -------
-        fig : figure object
-            To hold the axes of the plot
-        ax: axis object
-            To hold the points and drawing of the plot
-            
-        '''
-        
-        # sort out bounds
-        xs = []
-        ys = []
-        zs = [0, -self.depth]
-        
-        for point in self.pointList:
-            xs.append(point.r[0])
-            ys.append(point.r[1])
-            zs.append(point.r[2])
-            
-
-        # if axes not passed in, make a new figure
-        if ax == None:    
-            fig = plt.figure()
-            #fig = plt.figure(figsize=(20/2.54,12/2.54), dpi=300)
-            ax = plt.axes(projection='3d')
-        else:
-            fig = ax.get_figure()
-        
-        # set bounds
-        if rbound==0:
-            rbound = max([max(xs), max(ys), -min(xs), -min(ys)]) # this is the most extreme coordinate
-            
-        
-        if bounds=='default':
-            ax.set_zlim([-self.depth, 0])
-        elif bounds=='rbound':   
-            ax.set_xlim([-rbound,rbound])
-            ax.set_ylim([-rbound,rbound])
-            ax.set_zlim([-rbound, rbound])
-        elif bounds=='mooring':
-            ax.set_xlim([-rbound,0])
-            ax.set_ylim([-rbound/2,rbound/2])
-            ax.set_zlim([-self.depth, 0])
-        
-        #find max tension 
-        tens = []
-        for line in self.lineList:
-            tens.extend(line.maxtension(0))
-        maxten = max(tens)
-        minten = min(tens)
-        
-        # draw things
-        for body in self.bodyList:
-            body.draw(ax)
-        
-        j = 0
-        for line in self.lineList:
-            j = j + 1
-            line.drawColorTensionLine(0, ax,  maxten, minten)
-               
-            #Add line labels 
-            if linelabels == True:
-                ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
-            
-        #Add point labels
-        i = 0 
-        for point in self.pointList:
-            i = i + 1
-            if pointlabels == True:
-                ax.text(point.r[0], point.r[1], point.r[2], i, c = 'r')
-        
-        fig.suptitle(title)
-
-
-        set_axes_equal(ax)
-        
-        ax.set_zticks([-self.depth, 0])  # set z ticks to just 0 and seabed
-        
-        if hidebox:
-            ax.axis('off')
-        
-        #plt.show()
-        
-        # fig1, ax1 = plt.subplots(figsize=(6, 1))
-        # fig1.subplots_adjust(bottom=0.5)
-
-        # cmap = mpl.cm.cool
-        # norm = mpl.colors.Normalize(vmin=minten, vmax=maxten)
-        # cb1 = mpl.colorbar.ColorbarBase(ax, cmap=cmap,norm=norm,orientation='horizontal')
-        
-        return fig, ax, minten, maxten  # return the figure and axis object in case it will be used later to update the plot
-        
