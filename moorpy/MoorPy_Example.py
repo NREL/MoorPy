@@ -9,26 +9,30 @@
 # 2020-06-17: Trying to create a new quasi-static mooring system solver based on my Catenary function adapted from FAST v7, and using MoorDyn architecture
 
 
-
 import numpy as np
 import moorpy as mp
+from moorpy.MoorProps import getLineProps
 
 
 
+# EXAMPLE 1: Load in a MoorDyn input file to create a MoorPy System
 
-
-
-
-ms = mp.System('lines.txt')
-ms.initialize(plots=1)
+#ms = mp.System('lines.txt')
+#ms.initialize(plots=1)
 #ms.plot()
 
-
+ms = mp.System('IEA-15-240-RWT-UMaineSemi_MoorDyn_PPI.dat', depth=850)
+ms.initialize(plots=0)
+ms.bodyList[0].type=1
+ms.solveEquilibrium3(plots=0)
+anim = ms.animateSolution()
+#ms.plot(colortension=True, cbar_tension=True)
+#ms.plot2d(colortension=True)
 
 
 
 '''
-# catenary testing
+# EXAMPLE 2: Catenary Testing Calls
 mp.catenary(576.2346666666667, 514.6666666666666, 800, 4809884.623076923, -2.6132152062554828, CB=-64.33333333333337, HF0=0, VF0=0, Tol=1e-05, MaxIter=50, plots=2)
 print("\nTEST 2")
 mp.catenary(88.91360441490338, 44.99537159734132, 100.0, 854000000.0000001, 1707.0544275185273, CB=0.0, HF0=912082.6820817506, VF0=603513.100376363, Tol=1e-06, MaxIter=50, plots=1)
@@ -55,10 +59,8 @@ mp.catenary(98.6712173965359, 8.515909042185399, 102.7903150736787, 5737939634.5
 '''
 
 
-
-
-
 '''
+# EXAMPLE 3: Create a simple MoorPy System from scratch
 test = mp.System()
 
 test.depth = 100
@@ -85,8 +87,8 @@ test.plot()
 
 
 
-
-
+"""
+# EXAMPLE 4: Create a diagonal or orthogonal MoorPy System and compare system stiffness matrices
 ms = mp.System()
 
 # --- diagonal scenario ---
@@ -163,5 +165,106 @@ print("system stiffness A")
 mp.printMat(KsystemA)
 print("system stiffness nonlinear")
 mp.printMat(Ksystem)
+
+"""
+
+
+
+"""
+# EXAMPLE 5: Create a 3 line MoorPy System from scratch (Taken from ColorTension_example)
+
+depth     = 600
+angle     = np.arange(3)*np.pi*2/3  # line headings list
+anchorR   = 1600                    # anchor radius/spacing
+fair_depth= 21 
+fairR     = 20
+LineLength= 1800
+typeName  = "chain"                 # identifier string for line type
+
+# --------------- set up mooring system ---------------------
+
+# Create blank system object
+ms = mp.System()
+
+# Set the depth of the system to the depth of the input value
+ms.depth = depth
+
+# add a line type
+ms.lineTypes[typeName] = getLineProps(120, name=typeName)
+
+# Add a free, body at [0,0,0] to the system (including some properties to make it hydrostatically stiff)
+ms.addBody(0, np.zeros(6), m=1e6, v=1e3, rM=100, AWP=1e3)
+
+# Set the anchor points of the system
+anchors = []
+for i in range(len(angle)):
+    ms.addPoint(1, np.array([anchorR*np.cos(angle[i]), anchorR*np.sin(angle[i]), -ms.depth], dtype=float))
+    anchors.append(len(ms.pointList))
+
+# Set the points that are attached to the body to the system
+bodypts = []
+for i in range(len(angle)):
+    ms.addPoint(1, np.array([fairR*np.cos(angle[i]), fairR*np.sin(angle[i]), -fair_depth], dtype=float))
+    bodypts.append(len(ms.pointList))
+    ms.bodyList[0].attachPoint(ms.pointList[bodypts[i]-1].number, ms.pointList[bodypts[i]-1].r - ms.bodyList[0].r6[:3])
+
+# Add and attach lines to go from the anchor points to the body points
+for i in range(len(angle)):    
+    ms.addLine(LineLength, typeName)
+    line = len(ms.lineList)
+    ms.pointList[anchors[i]-1].attachLine(ms.lineList[line-1].number, 0)
+    ms.pointList[bodypts[i]-1].attachLine(ms.lineList[line-1].number, 1)
+
+
+'''
+ms.initialize()                                             # make sure everything's connected
+ms.solveEquilibrium3()                                      # equilibrate
+ms.unload("sample.txt")                                     # export to MD input file
+#fig, ax = ms.plot()                                         # plot the system in original configuration
+
+ms.solveEquilibrium3()                                      # equilibrate
+#fig, ax = ms.plot(color='red')                       # plot the system in displaced configuration (on the same plot, in red)
+
+print(f"Body offset position is {ms.bodyList[0].r6}")
+        
+plt.show()
+
+fig, ax, minten, maxten = ms.colortensions()
+#fig.show()
+#Read in tension data
+#dataff, unitsff = ml.read_output_file("C:/code/Analyzing Outputs/Python scripts for OpenFAST outputs/FF Mooring lines/", "steadyfarm.FarmMD.MD.out")
+#time = dataff['Time']
+fig, ax = plt.subplots(figsize=(6, 1))
+fig.subplots_adjust(bottom=0.5)
+
+cmap = mpl.colors.LinearSegmentedColormap.from_list('mycolors',['blue','red'])
+bounds = range(int(minten),int(maxten), int((maxten-minten)/10))
+norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+
+fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap),
+             cax=ax, orientation='horizontal',
+             label="Tension [N]")
+'''
+# ----------------
+
+ms.initialize()
+ms.solveEquilibrium3()
+#ms.unload('sample.txt')
+fig, ax = ms.plot(colortension=True)
+"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

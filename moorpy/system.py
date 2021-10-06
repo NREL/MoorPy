@@ -3,7 +3,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib import cm
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import yaml
+
+from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import spsolve
 
 from moorpy.body import Body
 from moorpy.point import Point
@@ -21,7 +27,7 @@ class System():
     # >>> note: system module will need to import Line, Point, Body for its add/creation routines 
     #     (but line/point/body modules shouldn't import system) <<<
     
-    def __init__(self, file="", depth=0, rho=1025, g=9.81):
+    def __init__(self, moordyn_file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1):
         '''Creates an empty MoorPy mooring system data structure and will read an input file if provided.
 
         Parameters
@@ -65,8 +71,22 @@ class System():
         self.display = 0    # a flag that controls how much printing occurs in methods within the System (Set manually. Values > 0 cause increasing output.)
         
         # read in data from an input file if a filename was provided
-        if len(file) > 0:
-            self.load(file)
+        if len(moordyn_file) > 0:
+            self.load(moordyn_file)
+        
+        # set the quasi-static/dynamic toggle for the entire mooring system
+        self.qs = qs
+        if self.qs==0:  # if the mooring system is desired to be used as a portrayal of MoorDyn data
+            if len(moordyn_file)==0 or len(dirname)==0 or len(rootname)==0:
+                raise ValueError("The directory location of the MoorDyn output files needs to be given OR the name of the .fst file needs to be given, without the .fst")
+            # load in the MoorDyn data for each line to set the xp,yp,zp positions of each node in the line
+            # Each row in the xp matrix is a time step and each column is a node in the line
+            for line in self.lineList:
+                try:
+                    line.loadData(dirname, rootname)
+                except:
+                    raise ValueError("There is likely not a .MD.Line#.out file in the directory. Make sure Line outputs are set to 'p' in the MoorDyn input file")
+                
     
     
     def addBody(self, mytype, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), f6Ext=np.zeros(6)):
@@ -343,6 +363,9 @@ class System():
                             pointType = 1
                             # attach to body here
                             BodyID = int("".join(filter(str.isdigit, entry1)))
+                            if len(self.bodyList) < BodyID:
+                                self.bodyList.append( Body(self, 1, 0, np.zeros(6)))
+                            
                             rRel = np.array(entries[2:5], dtype=float)
                             self.bodyList[BodyID-1].attachPoint(num, rRel)
                             
@@ -545,7 +568,32 @@ class System():
             self.rho = data['water_density']
             
         
+    def readBathymetryFile(self, filename):
+        f = open(filename, 'r')
 
+        # skip the header
+        line = next(f)
+        # collect the number of grid values in the x and y directions from the second and third lines
+        line = next(f)
+        nGridX = int(line.split()[1])
+        line = next(f)
+        nGridY = int(line.split()[1])
+        # allocate the Xs, Ys, and main bathymetry grid arrays
+        bathGrid_Xs = np.zeros(nGridX)
+        bathGrid_Ys = np.zeros(nGridY)
+        bathGrid = np.zeros([nGridX, nGridY])
+        # read in the fourth line to the Xs array
+        line = next(f)
+        bathGrid_Xs = [float(line.split()[i]) for i in range(nGridX)]
+        # read in the remaining lines in the file into the Ys array (first entry) and the main bathymetry grid
+        for i in range(nGridY):
+            line = next(f)
+            entries = line.split()
+            bathGrid_Ys[i] = entries[0]
+            bathGrid[i,:] = entries[1:]
+        
+        return bathGrid_Xs, bathGrid_Ys, bathGrid
+    
     
         
     def unload(self, fileName, MDversion=2, **kwargs):
@@ -1091,6 +1139,7 @@ class System():
         L.append("---------------------- OPTIONS ----------------------------------------")
         
         #Solver Options
+
         L.append("{:<9.5f}dtM          - time step to use in mooring integration (s)".format(float(dtm)))
         L.append("{:<9.1f}WtrDpth        - water depth (m) <<< must be specified for farm-level mooring".format(float(depth)))
         L.append("{:<9.1e}kbot         - bottom stiffness (Pa/m)".format(kbot))
@@ -1632,7 +1681,7 @@ class System():
         
         '''
         
-        
+        self.DOFtype_solve_for = DOFtype
         # create arrays for the initial positions of the objects that need to find equilibrium, and the max step sizes
         X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[100, 0.3])
         
@@ -1714,30 +1763,41 @@ class System():
             
             # adjust positions according to stiffness matrix to move toward net zero forces
             
-            if np.linalg.det(K) == 0.0:                 # if the stiffness matrix is singular, we will modify the approach
-                
-                # first try ignoring any DOFs with zero stiffness
-                indices = list(range(n))                # list of DOF indices that will remain active for this step
-                mask = [True]*n                         # this is a mask to be applied to the array K indices
-                
-                for i in range(n-1, -1, -1):            # go through DOFs and flag any with zero stiffness for exclusion
-                    if K[i,i] == 0:
-                        mask[i] = False
-                        del indices[i]
-                
-                K_select = K[mask,:][:,mask]
-                Y_select = Y[mask]
-                
-                dX = np.zeros(n)
-                
-                if np.linalg.det(K_select) == 0.0:      
-                    dX_select = Y_select/np.diag(K_select)   # last-ditch attempt to get a step despite matrix singularity
+
+            #else:                                       # Normal case where all DOFs are adjusted
+            try:               # try the normal solve first to avoid calculating the determinant every time
+                if n > 20: # if huge, count on the system being sparse and use a sparse solver
+                    Kcsr = csr_matrix(K)
+                    dX = spsolve(Kcsr, Y)
                 else:
-                    dX_select = np.linalg.solve(K_select, Y_select)
-                dX[indices] = dX_select                 # assign active step DOFs, other DOFs will be zero
+                    dX = np.linalg.solve(K, Y)              # calculate position adjustment according to Newton's method
+            except:
             
-            else:                                       # Normal case where all DOFs are adjusted
-                dX = np.linalg.solve(K, Y)              # calculate position adjustment according to Newton's method
+                if np.linalg.det(K) == 0.0:                 # if the stiffness matrix is singular, we will modify the approach
+                
+                    # first try ignoring any DOFs with zero stiffness
+                    indices = list(range(n))                # list of DOF indices that will remain active for this step
+                    mask = [True]*n                         # this is a mask to be applied to the array K indices
+                    
+                    for i in range(n-1, -1, -1):            # go through DOFs and flag any with zero stiffness for exclusion
+                        if K[i,i] == 0:
+                            mask[i] = False
+                            del indices[i]
+                    
+                    K_select = K[mask,:][:,mask]
+                    Y_select = Y[mask]
+                    
+                    dX = np.zeros(n)
+                    
+                    if np.linalg.det(K_select) == 0.0:      
+                        dX_select = Y_select/np.diag(K_select)   # last-ditch attempt to get a step despite matrix singularity
+                    else:
+                        dX_select = np.linalg.solve(K_select, Y_select)
+                    dX[indices] = dX_select                 # assign active step DOFs, other DOFs will be zero
+                
+                else:
+                    raise Exception("why did it fail even though det isn't zero?")
+            
             
             # but limit adjustment magnitude (still preserve direction) to keep things under control
             overratio = np.max(np.abs(dX)/db)            
@@ -1777,8 +1837,8 @@ class System():
             print(X)
             print(Y)
         
-        self.Xs = info['Xs']    # List of positions as it finds equilibrium for every iteration
-        self.Es = info['Es']    # List of errors that the forces are away from 0, which in this case, is the same as the forces
+        self.Xs2 = info['Xs']    # List of positions as it finds equilibrium for every iteration
+        self.Es2 = info['Es']    # List of errors that the forces are away from 0, which in this case, is the same as the forces
         
         # Update equilibrium position at converged X values
         F = self.mooringEq(X, DOFtype=DOFtype, tol=lineTol)
@@ -1807,30 +1867,30 @@ class System():
                 raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {info['iter']} iterations, with residual forces of {F}")
 
 
-            
+        
         # show an animation of the equilibrium solve if applicable
         if plots > 0:   
             self.animateSolution()
-    
+        
         return True
     
     
     def plotEQsolve(self, iter=-1):
         '''Plots trajectories of solving equilibrium from solveEquilibrium.'''
         
-        n = self.Xs.shape[1]
+        n = self.Xs2.shape[1]
         
         if n < 8:
             fig, ax = plt.subplots(2*n, 1, sharex=True)
             for i in range(n):
-                ax[  i].plot(self.Xs[:iter, i])
-                ax[n+i].plot(self.Es[:iter, i])
+                ax[  i].plot(self.Xs2[:iter, i])
+                ax[n+i].plot(self.Es2[:iter, i])
             ax[-1].set_xlabel("iteration")
         else:
             fig, ax = plt.subplots(n, 2, sharex=True)
             for i in range(n):
-                ax[i,0].plot(self.Xs[:iter, i])
-                ax[i,1].plot(self.Es[:iter, i])
+                ax[i,0].plot(self.Xs2[:iter, i])
+                ax[i,1].plot(self.Es2[:iter, i])
             ax[-1,0].set_xlabel("iteration, X")
             ax[-1,1].set_xlabel("iteration, Error")
         plt.show()
@@ -2005,6 +2065,8 @@ class System():
             nCpldDOF x nCpldDOF stiffness matrix of the system
 
         '''
+        self.nDOF, self.nCpldDOF = self.getDOFs()
+        
         if self.display > 2:
             print("Getting mooring system stiffness matrix...")
 
@@ -2024,7 +2086,7 @@ class System():
         
         if tensions:
             T1 = self.getTensions()
-            J = np.zeros([self.nCpldDOF, len(T1)])   # allocate Jacobian of tensions w.r.t. coupled DOFs
+            J = np.zeros([len(T1), self.nCpldDOF])   # allocate Jacobian of tensions w.r.t. coupled DOFs
                 
         if plots > 0:
             self.cpldDOFs.clear()  # clear the positions history to refill if animating this process
@@ -2048,7 +2110,7 @@ class System():
                     self.cpldDOFs.append(X2)
                 
                 K[:,i] = -(F2p-F1)/dX[i]                # take finite difference of force w.r.t perturbation
-                if tensions:  J[i,:] = (T2p-T1)/dX[i]
+                if tensions:  J[:,i] = (T2p-T1)/dX[i]
             
         elif solveOption==1:  # ::: adaptive central difference approach :::
         
@@ -2111,7 +2173,7 @@ class System():
                     
                     
                 K[:,i] = -0.5*(F2p-F2m)/dXi    # take finite difference of force w.r.t perturbation
-                if tensions:  J[i,:] = 0.5*(T2p-T2m)/dX[i]
+                if tensions:  J[:,i] = 0.5*(T2p-T2m)/dX[i]
                 
         else:
             raise ValueError("getSystemStiffness was called with an invalid solveOption (only 0 and 1 are supported)")
@@ -2165,19 +2227,19 @@ class System():
         
         
         # find the total number of free and coupled DOFs in case any object types changed
-        nDOF, nCpldDOF = self.getDOFs()
+        self.nDOF, self.nCpldDOF = self.getDOFs()
         
         #self.solveEquilibrium3()   # should we make sure the system is in equilibrium?
         
         # allocate stiffness matrix according to the DOFtype specified
         if DOFtype=="free":
-            K = np.zeros([nDOF,nDOF])
+            K = np.zeros([self.nDOF, self.nDOF])
             d = [0]
         elif DOFtype=="coupled":
-            K = np.zeros([nCpldDOF, nCpldDOF])
+            K = np.zeros([self.nCpldDOF, self.nCpldDOF])
             d = [-1]
         elif DOFtype=="both":
-            K = np.zeros([nDOF+nCpldDOF, nDOF+nCpldDOF])
+            K = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
             d = [0,-1]
         else:
             raise ValueError("getSystemStiffnessA called with invalid DOFtype input. Must be free, coupled, or both")
@@ -2236,6 +2298,7 @@ class System():
                                         r2 = rotatePosition(rPointRel2, body2.r6[3:])   # relative position of Point about body ref point in unrotated reference frame  
                                         H2 = getH(r2)
                                         
+                                        # check signs/transposes below
                                         K66 = np.block([[   KB        , np.matmul(KB, H1)],
                                                   [np.matmul(H2.T, KB), np.matmul(np.matmul(H2, KB), H1.T)]])
                                         
@@ -2335,7 +2398,7 @@ class System():
     
     
 
-    def plot(self, bounds='default', ax=None, color=None, hidebox=False, rbound=0, title="", linelabels=False, pointlabels=False, endpoints=False):
+    def plot(self, ax=None, bounds='default', rbound=0, color=None, **kwargs):
         '''Plots the mooring system objects in their current positions
         Parameters
         ----------
@@ -2351,8 +2414,15 @@ class System():
             A bound to be placed on each axis of the plot. If 0, the bounds will be the max values on each axis. The default is 0.
         title : string, optional
             A title of the plot. The default is "".
-        linelabels : adds line numbers to plot cooresponding to MoorDyn file 
-         pointlabels: adds line numbers to plot cooresponding to MoorDyn file 
+        linelabels : bool, optional
+            Adds line numbers to plot in text. Default is False.
+        pointlabels: bool, optional
+            Adds point numbers to plot in text. Default is False.
+        endpoints: bool, optional
+            Adds visible end points to lines. Default is False.
+        bathymetry: bool, optional
+            Creates a bathymetry map of the seabed based on an input file. Default is False.
+            
         Returns
         -------
         fig : figure object
@@ -2361,6 +2431,25 @@ class System():
             To hold the points and drawing of the plot
             
         '''
+        
+        hidebox         = kwargs.get('hidebox'        , False     )     # toggles whether to show the axes or not
+        title           = kwargs.get('title'          , ""        )     # optional title for the plot
+        time            = kwargs.get("time"           , 0         )     # the time in seconds of when you want to plot
+        linelabels      = kwargs.get('linelabels'     , False     )     # toggle to include line number labels in the plot
+        pointlabels     = kwargs.get('pointlabels'    , False     )     # toggle to include point number labels in the plot
+        endpoints       = kwargs.get('endpoints'      , False     )     # toggle to include the line end points in the plot
+        bathymetry      = kwargs.get("bathymetry"     , False     )     # toggle (and string) to include bathymetry or not. Can do full map based on text file, or simple squares
+        cmap_bath       = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
+        alpha           = kwargs.get("opacity"        , 1.0       )     # the transparency of the bathymetry plot_surface
+        draw_body       = kwargs.get("draw_body"      , True      )     # toggle to draw the Bodies or not
+        shadow          = kwargs.get("shadow"         , True      )     # toggle to draw the mooring line shadows or not
+        rang            = kwargs.get('rang'           , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
+        cbar_bath       = kwargs.get('cbar_bath'      , False     )     # toggle to include a colorbar for a plot or not
+        cbar_bath_size  = kwargs.get('colorbar_size'  , 1.0       )     # the scale of the colorbar. Not the same as aspect. Aspect adjusts proportions
+        colortension    = kwargs.get("colortension"   , False     )     # toggle to draw the mooring lines in colors based on node tensions
+        cmap_tension    = kwargs.get('cmap_tension'   , 'rainbow' )     # the type of color spectrum desired for colortensions
+        cbar_tension    = kwargs.get('cbar_tension'   , False     )     # toggle to include a colorbar of the tensions when colortension=True
+
         
         # sort out bounds
         xs = []
@@ -2398,32 +2487,85 @@ class System():
             ax.set_zlim([-self.depth, 0])
             
         # draw things
-        for body in self.bodyList:
-            body.draw(ax)
+        if draw_body:
+            for body in self.bodyList:
+                body.draw(ax)
         
         j = 0
         for line in self.lineList:
             j = j + 1
             if color==None and isinstance(line.type, str):       
                 if 'chain' in line.type:
-                    line.drawLine(0, ax, color=[.1, 0, 0], endpoints = endpoints)
-                elif 'rope' in line.type:
-                    line.drawLine(0, ax, color=[.3,.5,.5], endpoints = endpoints)
+                    line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                elif 'rope' in line.type or 'polyester' in line.type:
+                    line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 else:
-                    line.drawLine(0, ax, color=[0.3,0.3,0.3], endpoints = endpoints)
+                    line.drawLine(time, ax, color=[0.2,0.2,0.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
             else:
-                line.drawLine(0, ax, color=color, endpoints = endpoints)
-                
-            #Add line labels 
+                line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+            
+            
+            # Add line labels 
             if linelabels == True:
                 ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
+        
+        if cbar_tension:
+            maxten = max([max(line.getLineTens()) for line in self.lineList])   # find the max tension in the System
+            minten = min([min(line.getLineTens()) for line in self.lineList])   # find the min tension in the System
+            bounds = range(int(minten),int(maxten), int((maxten-minten)/256)) 
+            norm = mpl.colors.BoundaryNorm(bounds, 256)     # set the bounds in a norm object, with 256 being the length of all colorbar strings
+            fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap_tension), label='Tension (N)')  # add the colorbar
+            fig.tight_layout()
             
-        #Add point labels
-        i = 0 
+        # Add point labels
+        i = 0
         for point in self.pointList:
+            points = []
             i = i + 1
             if pointlabels == True:
                 ax.text(point.r[0], point.r[1], point.r[2], i, c = 'r')
+            
+            if bathymetry==True:     # if bathymetry is true, then make squares at each anchor point
+                if point.attachedEndB[0] == 0 and point.r[2] < -400:
+                    points.append([point.r[0]+250, point.r[1]+250, point.r[2]])
+                    points.append([point.r[0]+250, point.r[1]-250, point.r[2]])
+                    points.append([point.r[0]-250, point.r[1]-250, point.r[2]])
+                    points.append([point.r[0]-250, point.r[1]+250, point.r[2]])
+                    
+                    Z = np.array(points)
+                    verts = [[Z[0],Z[1],Z[2],Z[3]]]
+                    ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=alpha))
+            
+        if isinstance(bathymetry, str):   # or, if it's a string, load in the bathymetry file
+
+            # parse through the MoorDyn bathymetry file
+            bathGrid_Xs, bathGrid_Ys, bathGrid = self.readBathymetryFile(bathymetry)
+            if rang=='hold':
+                rang = (np.min(-bathGrid), np.max(-bathGrid))
+            '''
+            # First method: plot nice 2D squares using Poly3DCollection
+            nX = len(bathGrid_Xs)
+            nY = len(bathGrid_Ys)
+            # store a list of points in the grid
+            Z = [[bathGrid_Xs[j],bathGrid_Ys[i],-bathGrid[i,j]] for i in range(nY) for j in range(nX)]
+            # plot every square in the grid (e.g. 16 point grid yields 9 squares)
+            verts = []
+            for i in range(nY-1):
+                for j in range(nX-1):
+                    verts.append([Z[j+nX*i],Z[(j+1)+nX*i],Z[(j+1)+nX*(i+1)],Z[j+nX*(i+1)]])
+                    ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=0.5))
+                    verts = []
+            '''
+            # Second method: plot a 3D surface, plot_surface
+            X, Y = np.meshgrid(bathGrid_Xs, bathGrid_Ys)
+            bath = ax.plot_surface(X,Y,-bathGrid, cmap=cmap_bath, vmin=rang[0], vmax=rang[1], alpha=alpha)
+            
+            if cbar_bath_size!=1.0:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
+                cbar_bath=True
+            if cbar_bath:
+                fig.colorbar(bath, shrink=cbar_bath_size, label='depth (m)')
+            
+        
         
         fig.suptitle(title)
         
@@ -2434,13 +2576,13 @@ class System():
         if hidebox:
             ax.axis('off')
         
-        #plt.show()
+        plt.show()
         
         return fig, ax  # return the figure and axis object in case it will be used later to update the plot
         
         
         
-    def plot2d(self, Xuvec=[1,0,0], Yuvec=[0,0,1], ax=None, color=None, title="", linelabels=False, pointlabels=False):
+    def plot2d(self, Xuvec=[1,0,0], Yuvec=[0,0,1], ax=None, color=None, **kwargs):
         '''Makes a 2D plot of the mooring system objects in their current positions
 
         Parameters
@@ -2465,28 +2607,47 @@ class System():
 
         '''
         
+        title            = kwargs.get('title'           , ""        )     # optional title for the plot
+        time             = kwargs.get("time"            , 0         )     # the time in seconds of when you want to plot
+        linelabels       = kwargs.get('linelabels'      , False     )     # toggle to include line number labels in the plot
+        pointlabels      = kwargs.get('pointlabels'     , False     )     # toggle to include point number labels in the plot
+        bathymetry       = kwargs.get("bathymetry"      , False     )     # toggle (and string) to include bathymetry contours or not based on text file
+        draw_body        = kwargs.get("draw_body"       , False     )     # toggle to draw the Bodies or not
+        cmap_bath        = kwargs.get("cmap_bath"       , 'ocean'   )     # matplotlib colormap specification
+        alpha            = kwargs.get("opacity"         , 1.0       )     # the transparency of the bathymetry plot_surface
+        levels           = kwargs.get("levels"          , 7         )     # the number (or array) of levels in the contour plot
+        rang             = kwargs.get('rang'            , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
+        cbar_bath        = kwargs.get('colorbar'        , False     )     # toggle to include a colorbar for a plot or not
+        cbar_bath_aspect = kwargs.get('cbar_bath_aspect', 20        )     # the proportion of the colorbar. Default is 20 height x 1 width
+        cbar_bath_ticks  = kwargs.get('cbar_bath_ticks' , None      )     # the desired tick labels on the colorbar (can be an array)
+        colortension     = kwargs.get("colortension"    , False     )     # toggle to draw the mooring lines in colors based on node tensions
+        cmap_tension     = kwargs.get('cmap_tension'    , 'rainbow' )     # the type of color spectrum desired for colortensions
+        cbar_tension     = kwargs.get('cbar_tension'    , False     )     # toggle to include a colorbar of the tensions when colortension=True
+        
+        
         # if axes not passed in, make a new figure
         if ax == None:
             fig, ax = plt.subplots(1,1)
         else:
             fig = plt.gcf()   # will this work like this? <<<
         
-        #for body in self.bodyList:
-        #    #body.draw(ax)
-        #    plt.plot(body.r6[0],body.r6[1],'ko',markersize = 2)
+        if draw_body:
+            for body in self.bodyList:
+                #body.draw(ax)
+                plt.plot(body.r6[0],body.r6[1],'ko',markersize=5)
         
         j = 0
         for line in self.lineList:
             j = j + 1
             if color==None and isinstance(line.type, str):            
                 if 'chain' in line.type:
-                    line.drawLine2d(0, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec)
-                elif 'rope' in line.type:
-                    line.drawLine2d(0, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec)
+                    line.drawLine2d(time, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension)
+                elif 'rope' in line.type or 'polyester' in line.type:
+                    line.drawLine2d(time, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension)
                 else:
-                    line.drawLine2d(0, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec)
+                    line.drawLine2d(time, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension)
             else:
-                line.drawLine2d(0, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec)
+                line.drawLine2d(time, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension)
             
             # Add Line labels
             if linelabels == True:
@@ -2494,7 +2655,15 @@ class System():
                 yloc = np.dot([(line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2],Yuvec)
                 ax.text(xloc,yloc,j)
         
-        #Add point labels
+        if cbar_tension:
+            maxten = max([max(line.getLineTens()) for line in self.lineList])   # find the max tension in the System
+            minten = min([min(line.getLineTens()) for line in self.lineList])   # find the min tension in the System
+            bounds = range(int(minten),int(maxten), int((maxten-minten)/256)) 
+            norm = mpl.colors.BoundaryNorm(bounds, 256)     # set the bounds in a norm object, with 256 being the length of all colorbar strings
+            fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap_tension), label='Tension (N)')  # add the colorbar
+            fig.tight_layout()
+        
+        # Add point labels
         i = 0 
         for point in self.pointList:
             i = i + 1
@@ -2503,14 +2672,36 @@ class System():
                 yloc = np.dot([point.r[0], point.r[1], point.r[2]], Yuvec)
                 ax.text(xloc, yloc, i, c = 'r')
         
+        if isinstance(bathymetry, str):   # or, if it's a string, load in the bathymetry file
+
+            # parse through the MoorDyn bathymetry file
+            bathGrid_Xs, bathGrid_Ys, bathGrid = self.readBathymetryFile(bathymetry)
+            
+            X, Y = np.meshgrid(bathGrid_Xs, bathGrid_Ys)
+            Z = -bathGrid
+            if rang=='hold':
+                rang = (np.min(Z), np.max(Z))
+            
+            Xind = Xuvec.index(1); Yind = Yuvec.index(1); Zind = int(3-Xind-Yind)
+            W = [X,Y,Z]
+            
+            # plot a contour profile of the bathymetry
+            bath = ax.contourf(W[Xind],W[Yind],W[Zind], cmap=cmap_bath, levels=levels, alpha=alpha, vmin=rang[0], vmax=rang[1])
+            
+            if cbar_bath_aspect!=20 or cbar_bath_ticks!=None:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
+                cbar_bath=True
+            if cbar_bath:
+                fig.colorbar(bath, label='depth (m)', aspect=cbar_bath_aspect, ticks=cbar_bath_ticks)
+            
+        
         ax.axis("equal")
         ax.set_title(title)
-        #plt.show()
+        plt.show()
         
         return fig, ax  # return the figure and axis object in case it will be used later to update the plot
         
         
-    def animateSolution(self):
+    def animateSolution(self, DOFtype="free"):
         '''Creates an animation of the system
 
         Returns
@@ -2521,49 +2712,54 @@ class System():
         
         # first draw a plot of DOFs and forces
         x = np.array(self.Xs)
-        f = np.array(self.Fs)
+        f = np.array(self.Es)
         fig,ax = plt.subplots(2,1,sharex=True)
-        for i in range(len(self.Fs[0])):
+        for i in range(len(self.Es[0])):
             ax[0].plot(x[:,i])   # <<< warning this is before scale and offset!
             ax[1].plot(f[:,i], label=i+1)
         ax[1].legend()
         
         
-        self.mooringEq(self.freeDOFs[0])   # set positions back to the first ones of the iteration process
-        # ^^^^^^^ this only works for free DOF animation cases (not coupled DOF ones) <<<<<
+        #self.mooringEq(self.freeDOFs[0])   # set positions back to the first ones of the iteration process
+        self.mooringEq(self.Xs[0], DOFtype=self.DOFtype_solve_for)   # set positions back to the first ones of the iteration process
+        # ^^^^^^^ this only works for free DOF animation cases (not coupled DOF ones) <<<<< ...should be good now
         
         fig, ax = self.plot()    # make the initial plot to then animate
         
-        ms_delay = 10000/len(self.freeDOFs)  # time things so the animation takes 10 seconds
+        nFreeDOF, nCpldDOF = self.getDOFs()
+        if DOFtype=="free":
+            nDOF = nFreeDOF
+        elif DOFtype=="coupled":
+            nDOF = nCpldDOF
+        elif DOFtype=="both":
+            nDOF = nFreeDOF+nCpldDOF
         
-        line_ani = animation.FuncAnimation(fig, self.animate, len(self.freeDOFs),
-                                           interval=ms_delay, blit=False, repeat_delay=2000)
+        #ms_delay = 10000/len(self.freeDOFs)  # time things so the animation takes 10 seconds
+        
+        line_ani = animation.FuncAnimation(fig, self.animate, np.arange(0,len(self.Xs),1), #fargs=(ax),
+                                           interval=1000, blit=False, repeat_delay=2000, repeat=True)
     
-        plt.show()
+        return line_ani
     
     
     def animate(self, ts):
         '''Redraws mooring system positions at step ts. Currently set up in a hack-ish way to work for animations
         involving movement of either free DOFs or coupled DOFs (but not both)
-
-        Parameters
-        ----------
-        ts : TYPE
-            DESCRIPTION.
-
-        Raises
-        ------
-        ValueError
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
         '''
 
         # following sets positions of all objects and may eventually be made into self.setPositions(self.positions[i])
         
+        X = self.Xs[ts]         # Xs are already specified in solveEquilibrium's DOFtype
+        
+        if self.DOFtype_solve_for == "free":
+            types = [0]
+        elif self.DOFtype_solve_for == "coupled":
+            types = [-1]
+        elif self.DOFtype_solve_for == "both":
+            types = [0,-1]
+        else:
+            raise ValueError("System.animate called but there is an invalid DOFtype being used")
+        '''
         if len(self.freeDOFs) > 0:
             X = self.freeDOFs[ts]   # get freeDOFs of current instant
             type = 0
@@ -2572,7 +2768,7 @@ class System():
             type = -1
         else:
             raise ValueError("System.animate called but no animation data is saved in freeDOFs or cpldDOFs")
-        
+        '''
         
         #print(ts)
         
@@ -2580,14 +2776,14 @@ class System():
         
         # update position of free Bodies
         for body in self.bodyList:
-            if body.type==type:
+            if body.type in types:
                 body.setPosition(X[i:i+6])  # update position of free Body
                 i += 6
             body.redraw()                   # redraw Body
                 
         # update position of free Points
         for point in self.pointList:
-            if point.type==type:
+            if point.type in types:
                 point.setPosition(X[i:i+3])  # update position of free Point
                 i += 3
                 # redraw Point?
@@ -2601,113 +2797,90 @@ class System():
             
         pass #I added this line to get the above commented lines (^^^) to be included in the animate method 
     
-    def colortensions(self, bounds='default', ax=None, hidebox=False, rbound=0, title="", linelabels=False, pointlabels=False):
-        '''Plots the mooring system objects in their current positions
-
+    
+    
+    
+    
+    def animatelines(self, interval=200, repeat=True, delay=0, runtime=-1, **kwargs):
+        '''
         Parameters
         ----------
-        bounds : string, optional
-            signifier for the type of bounds desired in the plot. The default is "default".
-        ax : axes, optional
-            Plot on an existing set of axes
-        color : string, optional
-            Some way to control the color of the plot ... TBD <<<
-        hidebox : bool, optional
-            If true, hides the axes and box so just the plotted lines are visible.
-        rbound : float, optional
-            A bound to be placed on each axis of the plot. If 0, the bounds will be the max values on each axis. The default is 0.
-        title : string, optional
-            A title of the plot. The default is "".
+        dirname : string
+            The name of the directory folder you are in.
+        rootname : string
+            The name of the front portion of the main file name, like spar_WT1, or DTU_10MW_NAUTILUS_GoM.
+        interval : int, optional
+            The time between animation frames in milliseconds. The default is 200.
+        repeat : bool, optional
+            Whether or not to repeat the animation. The default is True.
+        delay : int, optional
+            The time between consecutive animation runs in milliseconds. The default is 0.
 
         Returns
         -------
-        fig : figure object
-            To hold the axes of the plot
-        ax: axis object
-            To hold the points and drawing of the plot
-            
+        line_ani : animation
+            an animation of the mooring lines based off of MoorDyn data.
+            Needs to be stored, returned, and referenced in a variable
         '''
         
-        # sort out bounds
-        xs = []
-        ys = []
-        zs = [0, -self.depth]
-        
-        for point in self.pointList:
-            xs.append(point.r[0])
-            ys.append(point.r[1])
-            zs.append(point.r[2])
-            
+        bathymetry       = kwargs.get('bathymetry'     , False     )     # toggles whether to show the axes or not
+        opacity          = kwargs.get('opacity'        , 1.0       )     # the transparency of the bathymetry plot_surface
+        hidebox          = kwargs.get('hidebox'        , False     )     # toggles whether to show the axes or not
+        rang             = kwargs.get('rang'           , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
+        res              = kwargs.get('res'            , 10        )     # the resolution of the animation; how fluid the animation is. Higher res means spottier animation. counter-intuitive
+        colortension     = kwargs.get("colortension"   , False     )     # toggle to draw the mooring lines in colors based on node tensions
+        cmap_tension     = kwargs.get('cmap_tension'   , 'rainbow' )     # the type of color spectrum desired for colortensions
 
-        # if axes not passed in, make a new figure
-        if ax == None:    
-            fig = plt.figure()
-            #fig = plt.figure(figsize=(20/2.54,12/2.54), dpi=300)
-            ax = plt.axes(projection='3d')
+        # not adding cbar_tension colorbar yet since the tension magnitudes might change in the animation and the colorbar won't reflect that
+        # can use any other kwargs that go into self.plot()
+        
+        if self.qs==1:
+            raise ValueError("This System is set to be quasi-static. Import MoorDyn data and make qs=0 to use this method")
+            
+        # update animation function. This gets called every iteration of the animation and redraws the line in its next position
+        def update_Coords(tStep, tempLineList, tempax, colortension, cmap_tension):     # not sure why it needs a 'tempax' input but it works better with it
+            
+            for imooring in tempLineList:
+                imooring.redrawLine(-tStep, colortension=colortension, cmap_tension=cmap_tension)
+                
+            return 
+
+        # create the figure and axes to draw the animation
+        fig, ax = self.plot(bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, colortension=colortension)
+        '''
+        # can do this section instead of self.plot(). They do the same thing
+        fig = plt.figure(figsize=(20/2.54,12/2.54))
+        ax = Axes3D(fig)
+        for imooring in self.lineList:
+            imooring.drawLine(0, ax)
+        '''
+        # set figure x/y/z bounds
+        d = 1600                # can make this an input later
+        ax.set_xlim((-d,d))
+        ax.set_ylim((-d,d)); 
+        ax.set_zlim((-self.depth, 300))
+        ax.set_xlabel('x');    ax.set_ylabel('y');      ax.set_zlabel('z');
+        
+        # make the axes scaling equal
+        rangex = np.diff(ax.get_xlim3d())[0]
+        rangey = np.diff(ax.get_ylim3d())[0]
+        rangez = np.diff(ax.get_zlim3d())[0]
+        ax.set_box_aspect([rangex, rangey, rangez])
+        
+        if runtime==-1:
+            nFrames = len(self.lineList[0].Tdata)
         else:
-            fig = ax.get_figure()
+            itime = int(np.where(self.lineList[0].Tdata==runtime)[0])
+            nFrames = len(self.lineList[0].Tdata[0:itime])
         
-        # set bounds
-        if rbound==0:
-            rbound = max([max(xs), max(ys), -min(xs), -min(ys)]) # this is the most extreme coordinate
-            
         
-        if bounds=='default':
-            ax.set_zlim([-self.depth, 0])
-        elif bounds=='rbound':   
-            ax.set_xlim([-rbound,rbound])
-            ax.set_ylim([-rbound,rbound])
-            ax.set_zlim([-rbound, rbound])
-        elif bounds=='mooring':
-            ax.set_xlim([-rbound,0])
-            ax.set_ylim([-rbound/2,rbound/2])
-            ax.set_zlim([-self.depth, 0])
+        # Animation: update the figure with the updated coordinates from update_Coords function
+        # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()
+        line_ani = animation.FuncAnimation(fig, update_Coords, np.arange(1, nFrames-1, res), fargs=(self.lineList, ax, colortension, cmap_tension),
+                                           interval=1, repeat=repeat, repeat_delay=delay, blit=False)
+                                            # works well when np.arange(...nFrames...) is used. Others iterable ways to do this
         
-        #find max tension 
-        tens = []
-        for line in self.lineList:
-            tens.extend(line.maxtension(0))
-        maxten = max(tens)
-        minten = min(tens)
-        
-        # draw things
-        for body in self.bodyList:
-            body.draw(ax)
-        
-        j = 0
-        for line in self.lineList:
-            j = j + 1
-            line.drawColorTensionLine(0, ax,  maxten, minten)
-               
-            #Add line labels 
-            if linelabels == True:
-                ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
-            
-        #Add point labels
-        i = 0 
-        for point in self.pointList:
-            i = i + 1
-            if pointlabels == True:
-                ax.text(point.r[0], point.r[1], point.r[2], i, c = 'r')
-        
-        fig.suptitle(title)
-
-
-        set_axes_equal(ax)
-        
-        ax.set_zticks([-self.depth, 0])  # set z ticks to just 0 and seabed
-        
-        if hidebox:
-            ax.axis('off')
-        
-        #plt.show()
-        
-        # fig1, ax1 = plt.subplots(figsize=(6, 1))
-        # fig1.subplots_adjust(bottom=0.5)
-
-        # cmap = mpl.cm.cool
-        # norm = mpl.colors.Normalize(vmin=minten, vmax=maxten)
-        # cb1 = mpl.colorbar.ColorbarBase(ax, cmap=cmap,norm=norm,orientation='horizontal')
-        
-        return fig, ax, minten, maxten  # return the figure and axis object in case it will be used later to update the plot
-        
+        return line_ani
+    
+    
+    

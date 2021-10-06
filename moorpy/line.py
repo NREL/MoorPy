@@ -1,6 +1,7 @@
 
 
 import numpy as np
+from matplotlib import cm
 from moorpy.Catenary import catenary
 from moorpy.helpers import LineError, CatenaryError, rotationMatrix
    
@@ -68,17 +69,18 @@ class Line():
         #print("Created Line "+str(self.number))
         
         
-        
-    def loadData(self, dirname):
-        '''Loads line-specific time series data from a MoorDyn output file'''
+
     
+    def loadData(self, dirname, rootname):
+        '''Loads line-specific time series data from a MoorDyn output file'''
+        
         self.qs = 0 # signals time series data
     
         # load time series data
         if self.isRod > 0:
-            data, ch, channels, units = read_mooring_file(dirname, "Rod"+str(self.number)+".out") # remember number starts on 1 rather than 0
+            data, ch, channels, units = self.read_mooring_file(dirname+rootname+".MD.", "Rod"+str(self.number)+".out") # remember number starts on 1 rather than 0
         else:
-            data, ch, channels, units = read_mooring_file(dirname, "Line"+str(self.number)+".out") # remember number starts on 1 rather than 0
+            data, ch, channels, units = self.read_mooring_file(dirname+rootname+".MD.", "Line"+str(self.number)+".out") # remember number starts on 1 rather than 0
                 
         # get time info
         if ("Time" in ch):
@@ -133,7 +135,56 @@ class Line():
         
         # check for tension data <<<<<<<
         
+    def read_mooring_file(self, dirName,fileName):
+
+        # load data from time series for single mooring line
         
+        print('attempting to load '+dirName+fileName)
+        
+        f = open(dirName+fileName, 'r')
+        
+        channels = []
+        units = []
+        data = []
+        i=0
+        
+        for line in f:          # loop through lines in file
+        
+            if (i == 0):
+                for entry in line.split():      # loop over the elemets, split by whitespace
+                    channels.append(entry)      # append to the last element of the list
+                    
+            elif (i == 1):
+                for entry in line.split():      # loop over the elemets, split by whitespace
+                    units.append(entry)         # append to the last element of the list
+            
+            elif len(line.split()) > 0:
+                data.append([])  # add a new sublist to the data matrix
+                import re
+                r = re.compile(r"(?<=\d)\-(?=\d)")  # catch any instances where a large negative exponent has been written with the "E"
+                line2 = r.sub("E-",line)            # and add in the E
+                
+                
+                for entry in line2.split():      # loop over the elemets, split by whitespace
+                    data[-1].append(entry)      # append to the last element of the list
+                
+            else:
+                break
+        
+            i+=1
+        
+        f.close()  # close data file
+        
+        # use a dictionary for convenient access of channel columns (eg. data[t][ch['PtfmPitch'] )
+        ch = dict(zip(channels, range(len(channels))))
+        
+        data2 = np.array(data)
+        
+        data3 = data2.astype(float)
+        
+        return data3, ch, channels, units
+    
+    
         
     def getTimestep(self, Time):
         '''Get the time step to use for showing time series data'''
@@ -157,7 +208,7 @@ class Line():
 
     def getLineCoords(self, Time, n=0):    # formerly UpdateLine
         '''Gets the updated line coordinates for drawing and plotting purposes.'''
-    
+        
         if n==0: n = self.nNodes
     
         # if a quasi-static analysis, just call the catenary function to return the line coordinates
@@ -202,7 +253,7 @@ class Line():
                 
                 # make points for appropriately sized cylinder
                 d = self.sys.lineTypes[self.type].d
-                Xs, Ys, Zs = makeTower(self.length, np.array([d, d]))
+                Xs, Ys, Zs = makeTower(self.length, np.array([d, d]))   # add in makeTower method once you start using Rods
                 
                 # translate and rotate into proper position for Rod
                 coords = np.vstack([Xs, Ys, Zs])
@@ -216,7 +267,7 @@ class Line():
             # drawing lines
             else:
                 
-                return self.xp[ts,:], self.yp[ts,:], self.zp[ts,:]
+                return self.xp[ts,:], self.yp[ts,:], self.zp[ts,:], self.Tdata[ts:]
     
     
     def getCoordinate(self, s, n=100):
@@ -237,7 +288,7 @@ class Line():
         
     
     
-    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1]):
+    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], colortension=False, cmap='rainbow'):
         '''Draw the line on 2D plot (ax must be 2D)
 
         Parameters
@@ -250,8 +301,12 @@ class Line():
             color identifier in one letter (k=black, b=blue,...). The default is "k".
         Xuvec : list, optional
             plane at which the x-axis is desired. The default is [1,0,0].
-        Yuvec : lsit, optional
+        Yuvec : list, optional
             plane at which the y-axis is desired. The default is [0,0,1].
+        colortension : bool, optional
+            toggle to plot the lines in a colormap based on node tensions. The default is False
+        cmap : string, optional
+            colormap string type to plot tensions when colortension=True. The default is 'rainbow'
 
         Returns
         -------
@@ -277,14 +332,28 @@ class Line():
         
         # drawing lines...
         else:
-        
-            Xs, Ys, Zs, Te = self.getLineCoords(Time)
+            
+            if self.qs==1:
+                Xs, Ys, Zs, tensions = self.getLineCoords(Time)
+            elif self.qs==0:
+                Xs, Ys, Zs, Ts = self.getLineCoords(Time)
+                self.rA = np.array([Xs[0], Ys[0], Zs[0]])
+                self.rB = np.array([Xs[-1], Ys[-1], Zs[-1]])
+                tensions = self.getLineTens()
             
             # apply any 3D to 2D transformation here to provide desired viewing angle
             Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] 
             Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] 
             
-            linebit.append(ax.plot(Xs2d, Ys2d, lw=1, color=color))
+            if colortension:    # if the mooring lines want to be plotted with colors based on node tensions
+                maxt = np.max(tensions); mint = np.min(tensions)
+                for i in range(len(Xs)-1):          # for each node in the line
+                    color_ratio = ((tensions[i] + tensions[i+1])/2 - mint)/(maxt - mint)  # ratio of the node tension in relation to the max and min tension
+                    cmap_obj = cm.get_cmap(cmap)    # create a cmap object based on the desired colormap
+                    rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
+                    linebit.append(ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba))
+            else:
+                linebit.append(ax.plot(Xs2d, Ys2d, lw=1, color=color)) # previously had lw=1 (linewidth)
             
         self.linebit = linebit # can we store this internally?
         
@@ -294,8 +363,9 @@ class Line():
 
     
 
-    def drawLine(self, Time, ax, color="k", endpoints = False):
+    def drawLine(self, Time, ax, color="k", endpoints=False, shadow=True, colortension=False, cmap_tension='rainbow'):
         '''Draw the line in 3D
+        
         Parameters
         ----------
         Time : float
@@ -304,10 +374,15 @@ class Line():
             the axis on which the line is to be drawn
         color : string, optional
             color identifier in one letter (k=black, b=blue,...). The default is "k".
-        Xuvec : list, optional
-            plane at which the x-axis is desired. The default is [1,0,0].
-        Yuvec : lsit, optional
-            plane at which the y-axis is desired. The default is [0,0,1].
+        endpoints : bool, optional
+            toggle to plot the end points of the lines. The default is False
+        shadow : bool, optional
+            toggle to plot the mooring line shadow on the seabed. The default is True
+        colortension : bool, optional
+            toggle to plot the lines in a colormap based on node tensions. The default is False
+        cmap : string, optional
+            colormap string type to plot tensions when colortension=True. The default is 'rainbow'
+            
         Returns
         -------
         linebit : list
@@ -325,15 +400,33 @@ class Line():
                 linebit.append(ax.plot(Xs[[2*i,2*i+2]],Ys[[2*i,2*i+2]],Zs[[2*i,2*i+2]]      , color=color))  # end A edges
                 linebit.append(ax.plot(Xs[[2*i+1,2*i+3]],Ys[[2*i+1,2*i+3]],Zs[[2*i+1,2*i+3]], color=color))  # end B edges
             
-            #Scatter points for line ends 
+            # scatter points for line ends 
             if endpoints == True:
                 linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
+        
         # drawing lines...
         else:
-        
-            Xs, Ys, Zs, Ts = self.getLineCoords(Time)
             
-            linebit.append(ax.plot(Xs, Ys, Zs, color=color))
+            if self.qs==1:  # returns the node positions and tensions of the line, doesn't matter what time
+                Xs, Ys, Zs, tensions = self.getLineCoords(Time)
+            elif self.qs==0: # returns the node positions and time data at the given time
+                Xs, Ys, Zs, Ts = self.getLineCoords(Time)
+                self.rA = np.array([Xs[0], Ys[0], Zs[0]])
+                self.rB = np.array([Xs[-1], Ys[-1], Zs[-1]])
+                tensions = self.getLineTens()
+            
+            if colortension:    # if the mooring lines want to be plotted with colors based on node tensions
+                maxt = np.max(tensions); mint = np.min(tensions)
+                for i in range(len(Xs)-1):          # for each node in the line
+                    color_ratio = ((tensions[i] + tensions[i+1])/2 - mint)/(maxt - mint)  # ratio of the node tension in relation to the max and min tension
+                    cmap_obj = cm.get_cmap(cmap_tension)    # create a cmap object based on the desired colormap
+                    rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
+                    linebit.append(ax.plot(Xs[i:i+2], Ys[i:i+2], Zs[i:i+2], color=rgba, zorder=100))
+            else:
+                linebit.append(ax.plot(Xs, Ys, Zs, color=color, zorder=100))
+            
+            if shadow:
+                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.sys.depth, color=[0.5, 0.5, 0.5, 0.2], zorder = 1.5) # draw shadow
             
             if endpoints == True:
                 linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
@@ -353,70 +446,12 @@ class Line():
         
             
         return linebit
-        '''Draw the line in 3D
-
-        Parameters
-        ----------
-        Time : float
-            time value at which to draw the line
-        ax : axis
-            the axis on which the line is to be drawn
-        color : string, optional
-            color identifier in one letter (k=black, b=blue,...). The default is "k".
-        Xuvec : list, optional
-            plane at which the x-axis is desired. The default is [1,0,0].
-        Yuvec : lsit, optional
-            plane at which the y-axis is desired. The default is [0,0,1].
-
-        Returns
-        -------
-        linebit : list
-            list of axes and points on which the line can be plotted
-
-        '''
-        
-        linebit = []  # make empty list to hold plotted lines, however many there are
-
-            
-        if self.isRod > 0:
-            
-            Xs, Ys, Zs, Ts = self.getLineCoords(Time)
-            
-            for i in range(int(len(Xs)/2-1)):
-                if colortensions == True:
-                    r = 255*(Ts[2*i:2*i+2] - mint)/(maxt - mint)
-                    g = 0
-                    b = 1-r
-                linebit.append(ax.plot(Xs[2*i:2*i+2],Ys[2*i:2*i+2],Zs[2*i:2*i+2]            , color=color))  # side edges
-                linebit.append(ax.plot(Xs[[2*i,2*i+2]],Ys[[2*i,2*i+2]],Zs[[2*i,2*i+2]]      , color=color))  # end A edges
-                linebit.append(ax.plot(Xs[[2*i+1,2*i+3]],Ys[[2*i+1,2*i+3]],Zs[[2*i+1,2*i+3]], color=color))  # end B edges
-        
-        # drawing lines...
-        else:
-        
-            Xs, Ys, Zs, Ts = self.getLineCoords(Time)
-            
-            linebit.append(ax.plot(Xs, Ys, Zs, color=color))
-            
-                
-            # drawing water velocity vectors (not for Rods for now) <<< should handle this better (like in getLineCoords) <<<
-            if self.qs == 0:
-                ts = self.getTimestep(Time)
-                Ux = self.Ux[ts,:]
-                Uy = self.Uy[ts,:]
-                Uz = self.Uz[ts,:]      
-                self.Ubits = ax.quiver(Xs, Ys, Zs, Ux, Uy, Uz)  # make quiver plot and save handle to line object
-                
-            
-        self.linebit = linebit # can we store this internally?
-        
-        self.X = np.array([Xs, Ys, Zs])
-        
-            
-        return linebit
+    
+    
 
         
-    def redrawLine(self, Time):  #, linebit):
+        
+    def redrawLine(self, Time, colortension=False, cmap_tension='rainbow'):  #, linebit):
         '''Update 3D line drawing based on instantaneous position'''
         
         linebit = self.linebit
@@ -438,9 +473,26 @@ class Line():
         else:
         
             Xs, Ys, Zs, Ts = self.getLineCoords(Time)
-            linebit[0][0].set_data(Xs,Ys)    # (x and y coordinates)
-            linebit[0][0].set_3d_properties(Zs)         # (z coordinates)               
+            
+            if colortension:
+                self.rA = np.array([Xs[0], Ys[0], Zs[0]])       # update the line ends based on the MoorDyn data
+                self.rB = np.array([Xs[-1], Ys[-1], Zs[-1]])
+                tensions = self.getLineTens()                   # get the tensions of the line calculated quasi-statically
+                maxt = np.max(tensions); mint = np.min(tensions)
+                cmap_obj = cm.get_cmap(cmap_tension)               # create the colormap object
                 
+                for i in range(len(Xs)-1):  # for each node in the line, find the relative tension of the segment based on the max and min tensions
+                    color_ratio = ((tensions[i] + tensions[i+1])/2 - mint)/(maxt - mint)
+                    rgba = cmap_obj(color_ratio)
+                    linebit[i][0]._color = rgba         # set the color of the segment to a new color based on its updated tension
+                    linebit[i][0].set_data(Xs[i:i+2],Ys[i:i+2])     # set the x and y coordinates
+                    linebit[i][0].set_3d_properties(Zs[i:i+2])      # set the z coorindates
+            
+            else:
+                linebit[0][0].set_data(Xs,Ys)    # (x and y coordinates)
+                linebit[0][0].set_3d_properties(Zs)         # (z coordinates) 
+                    
+            
         
             # drawing water velocity vectors (not for Rods for now)
             if self.qs == 0:
@@ -448,8 +500,8 @@ class Line():
                 Ux = self.Ux[ts,:]
                 Uy = self.Uy[ts,:]
                 Uz = self.Uz[ts,:]                  
-                segments = quiver_data_to_segments(Xs, Ys, Zs, Ux, Uy, Uz, scale=2)
-                self.Ubits.set_segments(segments)
+                #segments = quiver_data_to_segments(Xs, Ys, Zs, Ux, Uy, Uz, scale=2)
+                #self.Ubits.set_segments(segments)
         
         return linebit
         
@@ -635,10 +687,8 @@ class Line():
         return KA_rot, KB_rot
 
     
-    def getLineTens(self, Time):    # formerly UpdateLine
-        '''Gets the updated line coordinates for drawing and plotting purposes.'''
-    
-        #quasi-static analysis, just call the catenary function to return the tensions
+    def getLineTens(self):
+        '''Calls the catenary function to return the tensions of the Line for a quasi-static analysis'''
 
         depth = self.sys.depth
     
@@ -659,77 +709,11 @@ class Line():
 
         Ts = info["Te"]
         return Ts
+    
+    
 
 
-    def drawColorTensionLine(self, Time, ax, maxt, mint):
-        '''Draw the line in 3D
 
-        Parameters
-        ----------
-        Time : float
-            time value at which to draw the line
-        ax : axis
-            the axis on which the line is to be drawn
-        color : string, optional
-            color identifier in one letter (k=black, b=blue,...). The default is "k".
-        Xuvec : list, optional
-            plane at which the x-axis is desired. The default is [1,0,0].
-        Yuvec : lsit, optional
-            plane at which the y-axis is desired. The default is [0,0,1].
-
-        Returns
-        -------
-        linebit : list
-            list of axes and points on which the line can be plotted
-
-        '''
-        
-        linebit = []  # make empty list to hold plotted lines, however many there are
-
-            
-        if self.isRod > 0:
-            Xs, Ys, Zs, Ts = self.getLineCoords(Time)
-            Ts = self.getLineTens(Time)
-            
-            for i in range(int(len(Xs)/2-1)):
-            
-                r = int(Ts[2*i:2*i+2] - mint)/(maxt - mint)
-                g = 0
-                b = 1-r
-                linebit.append(ax.plot(Xs[2*i:2*i+2],Ys[2*i:2*i+2],Zs[2*i:2*i+2]            , color=(r,g,b)))  # side edges
-                linebit.append(ax.plot(Xs[[2*i,2*i+2]],Ys[[2*i,2*i+2]],Zs[[2*i,2*i+2]]      , color=(r,g,b)))  # end A edges
-                linebit.append(ax.plot(Xs[[2*i+1,2*i+3]],Ys[[2*i+1,2*i+3]],Zs[[2*i+1,2*i+3]], color=(r,g,b)))  # end B edges
-        
-        # drawing lines...
-        else:
-           
-            Xs, Ys, Zs, Ts = self.getLineCoords(Time)
-            Ts = self.getLineTens(Time)
-            for i in range(0,len(Xs)-1):
-                r = ((Ts[i] +Ts[i+1])/2 - mint)/(maxt - mint)
-                g = 0
-                b = 1-r
-                linebit.append(ax.plot(Xs[i:i+2], Ys[i:i+2], Zs[i:i+2], color=(r,g,b)))
-            #linebit.append(ax.plot(Xs, Ys, Zs,color=(r,g,b)))
-                
-            # drawing water velocity vectors (not for Rods for now) <<< should handle this better (like in getLineCoords) <<<
-            if self.qs == 0:
-                ts = self.getTimestep(Time)
-                Ux = self.Ux[ts,:]
-                Uy = self.Uy[ts,:]
-                Uz = self.Uz[ts,:]      
-                self.Ubits = ax.quiver(Xs, Ys, Zs, Ux, Uy, Uz)  # make quiver plot and save handle to line object
-                
-            
-        self.linebit = linebit # can we store this internally?
-        
-        self.X = np.array([Xs, Ys, Zs])
-        
-            
-        return linebit
 
     
-    def maxtension(self, Time):
-        Ts = self.getLineTens(Time)
-        return max(Ts), min(Ts)
-#
+    
