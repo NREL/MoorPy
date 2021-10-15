@@ -73,7 +73,7 @@ class System():
         # read in data from an input file if a filename was provided
         if len(moordyn_file) > 0:
             self.load(moordyn_file)
-        
+            
         # set the quasi-static/dynamic toggle for the entire mooring system
         self.qs = qs
         if self.qs==0:  # if the mooring system is desired to be used as a portrayal of MoorDyn data
@@ -86,8 +86,7 @@ class System():
                     line.loadData(dirname, rootname)
                 except:
                     raise ValueError("There is likely not a .MD.Line#.out file in the directory. Make sure Line outputs are set to 'p' in the MoorDyn input file")
-                
-    
+
     
     def addBody(self, mytype, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), f6Ext=np.zeros(6)):
         '''Convenience function to add a Body to a mooring system
@@ -386,6 +385,8 @@ class System():
                         else:
                             print("Point type not recognized")
                         
+                        if 'seabed' in entries[4]:
+                            entries[4] = -self.depth
                         r = np.array(entries[2:5], dtype=float)
                         m = np.float_(entries[5])
                         v = np.float_(entries[6])
