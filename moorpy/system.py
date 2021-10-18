@@ -158,6 +158,7 @@ class System():
         #print("Created Point "+str(self.pointList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
         
+
     def addLine(self, lUnstr, lineType, nSegs=40, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
 
@@ -1155,19 +1156,19 @@ class System():
         
             print('Successfully written '+fileName +' input file using MoorDyn v2')
     
-    def unload_farm(self, fileName, depth=600):
+    def unload_farm(self, fileName, depth=600, Outputs = []):
         '''Unloads a MoorPy system into a MoorDyn FAST.Farm input file'''
         
         # Settings
         Echo = False        #Echo input data to <RootName>.ech (flag)
-        dtm = 0.00005
+        dtm = 0.0001
         kbot = 3e6
         cbot = 3e5
-        dtIC = 1
-        TmaxIC = 60
+        dtIC = 2
+        TmaxIC = 100
         CdScaleIC = 4.0
-        threshIC = 0.01
-        dtOut = 0.2
+        threshIC = 0.001
+        dtOut = 0.0125
         
         # Line Type Properties
         BA = -1.0
@@ -1189,39 +1190,7 @@ class System():
             #print('Using Custom value for', key,kwargs[key])
         
         # Outputs List
-        Outputs = ["L3N1T" , "L10N1T", "L17N1T","L7N1T" , "L14N1T", "L21N1T" ,"L4N10Pz", "L11N10Pz", "L18N10Pz", "L4N10T", "L11N10T", "L18N10T"];
 
-        for i in range(24, 54, 3): #iterate through rope anchor lines
-            Outputs.append("L" + str(i)+ "N1Pz")
-            Outputs.append("L" +str(i) +"N20T")
-        for i in range(25,65,4): #iterate through fixed points
-            Outputs.append("Con" +str(i) +"Fx")
-            Outputs.append("Con" +str(i) +"Fy")
-            Outputs.append("Con" +str(i) +"Fz")
-        # for i in range(25, 75, 5): #iterate through chain lines
-        #     Outputs.append("Con" +str(i) +"Fx")
-        #     Outputs.append("Con" +str(i) +"Fy")
-        #     Outputs.append("Con" +str(i) +"Fz")   
-       
-        # for i in range(25, 65, 4): #iterate through rope anchor lines
-        #     Outputs.append("L" + str(i)+ "N1Pz")
-        #     Outputs.append("L" +str(i) +"N14T")
-        # for i in range(22,62,4): #iterate through fixed points
-        #     Outputs.append("L" +str(i) +"N12T")
-        
-        # for i in range(66, 132, 3): #iterate through rope anchor lines
-        #     Outputs.append("L" + str(i)+ "N1Pz")
-        #     Outputs.append("L" +str(i) +"N20T")
-        # for i in range(73,161,4): #iterate through fixed points
-        #     Outputs.append("Con" +str(i) +"Fx")
-        #     Outputs.append("Con" +str(i) +"Fy")
-        #     Outputs.append("Con" +str(i) +"Fz")
-        # for i in range(4,67, 7):
-        #     Outputs.append("L" + str(i)+ "N10Pz")
-        #     Outputs.append("L" +str(i) +"N10T")
-        # for i in range(3, 59,7):
-        #     Outputs.append("L" +str(i) +"N1T")
-        #     Outputs.append("L" +str(i+4) +"N1T")
         print('attempting to write '+fileName +' for MoorDyn FAST.Farm input file')
         
         # Array to add strings to for each line of moordyn input file
@@ -3041,6 +3010,59 @@ class System():
                                             # works well when np.arange(...nFrames...) is used. Others iterable ways to do this
         
         return line_ani
-    
-    
-    
+        
+    def unload_md_driver(self, outFileName, outroot = 'driver', MDinputfile = 'test.dat',depth = 600):
+        
+        '''Function to output moordyn driver input file
+
+        Parameters
+        ----------
+        outFileName: moordyn driver input file name
+        outroot: root name for output files (ex if outroot = 'driver', the MD output file will be driver.MD.out)
+        MDinputfile: name of the moordyn input file 
+        depth: water depth
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        Echo = False
+        density = 1025
+        gravity = 9.80665
+        TMax = 60.0225 
+        dtC = 0.0125  
+        numturbines = 0
+        inputsmode = 0
+        inputsfile =""
+        ref = [0,0]
+        T1 = [0,0,0,0,0,0]
+        L = []                   
+            
+        #Input File Header
+        L.append(" MoorDyn Driver Input File ")
+        L.append("Another comment line")
+        L.append("{:5}    Echo      - echo the input file data (flag)".format(str(Echo).upper()))
+        L.append("---------------- ENVIRONMENTAL CONDITIONS ------------------")
+        L.append("{:<1.5f}\t\tgravity      - gravity (m/s^2)".format(gravity))
+        L.append("{:<4.1f}\t\trhoW      - water density (kg/m^3)".format(density))
+        L.append("{:<4.1f}\t\tWtrDpth      - water depth".format(depth))
+        L.append("---------------- MOORDYN ------------------")
+        L.append("{:}\tMDInputFile      - Primary MoorDyn input file name (quoted string)".format(MDinputfile))
+        L.append("\"{:}\"\tOutRootName      -  The name which prefixes all HydroDyn generated files (quoted string)".format(str(outroot)))
+        L.append("{:<2.4f}\t\tTMax       - Number of time steps in the simulations (-)".format(TMax))
+        L.append("{:<1.4f}\t\tdtC      - TimeInterval for the simulation (sec)".format(dtC))
+        L.append("{:<2.0f}\t\tInputsMode       - MoorDyn coupled object inputs (0: all inputs are zero for every timestep, 1: time-series inputs) (switch)".format(inputsmode))
+        L.append("\"{:}\"\t\tInputsFile       - Filename for the MoorDyn inputs file for when InputsMod = 1 (quoted string)".format(inputsfile))
+        L.append("{:<2.0f}\t\tNumTurbines      - Number of wind turbines (-) [>=1 to use FAST.Farm mode. 0 to use OpenFAST mode.]".format(numturbines))
+        L.append("---------------- Initial Positions ------------------")
+        L.append("ref_X    ref_Y    surge_init   sway_init  heave_init  roll_init  pitch_init   yaw_init")
+        L.append("(m)      (m)        (m)          (m)        (m)        (m)         (m)        (m)         [followed by NumTurbines rows of data]")
+        L.append("{:2.8f} {:2.8f} {:2.8f} {:2.8f} {:2.8f} {:2.8f} {:2.8f} {:2.8f} ".format(ref[0],ref[1],T1[0], T1[1], T1[2],T1[3], T1[4], T1[5]))
+        L.append("END of driver input file")
+        
+        with open(outFileName, 'w') as out:
+            for x in range(len(L)):
+                out.write(L[x])
+                out.write('\n')
