@@ -2002,7 +2002,7 @@ class System():
         return K
         
     
-    def getCoupledStiffness(self, dx = 0.1, dth = 0.1, solveOption=1, lines_only=False, tensions=False, nTries=3, plots=0):
+    def getCoupledStiffness(self, dx=0.1, dth=0.1, solveOption=1, lines_only=False, tensions=False, nTries=3, plots=0):
         '''Calculates the stiffness matrix for coupled degrees of freedom of a mooring system
         with free uncoupled degrees of freedom equilibrated. 
         
@@ -2148,6 +2148,7 @@ class System():
         
         # ----------------- restore the system back to previous positions ------------------
         self.mooringEq(X1, DOFtype="coupled", tol=lineTol)
+        self.solveEquilibrium3(tol=eqTol)
         
         # show an animation of the stiffness perturbations if applicable
         if plots > 0:
