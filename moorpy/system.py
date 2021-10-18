@@ -1169,7 +1169,11 @@ class System():
         CdScaleIC = 4.0
         threshIC = 0.001
         dtOut = 0.0125
+<<<<<<< HEAD
  
+=======
+        
+>>>>>>> - changed default number of segments for addLine from 40 to 20
         # Line Type Properties
         BA = -1.0
         Can = 0.8
@@ -1190,6 +1194,7 @@ class System():
             #print('Using Custom value for', key,kwargs[key])
         
         # Outputs List
+<<<<<<< HEAD
 <<<<<<< HEAD
 
 =======
@@ -1227,6 +1232,9 @@ class System():
         #     Outputs.append("L" +str(i) +"N1T")
         #     Outputs.append("L" +str(i+4) +"N1T")
 >>>>>>> changes to unload_farm for MoorDyn file output (simulation time step, initialization time, output channels, added output timestep)
+=======
+
+>>>>>>> - changed default number of segments for addLine from 40 to 20
         print('attempting to write '+fileName +' for MoorDyn FAST.Farm input file')
         
         # Array to add strings to for each line of moordyn input file
