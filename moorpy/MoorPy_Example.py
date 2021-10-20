@@ -17,9 +17,9 @@ from moorpy.MoorProps import getLineProps
 
 # EXAMPLE 1: Load in a MoorDyn input file to create a MoorPy System
 
-#ms = mp.System('lines.txt')
-#ms.initialize(plots=1)
-#ms.plot()
+ms = mp.System('lines.txt')
+ms.initialize(plots=1)
+ms.plot()
 '''
 ms = mp.System('IEA-15-240-RWT-UMaineSemi_MoorDyn_PPIb.dat', depth=850)
 ms.initialize(plots=0)
@@ -41,7 +41,7 @@ print(ms.bodyList[0].r6)
 #for point in ms.pointList:
     #print(point.r)
 '''
-
+'''
 ms = mp.System('IEA-15-240-RWT-UMaineSemi_MoorDyn_PPI.dat', depth=850)
 ms.initialize(plots=0)
 #ms.bodyList[0].type=1
@@ -74,7 +74,7 @@ if heading==0:
 elif heading==60:
     print(ms.pointList[4].r[2])
     print(np.linalg.norm([ms.bodyList[0].r6[0],ms.bodyList[0].r6[1]]))
-
+'''
 
 
 

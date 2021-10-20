@@ -1462,7 +1462,7 @@ class System():
             
         return f
 
-    
+    """
     def solveEquilibrium(self, DOFtype="free", plots=0, rmsTol=10, maxIter=200):
         '''Solves for the static equilibrium of the system using the stiffness matrix, while updating positions of all free objects.
 
@@ -1613,11 +1613,13 @@ class System():
         # show an animation of the equilibrium solve if applicable
         if plots > 0:   
             self.animateSolution()
-           
-        
-        
-        
+    """
+    
     def solveEquilibrium3(self, DOFtype="free", plots=0, tol=0.05, rmsTol=0.0, maxIter=500, display=0, no_fail=False, finite_difference=False):
+        self.solveEquilibrium(DOFtype=DOFtype, plots=plots, tol=tol, rmsTol=rmsTol, maxIter=maxIter, display=display, no_fail=no_fail, finite_difference=finite_difference)
+        
+        
+    def solveEquilibrium(self, DOFtype="free", plots=0, tol=0.05, rmsTol=0.0, maxIter=500, display=0, no_fail=False, finite_difference=False):
         '''Solves for the static equilibrium of the system using the dsolve function approach in MoorSolve
 
         Parameters
@@ -1656,7 +1658,7 @@ class System():
         '''
         if rmsTol != 0.0:
             tols = np.zeros(len(X0)) + rmsTol
-            print("WHAT IS PASSING rmsTol in to solveEquilibrium3?")
+            print("WHAT IS PASSING rmsTol in to solveEquilibrium?")
             breakpoint()
         elif np.isscalar(tol):
             if tol < 0:
@@ -1702,7 +1704,7 @@ class System():
         if n == 0:
             self.mooringEq(X0, DOFtype=DOFtype, tol=lineTol)
             if display > 0:
-                print("There are no DOFs so solveEquilibrium3 is returning without adjustment.")
+                print("There are no DOFs so solveEquilibrium is returning without adjustment.")
             return True
         
         # clear some arrays to log iteration progress
@@ -1819,7 +1821,7 @@ class System():
                 else:
                     K = self.getSystemStiffnessA(DOFtype=DOFtype) 
                     
-                print("solveEquilibrium3 did not converge!")
+                print("solveEquilibrium did not converge!")
                 print(f"current system stiffness: {K}")
                 print(f"\n Current force {F}")
             
@@ -1831,7 +1833,7 @@ class System():
             if no_fail:
                 return False
             else:
-                raise SolveError(f"solveEquilibrium3 failed to find equilibrium after {info['iter']} iterations, with residual forces of {F}")
+                raise SolveError(f"solveEquilibrium failed to find equilibrium after {info['iter']} iterations, with residual forces of {F}")
 
 
         
@@ -2038,7 +2040,7 @@ class System():
             print("Getting mooring system stiffness matrix...")
 
         lineTol = 0.05*dx # manually specify an adaptive catenary solve tolerance <<<<
-        eqTol   = 0.05*dx        # manually specify an adaptive tolerance for when calling solveEquilibrium3
+        eqTol   = 0.05*dx        # manually specify an adaptive tolerance for when calling solveEquilibrium
 
         # ------------------ get the positions to linearize about -----------------------
         
@@ -2046,7 +2048,7 @@ class System():
         # the perturbation size in each coupled DOF of the system
         X1, dX = self.getPositions(DOFtype="coupled", dXvals=[dx, dth])
         
-        self.solveEquilibrium3(tol=eqTol)                               # let the system settle into equilibrium 
+        self.solveEquilibrium(tol=eqTol)                               # let the system settle into equilibrium 
         
         F1 = self.getForces(DOFtype="coupled", lines_only=lines_only)           # get mooring forces/moments about linearization point
         K = np.zeros([self.nCpldDOF, self.nCpldDOF])          # allocate stiffness matrix
@@ -2095,7 +2097,7 @@ class System():
                     X2[i] += dXi                                  # perturb positions by dx in each DOF in turn            
                     self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
                     #print(f'solving equilibrium {i+1}+_{self.nCpldDOF}')
-                    self.solveEquilibrium3(tol=eqTol)                       # let the system settle into equilibrium 
+                    self.solveEquilibrium(tol=eqTol)                       # let the system settle into equilibrium 
                     F2p = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
                     if tensions:  T2p = self.getTensions()
                     
@@ -2105,7 +2107,7 @@ class System():
                     X2[i] -= 2.0*dXi                              # now perturb from original to -dx
                     self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
                     #print(f'solving equilibrium {i+1}-_{self.nCpldDOF}')
-                    self.solveEquilibrium3(tol=eqTol)                       # let the system settle into equilibrium 
+                    self.solveEquilibrium(tol=eqTol)                       # let the system settle into equilibrium 
                     F2m = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
                     if tensions:  T2m = self.getTensions()
                     
@@ -2148,7 +2150,7 @@ class System():
         
         # ----------------- restore the system back to previous positions ------------------
         self.mooringEq(X1, DOFtype="coupled", tol=lineTol)
-        self.solveEquilibrium3(tol=eqTol)
+        self.solveEquilibrium(tol=eqTol)
         
         # show an animation of the stiffness perturbations if applicable
         if plots > 0:
@@ -2197,7 +2199,7 @@ class System():
         # find the total number of free and coupled DOFs in case any object types changed
         self.nDOF, self.nCpldDOF = self.getDOFs()
         
-        #self.solveEquilibrium3()   # should we make sure the system is in equilibrium?
+        #self.solveEquilibrium()   # should we make sure the system is in equilibrium?
         
         # allocate stiffness matrix according to the DOFtype specified
         if DOFtype=="free":
