@@ -598,8 +598,8 @@ class Line():
         self.th = np.arctan2(dr[1],dr[0])  # probably a more efficient way to handle this <<<
         self.HF = info["HF"]
         self.VF = info["VF"]
-        self.KA = info["stiffnessA"]
-        self.KB = info["stiffnessB"]
+        self.KA2 = info["stiffnessA"]
+        self.KB2 = info["stiffnessB"]
         self.LBot = info["LBot"]
         self.info = info
             
@@ -611,6 +611,31 @@ class Line():
         self.fB[2] = fBV
         self.TA = np.sqrt(fAH*fAH + fAV*fAV) # end tensions
         self.TB = np.sqrt(fBH*fBH + fBV*fBV)
+        
+        # ----- compute 3d stiffness matrix for both line ends (3 DOF + 3 DOF) -----
+        
+        # solve for required variables to set up the perpendicular stiffness. Keep it horizontal
+        #L_xy = np.linalg.norm(self.rB[:2] - self.rA[:2])
+        #T_xy = np.linalg.norm(self.fB[:2])
+        
+        # create the rotation matrix based on the heading angle that the line is from the horizontal
+        R = rotationMatrix(0,0,self.th)
+        
+        # initialize the line's analytic stiffness matrix in the "in-line" plane then rotate the matrix to be about the global frame [K'] = [R][K][R]^T
+        def from2Dto3Drotated(K2D, Kt):
+            K2 = np.array([[K2D[0,0], 0 , K2D[0,1]],
+                           [  0     , Kt,   0     ],
+                           [K2D[1,0], 0 , K2D[1,1]]])
+            return np.matmul(np.matmul(R, K2), R.T)
+        
+        self.KA  = from2Dto3Drotated(info['stiffnessA'], -fBH/LH)   # stiffness matrix describing reaction force on end A due to motion of end A
+        self.KB  = from2Dto3Drotated(info['stiffnessB'], -fBH/LH)   # stiffness matrix describing reaction force on end B due to motion of end B
+        self.KAB = from2Dto3Drotated(info['stiffnessAB'], fBH/LH)  # stiffness matrix describing reaction force on end B due to motion of end A
+                
+        #self.K6 = np.block([[ from2Dto3Drotated(self.KA),  from2Dto3Drotated(self.KAB.T)],
+        #                    [ from2Dto3Drotated(self.KAB), from2Dto3Drotated(self.KB)  ]])
+        
+        
         
         if plots==1:
             import matplotlib.pyplot as plt
@@ -680,13 +705,13 @@ class Line():
         Kt = T_xy/L_xy
         
         # initialize the line's analytic stiffness matrix in the "in-line" plane
-        KA = np.array([[self.KA[0,0], 0 , self.KA[0,1]],
+        KA = np.array([[self.KA2[0,0], 0 , self.KA2[0,1]],
                        [     0      , Kt,      0      ],
-                       [self.KA[1,0], 0 , self.KA[1,1]]])
+                       [self.KA2[1,0], 0 , self.KA2[1,1]]])
                        
-        KB = np.array([[self.KB[0,0], 0 , self.KB[0,1]],
+        KB = np.array([[self.KB2[0,0], 0 , self.KB2[0,1]],
                        [     0      , Kt,      0      ],
-                       [self.KB[1,0], 0 , self.KB[1,1]]])
+                       [self.KB2[1,0], 0 , self.KB2[1,1]]])
         
         # create the rotation matrix based on the heading angle that the line is from the horizontal
         R = rotationMatrix(0,0,self.th)
@@ -720,7 +745,6 @@ class Line():
 
         Ts = info["Te"]
         return Ts
-    
     
 
 
