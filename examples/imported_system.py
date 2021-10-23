@@ -4,7 +4,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import moorpy as mp
-from moorpy.MoorProps import getLineProps
 
 
 
@@ -22,9 +21,9 @@ ms.solveEquilibrium()                                       # equilibrate
 fig, ax = ms.plot()                                         # plot the system in original configuration
 
 # add hydrostatic stiffness properties to the body, then add a load and see how it responds
-ms.bodyList[0].rM=np.array([0,0,100])                       #
-ms.bodyList[0].AWP=1e3
-ms.bodyList[0].f6Ext = np.array([3e6, 0, 0, 0, 0, 0])       # apply an external force on the body 
+ms.bodyList[0].rM=np.array([0,0,100])                       # set a very high metacenter location to avoid pitch and roll [m]
+ms.bodyList[0].AWP=1e3                                      # set a very large waterplane area to avoid heave [m^2]
+ms.bodyList[0].f6Ext = np.array([3e6, 0, 0, 0, 0, 0])       # apply an external force on the body [N]
 ms.solveEquilibrium3(DOFtype='both')                        # equilibrate (specify 'both' to enable both free and coupled DOFs)
 fig, ax = ms.plot(ax=ax, color='red')                       # plot the system in displaced configuration (on the same plot, in red)
 
