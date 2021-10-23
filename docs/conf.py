@@ -54,9 +54,7 @@ exclude_patterns = []
 #html_theme = 'alabaster'
 #html_theme = 'default'
 html_theme = 'sphinx_rtd_theme' # need to run pip install sphinx_rtd_theme to use locally
-html_theme_options = {
-    'style_nav_header_background': 'slateblue'
-}
+#html_theme_options = {'style_nav_header_background': 'slateblue'}
 
 
 # Add any paths that contain custom static files (such as style sheets) here,

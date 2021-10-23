@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 MoorPy
-============================================
+=======
 
 A mooring system visualizer and quasi-static modeler written in Python.
 
@@ -19,21 +19,6 @@ MoorPy is an open-source quasi-static mooring system model that can be used for 
    structure
    usage
    theory
-
-.. automodule:: moorpy
-   :members:
-   :member-order: bysource
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
-
-
 
 
 

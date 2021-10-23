@@ -1,5 +1,5 @@
-MoorDyn Usage
-=====================================================
+MoorPy Usage
+============
 
 ..
   customize code highlight color through "hll" span css
@@ -89,6 +89,7 @@ MoorPy has functions to facilitate the orderly creation of a mooring system.
 
 Creating a MoorPy System for a MoorDyn Input File
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _inputfile:
 
 A MoorPy System can be initialized by reading in a MoorDyn-style input file. This is simply done by
 passing the input file name when creating the System object:
@@ -100,7 +101,6 @@ passing the input file name when creating the System object:
 
 The format of the input file is expected to follow the
 MoorDyn v2 style, which is still being finalized. As a working example for reference, see below:
-.. _inputfile:
 
 
 .. code-block:: none
