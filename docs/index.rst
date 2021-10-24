@@ -19,6 +19,7 @@ MoorPy is an open-source quasi-static mooring system model that can be used for 
    structure
    usage
    theory
+   api
 
 
 
