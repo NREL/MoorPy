@@ -17,17 +17,66 @@ from moorpy.MoorProps import getLineProps
 
 # EXAMPLE 1: Load in a MoorDyn input file to create a MoorPy System
 
-#ms = mp.System('lines.txt')
-#ms.initialize(plots=1)
-#ms.plot()
-
-ms = mp.System('IEA-15-240-RWT-UMaineSemi_MoorDyn_PPI.dat', depth=850)
+ms = mp.System('lines.txt')
+ms.initialize(plots=1)
+ms.plot()
+'''
+ms = mp.System('IEA-15-240-RWT-UMaineSemi_MoorDyn_PPIb.dat', depth=850)
 ms.initialize(plots=0)
-ms.bodyList[0].type=1
+for body in ms.bodyList:
+    body.m = 20093000           # from VolturnUS-S spec sheet
+    body.v = 20206              # from VolturnUS-S spec sheet
+    body.rCG = [0, 0, -2.3256]  # see RAFT verification doc
+    body.AWP = 78.54            # dWL=10 from VolturnUS-S spec sheet
+    body.rM = [0,0, 10.886]     # KB=-13.63+20=6.37, BM=It/V = It/20206, KM = KB+BM -> rM = KM-20
+    # It = (np.pi/64)*d**4 + np.pi*(d/2)**2 * each xWP**2 It = 496567 -> BM = 24.516 -> KM = 30.886 -> rM = 10.886
+#ms.bodyList[0].type=1
+print(ms.bodyList[0].r6)
+ms.bodyList[0].m += 450000
 ms.solveEquilibrium3(plots=0)
-anim = ms.animateSolution()
+print(ms.bodyList[0].r6)
+#anim = ms.animateSolution()
 #ms.plot(colortension=True, cbar_tension=True)
 #ms.plot2d(colortension=True)
+#for point in ms.pointList:
+    #print(point.r)
+'''
+'''
+ms = mp.System('IEA-15-240-RWT-UMaineSemi_MoorDyn_PPI.dat', depth=850)
+ms.initialize(plots=0)
+#ms.bodyList[0].type=1
+
+for body in ms.bodyList:
+    body.m = 20093000           # from VolturnUS-S spec sheet
+    body.v = 20206              # from VolturnUS-S spec sheet
+    body.rCG = [0, 0, -2.3256]  # see RAFT verification doc
+    body.AWP = 78.54            # dWL=10 from VolturnUS-S spec sheet
+    body.rM = [0,0, 10.886]     # KB=-13.63+20=6.37, BM=It/V = It/20206, KM = KB+BM -> rM = KM-20
+    #body.f6Ext = 2500000*np.array([1, 0, 0, 0, 150, 0])
+ms.solveEquilibrium3(plots=0)
+for body in ms.bodyList:
+    heading = 0
+    cosbeta = np.cos(heading*np.pi/180.0)
+    sinbeta = np.sin(heading*np.pi/180.0)
+    force = 2.5e6
+    height = 150
+    body.f6Ext = force*np.array([cosbeta, sinbeta, 0, -height*sinbeta, height*cosbeta, 0])
+fig, ax = ms.plot()
+ms.solveEquilibrium3(plots=0)
+#ms.bodyList[0].f6Ext = Fthrust*np.array([1, 0, 0, 0, hHub, 0])
+#ms.solveEquilibrium3(plots=0)
+#anim = ms.animateSolution()
+#ms.plot(colortension=True, cbar_tension=True)
+ms.plot(ax=ax)
+if heading==0:
+    print(ms.lineList[1].LBot)
+    print(ms.bodyList[0].r6[0])
+elif heading==60:
+    print(ms.pointList[4].r[2])
+    print(np.linalg.norm([ms.bodyList[0].r6[0],ms.bodyList[0].r6[1]]))
+'''
+
+
 
 
 
