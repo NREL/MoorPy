@@ -3,6 +3,11 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+
+.. automodule:: moorpy
+    :members:
+
+
 MoorPy
 =======
 
@@ -20,7 +25,16 @@ MoorPy is an open-source quasi-static mooring system model that can be used for 
    usage
    theory
    api
+   modules
 
+
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
 
 
 Welcome to MoorPy's (UNDER CONSTRUCTION) online documentation.

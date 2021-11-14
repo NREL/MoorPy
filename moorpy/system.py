@@ -397,7 +397,7 @@ class System():
                             if len(self.bodyList) > 1:
                                 raise ValueError("Generic Fairlead/Vessel-type points aren't supported when bodies are defined.")
                             if len(self.bodyList) == 0:
-                                print("Adding a body to attach fairlead points to.")
+                                #print("Adding a body to attach fairlead points to.")
                                 self.bodyList.append( Body(self, 1, 0, np.zeros(6)))#, m=m, v=v, rCG=rCG) )
                             
                             rRel = np.array(entries[2:5], dtype=float)
@@ -542,7 +542,7 @@ class System():
                 if len(self.bodyList) > 1:
                     raise ValueError("Generic Fairlead/Vessel-type points aren't supported when bodies are defined.")
                 if len(self.bodyList) == 0:
-                    print("Adding a body to attach fairlead points to.")
+                    #print("Adding a body to attach fairlead points to.")
                     self.bodyList.append( Body(self, 1, 0, np.zeros(6)))#, m=m, v=v, rCG=rCG) )
                 
                 rRel = np.array(d['location'], dtype=float)
@@ -1209,7 +1209,7 @@ class System():
             point.setPosition(point.r)
             
         for line in self.lineList:
-            line.staticSolve()
+            line.staticSolve(profiles=1)  # flag to enable additional line outputs used for plotting, tension results, etc.
             
         for point in self.pointList:
             point.getForces()
@@ -1446,7 +1446,7 @@ class System():
         
     
     
-    def mooringEq(self, X, DOFtype="free", lines_only=False, tol=0.001):
+    def mooringEq(self, X, DOFtype="free", lines_only=False, tol=0.001, profiles=0):
         '''Error function used in solving static equilibrium by calculating the forces on free objects
 
         Parameters
@@ -1475,7 +1475,7 @@ class System():
              
         # solve profile and forces of all lines 
         for line in self.lineList:
-            line.staticSolve(tol=tol)
+            line.staticSolve(tol=tol, profiles=profiles)
         
         # get reactions in DOFs
         f = self.getForces(DOFtype=DOFtype, lines_only=lines_only)
@@ -1725,7 +1725,7 @@ class System():
         
         # if there are no DOFs, just update the mooring system force calculations then exit
         if n == 0:
-            self.mooringEq(X0, DOFtype=DOFtype, tol=lineTol)
+            self.mooringEq(X0, DOFtype=DOFtype, tol=lineTol, profiles=1)
             if display > 0:
                 print("There are no DOFs so solveEquilibrium is returning without adjustment.")
             return True
@@ -1834,7 +1834,7 @@ class System():
         self.Es2 = info['Es']    # List of errors that the forces are away from 0, which in this case, is the same as the forces
         
         # Update equilibrium position at converged X values
-        F = self.mooringEq(X, DOFtype=DOFtype, tol=lineTol)
+        F = self.mooringEq(X, DOFtype=DOFtype, tol=lineTol, profiles=1)
         
         # Print statements if it ever reaches the maximum number of iterations
         if info['iter'] == maxIter-1:
@@ -1864,7 +1864,7 @@ class System():
         # show an animation of the equilibrium solve if applicable
         if plots > 0:   
             self.animateSolution()
-        
+                
         return True
     
     
@@ -2427,6 +2427,7 @@ class System():
         pointlabels     = kwargs.get('pointlabels'    , False     )     # toggle to include point number labels in the plot
         endpoints       = kwargs.get('endpoints'      , False     )     # toggle to include the line end points in the plot
         bathymetry      = kwargs.get("bathymetry"     , False     )     # toggle (and string) to include bathymetry or not. Can do full map based on text file, or simple squares
+        water           = kwargs.get("water"          , 0         )     # option to plot water surface (if > 0)
         cmap_bath       = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
         alpha           = kwargs.get("opacity"        , 1.0       )     # the transparency of the bathymetry plot_surface
         draw_body       = kwargs.get("draw_body"      , True      )     # toggle to draw the Bodies or not
@@ -2552,8 +2553,10 @@ class System():
                 cbar_bath=True
             if cbar_bath:
                 fig.colorbar(bath, shrink=cbar_bath_size, label='depth (m)')
-            
         
+        # draw water surface if requested
+        #if water > 0:
+            
         
         fig.suptitle(title)
         
