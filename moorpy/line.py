@@ -71,16 +71,16 @@ class Line():
         
 
     
-    def loadData(self, dirname, rootname):
+    def loadData(self, dirname, rootname, sep='.MD.'):
         '''Loads line-specific time series data from a MoorDyn output file'''
         
         self.qs = 0 # signals time series data
     
         # load time series data
         if self.isRod > 0:
-            data, ch, channels, units = self.read_mooring_file(dirname+rootname+".MD.", "Rod"+str(self.number)+".out") # remember number starts on 1 rather than 0
+            data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, "Rod"+str(self.number)+".out") # remember number starts on 1 rather than 0
         else:
-            data, ch, channels, units = self.read_mooring_file(dirname+rootname+".MD.", "Line"+str(self.number)+".out") # remember number starts on 1 rather than 0
+            data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, "Line"+str(self.number)+".out") # remember number starts on 1 rather than 0
                 
         # get time info
         if ("Time" in ch):

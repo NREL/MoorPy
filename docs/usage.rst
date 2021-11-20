@@ -26,9 +26,10 @@ generated based on reading in a MoorDyn-style input file.
 Creating a MoorPy System Manually
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-MoorPy has functions to facilitate the orderly creation of a mooring system. 
+MoorPy has functions to facilitate the orderly creation of a mooring system. The following
+gives an example of how they work.
 
-.. code-block:: none
+.. code-block:: python
 
 
   # ----- choose some system geometry parameters -----
@@ -67,24 +68,6 @@ MoorPy has functions to facilitate the orderly creation of a mooring system.
       ms.addLine(lineLength, typeName, pointA=2*i+1, pointB=2*i+2)
 
 
-.. code-block:: none      
-  
-  # ----- run the model to demonstrate -----
-  
-  ms.initialize()                                             # make sure everything's connected
-  
-  ms.solveEquilibrium()                                       # equilibrate
-  fig, ax = ms.plot()                                         # plot the system in original configuration
-  ms.unload("sample.txt")                                     # export to MD input file
-  
-  ms.bodyList[0].f6Ext = np.array([3e6, 0, 0, 0, 0, 0])       # apply an external force on the body 
-  ms.solveEquilibrium3()                                      # equilibrate
-  fig, ax = ms.plot(ax=ax, color='red')                       # plot the system in displaced configuration (on the same plot, in red)
-  
-  print(f"Body offset position is {ms.bodyList[0].r6}")
-          
-  plt.show()
-
 
 
 Creating a MoorPy System for a MoorDyn Input File
@@ -94,7 +77,7 @@ Creating a MoorPy System for a MoorDyn Input File
 A MoorPy System can be initialized by reading in a MoorDyn-style input file. This is simply done by
 passing the input file name when creating the System object:
 
-.. code-block:: none
+.. code-block:: python
 
   ms = mp.System(file='the MoorDyn-style input file.txt')
 
@@ -161,7 +144,7 @@ functions, as well as a variety of additional helper functions for more speciali
 Here is an example showing the most important functions:
 
 
-.. code-block:: none
+.. code-block:: python
  
   ms.initialize()                                             # make sure everything's connected
   

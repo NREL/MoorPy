@@ -29,7 +29,7 @@ class System():
     # >>> note: system module will need to import Line, Point, Body for its add/creation routines 
     #     (but line/point/body modules shouldn't import system) <<<
     
-    def __init__(self, file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1):
+    def __init__(self, file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1, Fortran=True):
         '''Creates an empty MoorPy mooring system data structure and will read an input file if provided.
 
         Parameters
@@ -79,15 +79,18 @@ class System():
         # set the quasi-static/dynamic toggle for the entire mooring system
         self.qs = qs
         if self.qs==0:  # if the mooring system is desired to be used as a portrayal of MoorDyn data
-            if len(file)==0 or len(dirname)==0 or len(rootname)==0:
-                raise ValueError("The directory location of the MoorDyn output files needs to be given OR the name of the .fst file needs to be given, without the .fst")
+            if len(file)==0 or len(rootname)==0:
+                raise ValueError("The MoorDyn input file name and the root name of the MoorDyn output files (e.g. the .fst file name without extension) need to be given.")
             # load in the MoorDyn data for each line to set the xp,yp,zp positions of each node in the line
             # Each row in the xp matrix is a time step and each column is a node in the line
             for line in self.lineList:
-                try:
-                    line.loadData(dirname, rootname)
-                except:
-                    raise ValueError("There is likely not a .MD.Line#.out file in the directory. Make sure Line outputs are set to 'p' in the MoorDyn input file")
+                #try:
+                    if Fortran:  # for output filename style for MD-F
+                        line.loadData(dirname, rootname, sep='.MD.')
+                    else:        # for output filename style for MD-C
+                        line.loadData(dirname, rootname, sep='_')  
+                #except:
+                #    raise ValueError("There is likely not a .MD.Line#.out file in the directory. Make sure Line outputs are set to 'p' in the MoorDyn input file")
 
     
     def addBody(self, mytype, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), f6Ext=np.zeros(6)):
@@ -391,17 +394,20 @@ class System():
                             rRel = np.array(entries[2:5], dtype=float)
                             self.bodyList[BodyID-1].attachPoint(num, rRel)
                             
-                        elif ("fair" in entry1) or ("ves" in entry1):
-                            pointType = -1
+                        elif ("fair" in entry1) or ("ves" in entry1) or ("couple" in entry1):
+                            # for coupled point type, just set it up that same way in MoorPy (attachment to a body not needed, right?)
+                            pointType = -1                            
+                            '''
                             # attach to a generic platform body (and make it if it doesn't exist)
                             if len(self.bodyList) > 1:
-                                raise ValueError("Generic Fairlead/Vessel-type points aren't supported when bodies are defined.")
+                                raise ValueError("Generic Fairlead/Vessel-type points aren't supported when multiple bodies are defined.")
                             if len(self.bodyList) == 0:
                                 #print("Adding a body to attach fairlead points to.")
                                 self.bodyList.append( Body(self, 1, 0, np.zeros(6)))#, m=m, v=v, rCG=rCG) )
                             
                             rRel = np.array(entries[2:5], dtype=float)
                             self.bodyList[0].attachPoint(num, rRel)    
+                            '''
                                 
                         elif ("con" in entry1) or ("free" in entry1):
                             pointType = 0
@@ -654,9 +660,9 @@ class System():
             cIntDamp = -0.8
             EI = 0.0
             Can = 1.0
-            Cat = 0.0
-            Cdn = 1.6
-            Cdt = 0.05
+            Cat = 1.0
+            Cdn = 1.0
+            Cdt = 0.5
             
             #Body Properties (for each body in bodyList)
             #! Add Comments

@@ -139,7 +139,13 @@ def getLineProps(dmm, type="chain", stud="studless", source="Orcaflex-altered", 
             EA = 1.06e6*d**2*1000           #[N]
             MBL = 105990*d**2*1000          #[N]
             d_vol = 0.80*d                  #[m]
-            cost = (0.42059603*MBL/1000/9.81) + 109.5   # [$/m] from old NREL-internal
+            cost = 1.0*((0.42059603*MBL/1000/9.81) + 109.5)   # [$/m] from old NREL-internal
+        elif type=="hmpe":
+            massden = 0.4526*d**2*1000      #[kg/m]
+            EA = 38.17e6*d**2*1000          #[N]
+            MBL = 619000*d**2*1000          #[N]
+            d_vol = 1.01*d                  #[m]
+            cost = (0.01*MBL/1000/9.81)     # [$/m] from old NREL-internal
         elif type=="wire-fiber" or type=="fiber":
             massden = 3.6109*d**2*1000      #[kg/m]
             EA = 3.67e7*d**2*1000           #[N]
