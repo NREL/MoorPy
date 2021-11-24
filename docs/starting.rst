@@ -36,5 +36,5 @@ Both of these example scripts should run successfully after MoorPy has been inst
 They will produce a plot showing the mooring system in the calculated equilibrium state.
 :ref:`The Model Structure page<Model Structure>` gives an overview of how a mooring system
 is represented in MoorPy. :ref:`The MoorPy Usage page<MoorPy Usage>` gives more information
-about the function calls used to make tehse examples work, as well as other available
+about the function calls used to make these examples work, as well as other available
 methods and outputs of MoorPy. 
