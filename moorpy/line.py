@@ -278,7 +278,13 @@ class Line():
             # drawing lines
             else:
                 
-                return self.xp[ts,:], self.yp[ts,:], self.zp[ts,:], self.Tdata[ts:]
+                # handle whether or not there is tension data
+                try:  # use average to go from segment tension to node tensions
+                    Te = 0.5*(np.append(self.Te[ts,0], self.Te[ts,:]) +np.append(self.Te[ts,:], self.Te[ts,-1]))
+                except: # otherwise return zeros to avoid an error (might want a warning in some cases?)
+                    Te = np.zeros(self.nNodes)
+                    
+                return self.xp[ts,:], self.yp[ts,:], self.zp[ts,:], Te
     
     
     def getCoordinate(self, s, n=100):

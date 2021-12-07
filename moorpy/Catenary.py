@@ -678,7 +678,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                         Zs[I] = ( SQRT1VFMinWLs_HF2 - SQRT1VFMinWL_HF2 )*HF_W + s_EA*( VFMinWL + 0.5*Ws );
                         Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs );
                  
-                    # A portion of the line must rest on the seabed and the anchor tension is zero
+                    # A portion of the line must rest on the seabed
                     elif ProfileType in [2,3]:             
                             
                         if CB > 0:
@@ -687,7 +687,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                             xB = 0.0
                         xBlim = max(xB, 0.0) 
                             
-                        if  s[I] <= xB:  # (aka Lbot - s > HF/(CB*W) ) if this node rests on the seabed and the tension is zero
+                        if  s[I] <= xB and CB > 0:  # (aka Lbot - s > HF/(CB*W) ) if this node rests on the seabed and the tension is zero
                         
                             Xs[I] = s[I];
                             Zs[I] = 0.0;
@@ -703,8 +703,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                         
                             Xs[I] = LBot + HF_W*np.log( VFMinWLs_HF + SQRT1VFMinWLs_HF2 ) + HF*s_EA + 0.5*CB*W/EA *(-LBot*LBot + xB*xBlim);
                             Zs[I] = ( -1.0  + SQRT1VFMinWLs_HF2)*HF_W + s_EA*(VFMinWL + 0.5*Ws ) + 0.5*   VFMinWL*VFMinWL/WEA;
-                            Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs );
-                    
+                            Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs )
+    
     if plots > 0:            
         # re-reverse line distributed data back to normal if applicable
         if reverseFlag:  

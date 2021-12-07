@@ -19,7 +19,7 @@ from moorpy.line import Line
 from moorpy.lineType import LineType
 import matplotlib as mpl
 #import moorpy.MoorSolve as msolve
-from moorpy.helpers import rotationMatrix, rotatePosition, getH, printVec, set_axes_equal, dsolve2, SolveError, MoorPyError
+from moorpy.helpers import rotationMatrix, rotatePosition, getH, printVec, set_axes_equal, dsolve2, SolveError, MoorPyError, loadLineProps, getLineProps
 
 
 
@@ -29,7 +29,7 @@ class System():
     # >>> note: system module will need to import Line, Point, Body for its add/creation routines 
     #     (but line/point/body modules shouldn't import system) <<<
     
-    def __init__(self, file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1, Fortran=True):
+    def __init__(self, file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1, Fortran=True, lineProps=None):
         '''Creates an empty MoorPy mooring system data structure and will read an input file if provided.
 
         Parameters
@@ -55,6 +55,9 @@ class System():
         self.pointList = []
         self.lineList = []
         self.lineTypes = {}
+        
+        # load mooring line property scaling coefficients for easy use when creating line types
+        self.lineProps = loadLineProps(lineProps)
         
         # the ground body (number 0, type 1[fixed]) never moves but is the parent of all anchored things
         self.groundBody = Body(self, 0, 1, np.zeros(6))   # <<< implementation not complete <<<< be careful here if/when MoorPy is split up
@@ -177,7 +180,7 @@ class System():
 
         '''
         
-        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, self.lineTypes[type_string].name, nSegs=nSegs, cb=cb) )
+        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, type_string, nSegs=nSegs, cb=cb) )
         
         if pointA > 0:
             if pointA <= len(self.pointList):
@@ -235,8 +238,34 @@ class System():
         '''
         
         self.lineTypes[type_string] = LineType(type_string, d, massden, EA)
+
+
+    def addLineType2(self, material, dnommm, source=None, name="", **kwargs):
+        '''Add a LineType to the System using new dictionary-based method.
+
+        Parameters
+        ----------
+        dnommm : float
+            nominal diameter [mm].
+        material : string
+            string identifier of the material type be used.
+        source : dict or filename (optional)
+            YAML file name or dictionary containing line property scaling coefficients
+        name : any dict index (optional)
+            Identifier for the line type (otherwise will be generated automatically).
+
+        Returns
+        -------
+        None.
+        '''
+                 
+        lineType = getLineProps(dnommm, material, source=source, name=name)  # compute the actual values for this line type
         
-        # handle display message if/when MoorPy is reorganized by classes
+        lineType.update(kwargs)                      # add any custom arguments provided in the call to the lineType's dictionary
+        
+        self.lineTypes[dict['name']] = lineType      # add the dictionary to the System's lineTypes master dictionary
+        
+        return lineType                              # return the dictionary in case it's useful separately
         
             
     def load(self, filename):
@@ -298,6 +327,7 @@ class System():
                     while line.count('---') == 0:
                         entries = line.split()
                         self.lineTypes[entries[0]] = LineType(entries[0], np.float_(entries[1]), np.float_(entries[2]), np.float_(entries[3])) 
+                        #self.lineTypes[entries[0]] = dict(name=entries[0], d=float(entries[1]), massden=float(entries[2]), EA=float(entries[3])) <<< also store dynamic coefficients!
                         line = next(f)
                         
                         
@@ -442,7 +472,7 @@ class System():
                         #EA= lineTypes[entries[1]].EA 
                         
                         #lineList.append( Line(dirName, num, lUnstr, dia, nSegs) )
-                        self.lineList.append( Line(self, num, lUnstr, self.lineTypes[entries[1]].name, nSegs=nSegs, attachments = [np.int(entries[4]),np.int(entries[5])]) )
+                        self.lineList.append( Line(self, num, lUnstr, entries[1], nSegs=nSegs, attachments = [int(entries[4]), int(entries[5])]) )
                         
                         # attach ends
                         self.pointList[np.int(entries[4])-1].attachLine(num, 0)

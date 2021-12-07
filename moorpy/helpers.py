@@ -1,7 +1,8 @@
 
 import numpy as np
 import time
-
+import yaml
+import os
 
 
  
@@ -495,4 +496,153 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
          
 
     return X, Y, dict(iter=iter, err=err, dX=dX_last, oths=oths, Xs=Xs, Es=Es, success=success, dXlist=dXlist, dXlist2=dXlist2)
+
+
+def getLineProps(dnommm, material, source=None, name="", **kwargs):
+    '''Sets up a dictionary that represents a mooring line type based on the 
+    specified diameter and material type. The
+
+    - This function requires at least one input: the line diameter in millimeters.
+    - The rest of the inputs are optional: describe the desired type of line (chain, polyester, wire, etc.),
+    the type of chain (studless or studlink), the source of data (Orcaflex-original or altered), or a name identifier
+    - The function will output a MoorPy linetype object
+
+    # support options for :
+    
+    # 1. dictionary passed in (this is what will be done when called from a System method)
+    
+        (a) by default, System will load in MoorPy's default line property information YAML
+        
+        (b) or user specify's alternate YAML file when making the system
+        
+    
+    # 2. yaml filename pass in or use default moorpy yaml and load yaml (used when called independently)
+    
+    System.linePropsDatabase will be a dictionary of stored YAML coefficients
+    
+    System.lineTypes will become a dictionary of LineType DICTIONARIES
+        
+        
+    Parameters
+    ----------
+    dnommm : float
+        nominal diameter [mm].
+    material : string
+        string identifier of the material type be used.
+    source : dict or filename (optional)
+        YAML file name or dictionary containing line property scaling coefficients
+    name : any dict index (optional)
+        Identifier for the line type (otherwise will be generated automatically).    
+    '''
+    
+    
+    # deal with the source (is it a dictionary, or reading in a new yaml?)
+    if source is None and len(yaml_file) == 0:       # load MoorPy default linePropsDatabase        
+        lineProps = loadLineProps('default')
+            
+    elif not source is None and len(yaml_file) == 0:
+        lineProps = source
+    
+    elif source is None and len(yaml_file) > 0:
+        lineProps = loadLineProps(yaml_file)
+    
+    elif source is None and len(yaml_file) > 0:
+        raise ValueError(f'Only one of source or yaml_file parameters must be supplied to getLineProps (both were supplied).')
+    
+    
+    # raise an error if the material isn't in the source dictionary
+    if not material in lineProps:
+        raise ValueError(f'Specified mooring line material, {material}, is not in the database.')
+    
+    # calculate the relevant properties for this specific line type
+    mat = lineProps[material]       # shorthand for the sub-dictionary of properties for the material in question    
+    d = dnommm/1000                 # convert nominal diameter from mm to m    
+    d_vol = mat['dvol_dnom']*d    
+    mass = mat['mass_0'] + mat['mass_d']*d + mat['mass_d2']*d**2 + mat['mass_d3']*d**3 
+    EA   = mat[  'EA_0'] + mat[  'EA_d']*d + mat[  'EA_d2']*d**2 + mat[  'EA_d3']*d**3 
+    MBL  = mat[ 'MBL_0'] + mat[ 'MBL_d']*d + mat[ 'MBL_d2']*d**2 + mat[ 'MBL_d3']*d**3 
+    cost =(mat['cost_0'] + mat['cost_d']*d + mat['cost_d2']*d**2 + mat['cost_d3']*d**3 
+                         + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
+    w = (mass - np.pi/4*d*d*1025)*9.81
+    
+    # Set up a main identifier for the linetype unless one is provided
+    if name=="":
+        typestring = f"{type}{dnom:.0f}"
+    else:
+        typestring = name
+    
+    notes = f"made with getLineProps - source: {YAML_input}"
+
+    lineType = dict(name=typestring, d_vol=dvol, m_lin=mass, EA=EA, w=w,
+                    MBL=MBL, cost=cost, notes=notes, input_type=type, input_d=d)
+
+    lineType.update(kwargs)   # add any custom arguments provided in the call to the lineType's dictionary
+          
+    return lineType
+
+
+def loadLineProps(source):
+    '''Loads a set of MoorPy mooring line property scaling coefficients from
+    a specified YAML file or passed dictionary. Any coefficients not included
+    will take a default value (zero for everything except diameter ratio, 
+    which is 1). It returns a dictionary containing the complete mooring line
+    property scaling coefficient set to use for any provided mooring line types.
+    
+    Parameters
+    ----------
+    
+    source : dict or filename
+        YAML file name or dictionary containing line property scaling coefficients
+            
+    '''
+
+    if type(source) is dict:
+        source = source
+        
+    elif source is None or source=="default":
+        import os
+        mpdir = os.path.dirname(os.path.realpath(__file__))
+        with open(os.path.join(mpdir,"MoorProps_default.yaml")) as file:
+            source = yaml.load(file, Loader=yaml.FullLoader)
+        
+    elif type(source) is string:
+        with open(source) as file:
+            source = yaml.load(file, Loader=yaml.FullLoader)
+
+    else:
+        raise Exception("loadLineProps supplied with invalid source")
+
+    if 'lineProps' in source:
+        lineProps = source['lineProps']
+    else:
+        raise Exception("YAML file or dictionary must have a 'lineProps' field containing the data")
+
+    
+    output = dict()  # output dictionary combining default values with loaded coefficients
+
+    # combine loaded coefficients and default values into dictionary that will be saved
+    output['mass_0'   ] = lineProps.get('mass_0'   , 0.0)
+    output['mass_d'   ] = lineProps.get('mass_d'   , 0.0)
+    output['mass_d2'  ] = lineProps.get('mass_d2'  , 0.0)
+    output['mass_d3'  ] = lineProps.get('mass_d3'  , 0.0)
+    output['EA_0'     ] = lineProps.get('EA_0'     , 0.0)
+    output['EA_d'     ] = lineProps.get('EA_d'     , 0.0)
+    output['EA_d2'    ] = lineProps.get('EA_d2'    , 0.0)
+    output['EA_d3'    ] = lineProps.get('EA_d3'    , 0.0)
+    output['MBL_0'    ] = lineProps.get('MBL_0'    , 0.0)
+    output['MBL_d'    ] = lineProps.get('MBL_d'    , 0.0)
+    output['MBL_d2'   ] = lineProps.get('MBL_d2'   , 0.0)
+    output['MBL_d3'   ] = lineProps.get('MBL_d3'   , 0.0)
+    output['dvol_dnom'] = lineProps.get('dvol_dnom', 1.0)
+    output['cost_0'   ] = lineProps.get('cost_0'   , 0.0)
+    output['cost_d'   ] = lineProps.get('cost_d'   , 0.0)
+    output['cost_d2'  ] = lineProps.get('cost_d2'  , 0.0)
+    output['cost_d3'  ] = lineProps.get('cost_d3'  , 0.0)
+    output['cost_mass'] = lineProps.get('cost_mass', 0.0)
+    output['cost_EA'  ] = lineProps.get('cost_EA'  , 0.0)
+    output['cost_MBL' ] = lineProps.get('cost_MBL' , 0.0)
+    
+    return output
+
+
 
