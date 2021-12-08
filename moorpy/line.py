@@ -10,7 +10,7 @@ from moorpy.helpers import LineError, CatenaryError, rotationMatrix
 class Line():
     '''A class for any mooring line that consists of a single material'''
 
-    def __init__(self, mooringSys, num, L, lineTypeName, nSegs=100, cb=0, isRod=0, attachments = [0,0]):
+    def __init__(self, mooringSys, num, L, lineType, nSegs=100, cb=0, isRod=0, attachments = [0,0]):
         '''Initialize Line attributes
 
         Parameters
@@ -21,8 +21,8 @@ class Line():
             indentifier number
         L : float
             line unstretched length [m]
-        lineTypeName : string
-            string identifier of LineType object that this Line is to be
+        lineType : dict
+            dictionary containing the coefficients needed to describe the line (could reference an entry of System.lineTypes).
         nSegs : int, optional
             number of segments to split the line into. Used in MoorPy just for plotting. The default is 100.
         cb : float, optional
@@ -30,7 +30,7 @@ class Line():
         isRod : boolean, optional
             determines whether the line is a rod or not. The default is 0.
         attachments : TYPE, optional
-            ID numbers of any Points attached to the Line. The default is [0,0].
+            ID numbers of any Points attached to the Line. The default is [0,0]. << consider removing
 
         Returns
         -------
@@ -43,9 +43,8 @@ class Line():
         self.number = num
         self.isRod = isRod
             
-        
         self.L = L  # line unstretched length
-        self.type = lineTypeName    # string that should match a lineTypes dict entry
+        self.type = lineType    # dictionary of a System.lineTypes entry
         
         self.nNodes = int(nSegs) + 1
         self.cb = float(cb)    # friction coefficient (will automatically be set negative if line is fully suspended)
@@ -237,8 +236,8 @@ class Line():
                 self.cb = 0.0     # set to zero so that the line includes seabed interaction.
         
             try:
-                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.sys.lineTypes[self.type].EA, 
-                                                  self.sys.lineTypes[self.type].w, self.cb, HF0=self.HF, VF0=self.VF, nNodes=n, plots=1) 
+                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], 
+                                                      self.cb, HF0=self.HF, VF0=self.VF, nNodes=n, plots=1) 
             except CatenaryError as error:
                 raise LineError(self.number, error.message)
             
@@ -263,7 +262,7 @@ class Line():
                 Rmat = np.array(rotationMatrix(0, np.arctan2(np.hypot(k[0],k[1]), k[2]), np.arctan2(k[1],k[0])))  # <<< should fix this up at some point, MattLib func may be wrong
                 
                 # make points for appropriately sized cylinder
-                d = self.sys.lineTypes[self.type].d
+                d = self.type['d']
                 Xs, Ys, Zs = makeTower(self.length, np.array([d, d]))   # add in makeTower method once you start using Rods
                 
                 # translate and rotate into proper position for Rod
@@ -608,7 +607,7 @@ class Line():
             self.HF = 0   # iteration with, and insteady use the default values.
             
         try:
-            (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.sys.lineTypes[self.type].EA, self.sys.lineTypes[self.type].w, 
+            (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], 
                                                   CB=self.cb, Tol=tol, HF0=self.HF, VF0=self.VF, plots=profiles)   # call line model
         except CatenaryError as error:
             raise LineError(self.number, error.message)
@@ -758,8 +757,8 @@ class Line():
             self.cb = 0.0     # set to zero so that the line includes seabed interaction.
     
         try:
-            (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.sys.lineTypes[self.type].EA, 
-                                              self.sys.lineTypes[self.type].w, self.cb, HF0=self.HF, VF0=self.VF, nNodes=self.nNodes, plots=1) 
+            (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], 
+                                                  self.cb, HF0=self.HF, VF0=self.VF, nNodes=self.nNodes, plots=1) 
         except CatenaryError as error:
             raise LineError(self.number, error.message)
 

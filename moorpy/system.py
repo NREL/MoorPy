@@ -158,15 +158,15 @@ class System():
         #print("Created Point "+str(self.pointList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
         
-    def addLine(self, lUnstr, type_string, nSegs=40, pointA=0, pointB=0, cb=0):
+    def addLine(self, lUnstr, lineType, nSegs=40, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
 
         Parameters
         ----------
         lUnstr : float
             unstretched line length [m].
-        type_string : string
-            string identifier of LineType object that this Line is to be.
+        lineType : string or dict
+            string identifier of lineType for this line already added to the system, or dict specifying custom line type.
         nSegs : int, optional
             number of segments to split the line into. The default is 20.
         pointA int, optional
@@ -180,7 +180,13 @@ class System():
 
         '''
         
-        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, type_string, nSegs=nSegs, cb=cb) )
+        if not isinstance(lineType, dict):                      # If lineType is not a dict, presumably it is a key for System.LineTypes.
+            if lineType in self.lineTypes:                      # So make sure it matches up with a System.LineType
+                lineType = self.lineTypes[lineType]             # in which case that entry will get passed to Line.init
+            else:
+                ValueError("The specified lineType name does not correspond with any lineType stored in this MoorPy System")
+                
+        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, lineType, nSegs=nSegs, cb=cb) )
         
         if pointA > 0:
             if pointA <= len(self.pointList):
@@ -237,7 +243,8 @@ class System():
 
         '''
         
-        self.lineTypes[type_string] = LineType(type_string, d, massden, EA)
+        #self.lineTypes[type_string] = LineType(type_string, d, massden, EA)
+        self.lineTypes[type_string] = dict(name=type_string, d_vol=d, m=massden, EA=EA)
 
 
     def addLineType2(self, material, dnommm, source=None, name="", **kwargs):
@@ -263,7 +270,7 @@ class System():
         
         lineType.update(kwargs)                      # add any custom arguments provided in the call to the lineType's dictionary
         
-        self.lineTypes[dict['name']] = lineType      # add the dictionary to the System's lineTypes master dictionary
+        self.lineTypes[lineType['name']] = lineType  # add the dictionary to the System's lineTypes master dictionary
         
         return lineType                              # return the dictionary in case it's useful separately
         
@@ -326,8 +333,8 @@ class System():
                     line = next(f)
                     while line.count('---') == 0:
                         entries = line.split()
-                        self.lineTypes[entries[0]] = LineType(entries[0], np.float_(entries[1]), np.float_(entries[2]), np.float_(entries[3])) 
-                        #self.lineTypes[entries[0]] = dict(name=entries[0], d=float(entries[1]), massden=float(entries[2]), EA=float(entries[3])) <<< also store dynamic coefficients!
+                        #self.lineTypes[entries[0]] = LineType(entries[0], np.float_(entries[1]), np.float_(entries[2]), np.float_(entries[3])) 
+                        self.lineTypes[entries[0]] = dict(name=entries[0], d=float(entries[1]), massden=float(entries[2]), EA=float(entries[3])) #<<< also store dynamic coefficients!
                         line = next(f)
                         
                         
@@ -461,18 +468,14 @@ class System():
                     line = next(f)
                     while line.count('---') == 0:
                         entries = line.split()
-                        
-                        #print(entries)
-                        
+                                                
                         num    = np.int(entries[0])
-                        #dia    = lineTypes[entries[1]].d # find diameter based on specified rod type string
                         lUnstr = np.float_(entries[2])
+                        lineType = self.lineTypes[entries[1]]
                         nSegs  = np.int(entries[3])         
-                        #w = lineTypes[entries[1]].w  # line wet weight per unit length
-                        #EA= lineTypes[entries[1]].EA 
                         
                         #lineList.append( Line(dirName, num, lUnstr, dia, nSegs) )
-                        self.lineList.append( Line(self, num, lUnstr, entries[1], nSegs=nSegs, attachments = [int(entries[4]), int(entries[5])]) )
+                        self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs)) #attachments = [int(entries[4]), int(entries[5])]) )
                         
                         # attach ends
                         self.pointList[np.int(entries[4])-1].attachLine(num, 0)
@@ -538,7 +541,7 @@ class System():
                 MBL = float(d['breaking_load'])
             else:
                 MBL = 0
-            self.lineTypes[d['name']] = LineType(d['name'], dia, w, EA, MBL=MBL)
+            self.lineTypes[d['name']] = dict(name=d['name'], d_vol=dia, w=w, EA=EA, MBL=MBL)
             
         # rod types TBD
         
@@ -805,9 +808,9 @@ class System():
                         connection_points[line -1,1] = point_ind                                #Save as a Fairlead node
                         #connection_points[line -1,1] = self.pointList.index(point) + 1
             #Populate text
-            for i in range(len(self.lineList)):
+            for line in self.lineList:
                 L.append("{:<4d} {:<15} {:8.3f} {:5d} {:7d} {:8d}      {}"
-                          .format(self.lineList[i].number,self.lineList[i].type,self.lineList[i].L,self.lineList[i].nNodes - 1,int(connection_points[i,0]),int(connection_points[i,1]),flag))
+                          .format(line.number, line.type['name'], line.L, line.nNodes-1, int(connection_points[i,0]), int(connection_points[i,1]), flag))
             
             #Solver Options Header
             L.append("---------------------- OPTIONS ----------------------------------------")
@@ -1010,9 +1013,9 @@ class System():
                         connection_points[line -1,1] = point_ind                                #Save as a Fairlead node
                         #connection_points[line -1,1] = self.pointList.index(point) + 1
             #Populate text
-            for i in range(len(self.lineList)):
+            for line in self.lineList:
                 L.append("{:<4d} {:<15} {:8.3f} {:5d} {:7d} {:8d}      {}"
-                          .format(self.lineList[i].number,self.lineList[i].type,self.lineList[i].L,self.lineList[i].nNodes - 1,int(connection_points[i,0]),int(connection_points[i,1]),flag))
+                          .format(line.number, line.type['name'], line.L, line.nNodes-1, int(connection_points[i,0]), int(connection_points[i,1]), flag))
             
             #Solver Options Header
             L.append("---------------------- OPTIONS ----------------------------------------")
@@ -1159,9 +1162,9 @@ class System():
                     connection_points[line -1,1] = point_ind                                #Save as a Fairlead node
                     #connection_points[line -1,1] = self.pointList.index(point) + 1
         #Populate text
-        for i in range(len(self.lineList)):
+        for line in self.lineList:
             L.append("{:<4d} {:<15} {:8.3f} {:5d} {:8d} {:9d}        {}   {}"
-                      .format(self.lineList[i].number,self.lineList[i].type,self.lineList[i].L,self.lineList[i].nNodes-1,int(connection_points[i,0]),int(connection_points[i,1]),flag, 0))
+                      .format(line.number, line.type['name'], line.L, line.nNodes-1, int(connection_points[i,0]), int(connection_points[i,1]), flag, 0))
         
         #Solver Options Header
         L.append("---------------------- OPTIONS ----------------------------------------")
@@ -2519,7 +2522,7 @@ class System():
         j = 0
         for line in self.lineList:
             j = j + 1
-            if color==None and isinstance(line.type, str):       
+            if color==None and isinstance(line.type, str):       # TODO: update color implementation for new lineType approach <<<
                 if 'chain' in line.type:
                     line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 elif 'rope' in line.type or 'polyester' in line.type:

@@ -535,20 +535,8 @@ def getLineProps(dnommm, material, source=None, name="", **kwargs):
         Identifier for the line type (otherwise will be generated automatically).    
     '''
     
-    
     # deal with the source (is it a dictionary, or reading in a new yaml?)
-    if source is None and len(yaml_file) == 0:       # load MoorPy default linePropsDatabase        
-        lineProps = loadLineProps('default')
-            
-    elif not source is None and len(yaml_file) == 0:
-        lineProps = source
-    
-    elif source is None and len(yaml_file) > 0:
-        lineProps = loadLineProps(yaml_file)
-    
-    elif source is None and len(yaml_file) > 0:
-        raise ValueError(f'Only one of source or yaml_file parameters must be supplied to getLineProps (both were supplied).')
-    
+    lineProps = loadLineProps(source)
     
     # raise an error if the material isn't in the source dictionary
     if not material in lineProps:
@@ -563,7 +551,7 @@ def getLineProps(dnommm, material, source=None, name="", **kwargs):
     MBL  = mat[ 'MBL_0'] + mat[ 'MBL_d']*d + mat[ 'MBL_d2']*d**2 + mat[ 'MBL_d3']*d**3 
     cost =(mat['cost_0'] + mat['cost_d']*d + mat['cost_d2']*d**2 + mat['cost_d3']*d**3 
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
-    w = (mass - np.pi/4*d*d*1025)*9.81
+    w = (mass - np.pi/4*d_vol*d_vol*1025)*9.81
     
     # Set up a main identifier for the linetype unless one is provided
     if name=="":
@@ -571,10 +559,10 @@ def getLineProps(dnommm, material, source=None, name="", **kwargs):
     else:
         typestring = name
     
-    notes = f"made with getLineProps - source: {YAML_input}"
+    notes = f"made with getLineProps"
 
-    lineType = dict(name=typestring, d_vol=dvol, m_lin=mass, EA=EA, w=w,
-                    MBL=MBL, cost=cost, notes=notes, input_type=type, input_d=d)
+    lineType = dict(name=typestring, d_vol=d_vol, m_lin=mass, EA=EA, w=w,
+                    MBL=MBL, cost=cost, notes=notes, input_type=type, input_d=d, material=material)
 
     lineType.update(kwargs)   # add any custom arguments provided in the call to the lineType's dictionary
           
@@ -619,30 +607,93 @@ def loadLineProps(source):
 
     
     output = dict()  # output dictionary combining default values with loaded coefficients
-
-    # combine loaded coefficients and default values into dictionary that will be saved
-    output['mass_0'   ] = lineProps.get('mass_0'   , 0.0)
-    output['mass_d'   ] = lineProps.get('mass_d'   , 0.0)
-    output['mass_d2'  ] = lineProps.get('mass_d2'  , 0.0)
-    output['mass_d3'  ] = lineProps.get('mass_d3'  , 0.0)
-    output['EA_0'     ] = lineProps.get('EA_0'     , 0.0)
-    output['EA_d'     ] = lineProps.get('EA_d'     , 0.0)
-    output['EA_d2'    ] = lineProps.get('EA_d2'    , 0.0)
-    output['EA_d3'    ] = lineProps.get('EA_d3'    , 0.0)
-    output['MBL_0'    ] = lineProps.get('MBL_0'    , 0.0)
-    output['MBL_d'    ] = lineProps.get('MBL_d'    , 0.0)
-    output['MBL_d2'   ] = lineProps.get('MBL_d2'   , 0.0)
-    output['MBL_d3'   ] = lineProps.get('MBL_d3'   , 0.0)
-    output['dvol_dnom'] = lineProps.get('dvol_dnom', 1.0)
-    output['cost_0'   ] = lineProps.get('cost_0'   , 0.0)
-    output['cost_d'   ] = lineProps.get('cost_d'   , 0.0)
-    output['cost_d2'  ] = lineProps.get('cost_d2'  , 0.0)
-    output['cost_d3'  ] = lineProps.get('cost_d3'  , 0.0)
-    output['cost_mass'] = lineProps.get('cost_mass', 0.0)
-    output['cost_EA'  ] = lineProps.get('cost_EA'  , 0.0)
-    output['cost_MBL' ] = lineProps.get('cost_MBL' , 0.0)
+    
+    # combine loaded coefficients and default values into dictionary that will be saved for each material
+    for mat, props in lineProps.items():    
+        output[mat] = {}
+        output[mat]['mass_0'   ] = getFromDict(props, 'mass_0'   , default=0.0)
+        output[mat]['mass_d'   ] = getFromDict(props, 'mass_d'   , default=0.0)
+        output[mat]['mass_d2'  ] = getFromDict(props, 'mass_d2'  , default=0.0)
+        output[mat]['mass_d3'  ] = getFromDict(props, 'mass_d3'  , default=0.0)
+        output[mat]['EA_0'     ] = getFromDict(props, 'EA_0'     , default=0.0)
+        output[mat]['EA_d'     ] = getFromDict(props, 'EA_d'     , default=0.0)
+        output[mat]['EA_d2'    ] = getFromDict(props, 'EA_d2'    , default=0.0)
+        output[mat]['EA_d3'    ] = getFromDict(props, 'EA_d3'    , default=0.0)
+        output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
+        output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
+        output[mat]['MBL_d2'   ] = getFromDict(props, 'MBL_d2'   , default=0.0)
+        output[mat]['MBL_d3'   ] = getFromDict(props, 'MBL_d3'   , default=0.0)
+        output[mat]['dvol_dnom'] = getFromDict(props, 'dvol_dnom', default=1.0)
+        output[mat]['cost_0'   ] = getFromDict(props, 'cost_0'   , default=0.0)
+        output[mat]['cost_d'   ] = getFromDict(props, 'cost_d'   , default=0.0)
+        output[mat]['cost_d2'  ] = getFromDict(props, 'cost_d2'  , default=0.0)
+        output[mat]['cost_d3'  ] = getFromDict(props, 'cost_d3'  , default=0.0)
+        output[mat]['cost_mass'] = getFromDict(props, 'cost_mass', default=0.0)
+        output[mat]['cost_EA'  ] = getFromDict(props, 'cost_EA'  , default=0.0)
+        output[mat]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
     
     return output
 
 
+def getFromDict(dict, key, shape=0, dtype=float, default=None):
+    '''
+    Function to streamline getting values from design dictionary from YAML file, including error checking.
+
+    Parameters
+    ----------
+    dict : dict
+        the dictionary
+    key : string
+        the key in the dictionary
+    shape : list, optional
+        The desired shape of the output. If not provided, assuming scalar output. If -1, any input shape is used.
+    dtype : type
+        Must be a python type than can serve as a function to format the input value to the right type.
+    default : number, optional
+        The default value to fill in if the item isn't in the dictionary. Otherwise will raise error if the key doesn't exist.
+    '''
+    # in future could support nested keys   if type(key)==list: ...
+
+    if key in dict:
+        val = dict[key]                                      # get the value from the dictionary
+        if shape==0:                                         # scalar input expected
+            if np.isscalar(val):
+                return dtype(val)
+            else:
+                raise ValueError(f"Value for key '{key}' is expected to be a scalar but instead is: {val}")
+        elif shape==-1:                                      # any input shape accepted
+            if np.isscalar(val):
+                return dtype(val)
+            else:
+                return np.array(val, dtype=dtype)
+        else:
+            if np.isscalar(val):                             # if a scalar value is provided and we need to produce an array (of any shape)
+                return np.tile(dtype(val), shape)
+
+            elif np.isscalar(shape):                         # if expecting a 1D array
+                if len(val) == shape:
+                    return np.array([dtype(v) for v in val])
+                else:
+                    raise ValueError(f"Value for key '{key}' is not the expected size of {shape} and is instead: {val}")
+
+            else:                                            # must be expecting a multi-D array
+                vala = np.array(val, dtype=dtype)            # make array
+
+                if list(vala.shape) == shape:                      # if provided with the right shape
+                    return vala
+                elif len(shape) > 2:
+                    raise ValueError("Function getFromDict isn't set up for shapes larger than 2 dimensions")
+                elif vala.ndim==1 and len(vala)==shape[1]:   # if we expect an MxN array, and an array of size N is provided, tile it M times
+                    return np.tile(vala, [shape[0], 1] )
+                else:
+                    raise ValueError(f"Value for key '{key}' is not a compatible size for target size of {shape} and is instead: {val}")
+
+    else:
+        if default == None:
+            raise ValueError(f"Key '{key}' not found in input file...")
+        else:
+            if shape==0 or shape==-1:
+                return default
+            else:
+                return np.tile(default, shape)
 
