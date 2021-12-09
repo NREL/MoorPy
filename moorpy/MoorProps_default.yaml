@@ -51,7 +51,7 @@ lineProps:
   
   polyester   :           # line type name
     mass_d2   :  797.8    # linear mass density per diameter^2 [kg/m^3]    
-    EA_d2     :  1.18e8   # stiffness per diameter^2 [N/m^2]    
+    EA_d2     :  1.09e9   # stiffness per diameter^2 [N/m^2]    
     MBL_d2    :  170.5e6  # minimum breaking load per diameter^2 [N/m^2]   
     dvol_dnom :  0.86     # volume-equivalent diameter per nominal diameter [-]    
     cost_MBL  : 1.65e-05  # cost per MBL [$/m/N]
