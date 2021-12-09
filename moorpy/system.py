@@ -223,8 +223,9 @@ class System():
             
     """    
         
-    def addLineType(self, type_string, d, massden, EA ):
-        '''Convenience function to add a LineType to a mooring system
+    def addLineType(self, type_string, d, mass, EA ):
+        '''Convenience function to add a LineType to a mooring system or adjust
+        the values of an existing line type if it has the same name/key.
 
         Parameters
         ----------
@@ -232,7 +233,7 @@ class System():
             string identifier of the LineType object that is to be added.
         d : float
             volume-equivalent diameter [m].
-        massden : float
+        mass : float
             mass of line per length, or mass density [kg/m], used to calculate weight density (w) [N/m]
         EA : float
             extensional stiffness [N].
@@ -243,12 +244,19 @@ class System():
 
         '''
         
-        #self.lineTypes[type_string] = LineType(type_string, d, massden, EA)
-        self.lineTypes[type_string] = dict(name=type_string, d_vol=d, m=massden, EA=EA)
+        w = (mass - np.pi/4*d**2 *self.rho)*self.g
+        
+        lineType = dict(name=type_string, d_vol=d, w=w, m=mass, EA=EA)   # make dictionary for this line type
+        
+        if type_string in self.lineTypes:                                # if there is already a line type with this name
+            self.lineTypes[type_string].update(lineType)                 # update the existing dictionary values rather than overwriting with a new dictionary
+        else:
+            self.lineTypes[type_string] = lineType
 
 
-    def addLineType2(self, material, dnommm, source=None, name="", **kwargs):
-        '''Add a LineType to the System using new dictionary-based method.
+
+    def setLineType(self, dnommm, material, source=None, name="", **kwargs):
+        '''Add or update a System lineType using the new dictionary-based method.
 
         Parameters
         ----------
@@ -265,16 +273,22 @@ class System():
         -------
         None.
         '''
-                 
-        lineType = getLineProps(dnommm, material, source=source, name=name)  # compute the actual values for this line type
+ 
+        # compute the actual values for this line type
+        lineType = getLineProps(dnommm, material, source=source, name=name, rho=self.rho, g=self.g)  
         
         lineType.update(kwargs)                      # add any custom arguments provided in the call to the lineType's dictionary
         
-        self.lineTypes[lineType['name']] = lineType  # add the dictionary to the System's lineTypes master dictionary
-        
+        # add the dictionary to the System's lineTypes master dictionary
+        if lineType['name'] in self.lineTypes:                                # if there is already a line type with this name
+            self.lineTypes[lineType['name']].update(lineType)                 # update the existing dictionary values rather than overwriting with a new dictionary
+        else:
+            self.lineTypes[lineType['name']] = lineType                       # otherwise save a new entry
+
         return lineType                              # return the dictionary in case it's useful separately
         
-            
+
+
     def load(self, filename):
         '''Loads a MoorPy System from a MoorDyn-style input file
 
@@ -334,7 +348,7 @@ class System():
                     while line.count('---') == 0:
                         entries = line.split()
                         #self.lineTypes[entries[0]] = LineType(entries[0], np.float_(entries[1]), np.float_(entries[2]), np.float_(entries[3])) 
-                        self.lineTypes[entries[0]] = dict(name=entries[0], d=float(entries[1]), massden=float(entries[2]), EA=float(entries[3])) #<<< also store dynamic coefficients!
+                        self.addLineType(entries[0], float(entries[1]), float(entries[2]), float(entries[3])) #<<< also store dynamic coefficients!
                         line = next(f)
                         
                         

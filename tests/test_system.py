@@ -22,7 +22,7 @@ def test_tensions_swap():
     ms = mp.System(depth=60)
 
     #ms.lineTypes['chain'] = getLineProps(120, name='chain')    # add a line type
-    ms.addLineType2('chain', 120, name='chain')    # add a line type
+    ms.setLineType(120, 'chain', name='chain')    # add a line type
     
     ms.addPoint(1, [  0, 0, -60])
     ms.addPoint(1, [100, 10, -30])
@@ -44,7 +44,7 @@ def test_stiffnesses_swap():
     ms = mp.System(depth=60)
 
     #ms.lineTypes['chain'] = getLineProps(120, name='chain')    # add a line type
-    ms.addLineType2('chain', 120, name='chain')    # add a line type
+    ms.setLineType(120, 'chain', name='chain')    # add a line type
 
     ms.addPoint(1, [  0, 0, -60])
     ms.addPoint(1, [100, 10, -30])
@@ -66,7 +66,7 @@ def test_stiffness_body():
     ms = mp.System(depth=60)
 
     #ms.lineTypes['chain'] = getLineProps(120, name='chain')    # add a line type
-    ms.addLineType2('chain', 120, name='chain')    # add a line type
+    ms.setLineType(120, 'chain', name='chain')    # add a line type
 
     ms.addPoint(1, [  0, 0, -60])
     ms.addPoint(1, [100, 10, -30])
@@ -108,7 +108,7 @@ def test_basic():
 
     # add a line type
     #ms.lineTypes[typeName] = getLineProps(120, name=typeName)
-    ms.addLineType2(typeName, 120, name=typeName)
+    ms.setLineType(typeName, 120, name=typeName)
 
     # Add a free, body at [0,0,0] to the system (including some properties to make it hydrostatically stiff)
     ms.addBody(0, np.zeros(6), m=1e6, v=1e3, rM=100, AWP=1e6)
@@ -150,7 +150,7 @@ def test_multiseg():
     ms1 = mp.System()
     ms1.depth = 200    
     #ms1.lineTypes['chain'] = getLineProps(120, name='chain')
-    ms1.addLineType2('chain', 120, name='chain')
+    ms1.setLineType(120, 'chain', name='chain')
     
     ms1.addPoint(1, [-800, 0 , -200])                 # anchor point
     ms1.addPoint(1, [   0, 0 ,    0])                 # fairlead    
@@ -162,7 +162,7 @@ def test_multiseg():
     ms2 = mp.System()
     ms2.depth = 200    
     #ms2.lineTypes['chain'] = getLineProps(120, name='chain')
-    ms2.addLineType2('chain', 120, name='chain')
+    ms2.setLineType(120, 'chain', name='chain')
     ms2.addPoint(1, [-800, 0 , -200])                 # anchor point
     ms2.addPoint(0, [-205, 0 , -100])                 # point along line
     ms2.addPoint(1, [   0, 0 ,    0])                 # fairlead    
@@ -185,7 +185,7 @@ def test_multiseg_seabed():
     ms1 = mp.System()
     ms1.depth = 200    
     #ms1.lineTypes['chain'] = getLineProps(120, name='chain')
-    ms1.addLineType2('chain', 120, name='chain')
+    ms1.setLineType(120, 'chain', name='chain')
     ms1.addPoint(1, [-800, 0 , -200])                 # anchor point
     ms1.addPoint(1, [   0, 0 ,    0])                 # fairlead    
     ms1.addLine(860, 'chain', pointA=1, pointB=2)
@@ -196,7 +196,7 @@ def test_multiseg_seabed():
     ms2 = mp.System()
     ms2.depth = 200    
     #ms2.lineTypes['chain'] = getLineProps(120, name='chain')
-    ms2.addLineType2('chain', 120, name='chain')
+    ms2.setLineType(120, 'chain', name='chain')
     ms2.addPoint(1, [-800, 0 , -200])                 # anchor point
     ms2.addPoint(0, [-700, 0 , -200])                 # point along line
     ms2.addPoint(0, [-600, 0 , -200])                 # point along line
@@ -223,7 +223,7 @@ def test_basicU():
     ms1.depth = 100
     
     #ms1.lineTypes['chain'] = getLineProps(120, name='chain')
-    ms1.addLineType2('chain', 120, name='chain')
+    ms1.setLineType(120, 'chain', name='chain')
 
     ms1.addPoint(1, [-200, 0 , -100])                 # anchor point
     ms1.addPoint(0, [-100, 0 ,  -50], m=0, v=50)      # float
@@ -243,7 +243,7 @@ def test_basicU():
     msU.depth = 100
     
     #msU.lineTypes['chain'] = getLineProps(120, name='chain')
-    msU.addLineType2('chain', 120, name='chain')
+    msU.setLineType(120, 'chain', name='chain')
 
     msU.addPoint(1, [-200, 0 , -100])                 # anchor point
     msU.addPoint(0, [-100, 0 ,  -50], m=0, v=50)      # float
@@ -277,7 +277,7 @@ def test_seabed(CB):
     ms1 = mp.System()
     ms1.depth = 200    
     #ms1.lineTypes['chain'] = getLineProps(120, name='chain')
-    ms1.addLineType2('chain', 120, name='chain')
+    ms1.setLineType(120, 'chain', name='chain')
     ms1.addPoint(1, [-800, 0 , -200])                 # anchor point
     ms1.addPoint(1, [   0, 0 ,    0])                 # fairlead    
     ms1.addLine(860, 'chain', pointA=1, pointB=2, cb=CB)
@@ -288,7 +288,7 @@ def test_seabed(CB):
     ms2 = mp.System()
     ms2.depth = 200    
     #ms2.lineTypes['chain'] = getLineProps(120, name='chain')
-    ms2.addLineType2('chain', 120, name='chain')
+    ms2.setLineType(120, 'chain', name='chain')
     ms2.addPoint(1, [-800, 0 , -200])                 # anchor point
     ms2.addPoint(0, [-405, 0 , -150])                 # midpoint    
     ms2.addPoint(1, [   0, 0 ,    0])                 # fairlead    

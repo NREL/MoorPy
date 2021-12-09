@@ -498,7 +498,7 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     return X, Y, dict(iter=iter, err=err, dX=dX_last, oths=oths, Xs=Xs, Es=Es, success=success, dXlist=dXlist, dXlist2=dXlist2)
 
 
-def getLineProps(dnommm, material, source=None, name="", **kwargs):
+def getLineProps(dnommm, material, source=None, name="", rho=1025.0, g=9.81, **kwargs):
     '''Sets up a dictionary that represents a mooring line type based on the 
     specified diameter and material type. The
 
@@ -544,14 +544,14 @@ def getLineProps(dnommm, material, source=None, name="", **kwargs):
     
     # calculate the relevant properties for this specific line type
     mat = lineProps[material]       # shorthand for the sub-dictionary of properties for the material in question    
-    d = dnommm/1000                 # convert nominal diameter from mm to m    
+    d = dnommm*0.001                # convert nominal diameter from mm to m    
     d_vol = mat['dvol_dnom']*d    
     mass = mat['mass_0'] + mat['mass_d']*d + mat['mass_d2']*d**2 + mat['mass_d3']*d**3 
     EA   = mat[  'EA_0'] + mat[  'EA_d']*d + mat[  'EA_d2']*d**2 + mat[  'EA_d3']*d**3 
     MBL  = mat[ 'MBL_0'] + mat[ 'MBL_d']*d + mat[ 'MBL_d2']*d**2 + mat[ 'MBL_d3']*d**3 
     cost =(mat['cost_0'] + mat['cost_d']*d + mat['cost_d2']*d**2 + mat['cost_d3']*d**3 
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
-    w = (mass - np.pi/4*d_vol*d_vol*1025)*9.81
+    w = (mass - np.pi/4*d_vol**2 *rho)*g
     
     # Set up a main identifier for the linetype unless one is provided
     if name=="":
