@@ -7,7 +7,7 @@ import numpy as np
 class Point():
     '''A class for any object in the mooring system that can be described by three translational coorindates'''
     
-    def __init__(self, mooringSys, num, type, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2]):
+    def __init__(self, mooringSys, num, type, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0):
         '''Initialize Point attributes
 
         Parameters
@@ -23,11 +23,13 @@ class Point():
         m : float, optional
             mass [kg]. The default is 0.
         v : float, optional
-            volume [m^3]. The default is 0.
+            submerged volume [m^3]. The default is 0.
         fExt : array, optional
             applied external force vector in global orientation (not including weight/buoyancy). The default is np.zeros(3).
         DOFs: list
             list of which coordinate directions are DOFs for this point (default 0,1,2=x,y,z). E.g. set [2] for vertical motion only.
+        d : float, optional
+            diameter [m]. The default is 0.
         
         Returns
         -------
@@ -51,6 +53,7 @@ class Point():
         self.DOFs = DOFs
         self.nDOF = len(DOFs)
         
+        self.d = d                      # the diameter of the point, if applicable. Used for hydrostatics [m]
         
         self.attached     = []         # ID numbers of any Lines attached to the Point
         self.attachedEndB = []         # specifies which end of the line is attached (1: end B, 0: end A)
@@ -160,22 +163,34 @@ class Point():
         '''
     
         f = np.zeros(3)         # create empty force vector on the point
-    
+        
         if lines_only==False:
-        
+            
+            radius = self.d/2           # can do this, or find the radius using r=(3*self.v/(4*np.pi))**(1/3)
+            x = max(0, radius**2 - self.r[2]**2)
+            dWP = 2*np.sqrt(x)          # diameter at the waterplane [m]
+            AWP = np.pi/4 * dWP**2      # waterplane area [m]
+            #v_half = (4/3)*np.pi*(np.sqrt(x)**3) * 0.5  # volume of the half sphere that is cut by the waterplane [m^3]
+            #v = abs(-min(0, np.sign(self.r[2]))*self.v - v_half)    # submerged volume of the point [m^3]
+            
             f[2] += -self.m*self.sys.g  # add weight 
-        
+            
+            f[2] += self.v*self.sys.rho*self.sys.g   # add buoyancy using submerged volume
+            '''
             if self.r[2] < -1:                # add buoyancy if fully submerged
                 f[2] +=  self.v*self.sys.rho*self.sys.g  
             elif self.r[2] < 1:               # imagine a +/-1 m band at z=0 where buoyancy tapers to zero
                 f[2] +=  self.v*self.sys.rho*self.sys.g * (0.5 - 0.5*self.r[2])
-            
+            '''
             f += np.array(self.fExt) # add external forces
-        
+            
+            f[2] -= self.sys.rho*self.sys.g*AWP*self.r[2]   # hydrostatic heave stiffness
+            
             # handle case of Point resting on or below the seabed, to provide a restoring force
             # add smooth transition to fz=0 at seabed (starts at zTol above seabed)
             f[2] += max(self.m - self.v*self.sys.rho, 0)*self.sys.g * (self.zSub + self.zTol)/self.zTol
-            
+
+        
                 
         # add forces from attached lines
         for LineID,endB in zip(self.attached,self.attachedEndB):

@@ -64,7 +64,6 @@ class Line():
         self.info = {}        # to hold all info provided by catenary
         
         self.qs = 1  # flag indicating quasi-static analysis (1). Set to 0 for time series data
-        
         #print("Created Line "+str(self.number))
         
         
@@ -586,7 +585,7 @@ class Line():
 
         depth = self.sys.depth
         
-        dr =  self.rB - self.rA                 
+        dr =  self.rB - self.rA
         LH = np.hypot(dr[0], dr[1])     # horizontal spacing of line ends
         LV = dr[2]                # vertical offset from end A to end B
 

@@ -129,7 +129,7 @@ class System():
         # handle display message if/when MoorPy is reorganized by classes
         
         
-    def addPoint(self, mytype, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2]):
+    def addPoint(self, mytype, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0):
         '''Convenience function to add a Point to a mooring system
 
         Parameters
@@ -153,7 +153,7 @@ class System():
 
         '''
 
-        self.pointList.append( Point(self, len(self.pointList)+1, mytype, r, m=m, v=v, fExt=fExt, DOFs=DOFs) )
+        self.pointList.append( Point(self, len(self.pointList)+1, mytype, r, m=m, v=v, fExt=fExt, DOFs=DOFs, d=d) )
         
         #print("Created Point "+str(self.pointList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
@@ -628,7 +628,7 @@ class System():
             
             lUnstr = np.float_(d['length'])      
             
-            self.lineList.append( Line(self, num, lUnstr, self.lineTypes[d['type']].name) )
+            self.lineList.append( Line(self, num, lUnstr, self.lineTypes[d['type']]) )
             
             # attach ends (name matching here)
             self.pointList[pointDict[d['endA']]].attachLine(num, 0)
@@ -2536,13 +2536,13 @@ class System():
         j = 0
         for line in self.lineList:
             j = j + 1
-            if color==None and isinstance(line.type, str):       # TODO: update color implementation for new lineType approach <<<
-                if 'chain' in line.type:
+            if color==None and isinstance(line.type['material'], str):       # TODO: update color implementation for new lineType approach <<<
+                if 'chain' in line.type['material']:
                     line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                elif 'rope' in line.type or 'polyester' in line.type:
+                elif 'rope' in line.type['material'] or 'polyester' in line.type['material']:
                     line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 else:
-                    line.drawLine(time, ax, color=[0.2,0.2,0.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                    line.drawLine(time, ax, color=[0.5,0.5,0.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
             else:
                 line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
             
