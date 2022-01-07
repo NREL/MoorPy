@@ -7,7 +7,7 @@ import numpy as np
 class Point():
     '''A class for any object in the mooring system that can be described by three translational coorindates'''
     
-    def __init__(self, mooringSys, num, type, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0):
+    def __init__(self, mooringSys, num, type, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0, zSpan=[-1,1]):
         '''Initialize Point attributes
 
         Parameters
@@ -30,6 +30,10 @@ class Point():
             list of which coordinate directions are DOFs for this point (default 0,1,2=x,y,z). E.g. set [2] for vertical motion only.
         d : float, optional
             diameter [m]. The default is 0.
+        zSpan : [float, float], optional
+            The lower and upper limits of the Point's volume relative to its coordinate [m]. 
+            This only affects the change in buoyancy when crossing the free surface. The 
+            default is [-1,1], i.e. a 2-m tall volume.
         
         Returns
         -------
@@ -57,6 +61,11 @@ class Point():
         
         self.attached     = []         # ID numbers of any Lines attached to the Point
         self.attachedEndB = []         # specifies which end of the line is attached (1: end B, 0: end A)
+    
+        if len(zSpan)==2:
+            self.zSpan = np.array(zSpan, dtype=float)
+        else:
+            raise ValueError("Point zSpan parameter must contain two numbers.")
     
         #print("Created Point "+str(self.number))
     
@@ -165,26 +174,27 @@ class Point():
         f = np.zeros(3)         # create empty force vector on the point
         
         if lines_only==False:
-            
+            '''
             radius = self.d/2           # can do this, or find the radius using r=(3*self.v/(4*np.pi))**(1/3)
             x = max(0, radius**2 - self.r[2]**2)
             dWP = 2*np.sqrt(x)          # diameter at the waterplane [m]
             AWP = np.pi/4 * dWP**2      # waterplane area [m]
             #v_half = (4/3)*np.pi*(np.sqrt(x)**3) * 0.5  # volume of the half sphere that is cut by the waterplane [m^3]
             #v = abs(-min(0, np.sign(self.r[2]))*self.v - v_half)    # submerged volume of the point [m^3]
-            
+            '''
             f[2] += -self.m*self.sys.g  # add weight 
             
-            f[2] += self.v*self.sys.rho*self.sys.g   # add buoyancy using submerged volume
-            '''
-            if self.r[2] < -1:                # add buoyancy if fully submerged
+            #f[2] += self.v*self.sys.rho*self.sys.g   # add buoyancy using submerged volume
+            
+            if self.r[2] + self.zSpan[1] < 0.0:                # add buoyancy if fully submerged
                 f[2] +=  self.v*self.sys.rho*self.sys.g  
-            elif self.r[2] < 1:               # imagine a +/-1 m band at z=0 where buoyancy tapers to zero
-                f[2] +=  self.v*self.sys.rho*self.sys.g * (0.5 - 0.5*self.r[2])
-            '''
+            elif self.r[2] + self.zSpan[0] < 0.0:    # add some buoyancy if part-submerged (linear variation, constant Awp)
+                f[2] +=  self.v*self.sys.rho*self.sys.g * (self.r[2] + self.zSpan[0])/(self.zSpan[0]-self.zSpan[1])
+            # (no buoyancy force added if it's fully out of the water, which would be very exciting for the Point)
+            
             f += np.array(self.fExt) # add external forces
             
-            f[2] -= self.sys.rho*self.sys.g*AWP*self.r[2]   # hydrostatic heave stiffness
+            #f[2] -= self.sys.rho*self.sys.g*AWP*self.r[2]   # hydrostatic heave stiffness
             
             # handle case of Point resting on or below the seabed, to provide a restoring force
             # add smooth transition to fz=0 at seabed (starts at zTol above seabed)
@@ -301,9 +311,9 @@ class Point():
         # add seabed or hydrostatic terms if needed
         if lines_only==False:
         
-            # if within a +/-1 m band from z=0, apply a hydrostatic stiffness based on buoyancy
-            if abs(self.r[2]) < 1:               
-                K[2,2] +=  self.v*self.sys.rho*self.sys.g * 0.5
+            # if partially submerged, apply a hydrostatic stiffness based on buoyancy
+            if self.r[2] + self.zSpan[1] > 0.0 and self.r[2] + self.zSpan[0] < 0.0: 
+                K[2,2] += self.sys.rho*self.sys.g * self.v/(self.zSpan[1]-self.zSpan[0])  # assumes volume is distributed evenly across zSpan
             
             # if less than zTol above the seabed (could even be below the seabed), apply a stiffness (should bring wet weight to zero at seabed)
             if self.r[2] < self.zTol - self.sys.depth:
