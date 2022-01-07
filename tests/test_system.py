@@ -108,7 +108,7 @@ def test_basic():
 
     # add a line type
     #ms.lineTypes[typeName] = getLineProps(120, name=typeName)
-    ms.setLineType(typeName, 120, name=typeName)
+    ms.setLineType(120, typeName, name=typeName)
 
     # Add a free, body at [0,0,0] to the system (including some properties to make it hydrostatically stiff)
     ms.addBody(0, np.zeros(6), m=1e6, v=1e3, rM=100, AWP=1e6)

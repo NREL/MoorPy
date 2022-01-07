@@ -51,7 +51,7 @@ class System():
         
         # lists to hold mooring system objects
         self.bodyList = []
-        # self.RodList = []    <<< TODO: add support for Rods eventually, for compatability with MoorDyn systems
+        # self.rodList = []    <<< TODO: add support for Rods eventually, for compatability with MoorDyn systems
         self.pointList = []
         self.lineList = []
         self.lineTypes = {}
@@ -312,10 +312,11 @@ class System():
 
         RodDict   = {}  # create empty dictionary for rod types
         self.lineTypes = {}  # create empty dictionary for line types
+        self.rodTypes = {}  # create empty dictionary for line types
 
         # ensure the mooring system's object lists are empty before adding to them
         self.bodyList = []
-        #self.RodList  = []
+        self.rodList  = []
         self.pointList= []
         self.lineList = []
 
@@ -352,7 +353,7 @@ class System():
                         line = next(f)
                         
                         
-                # get line type property sets
+                # get rod type property sets
                 if line.count('---') > 0 and (line.upper().count('ROD DICTIONARY') > 0 or line.upper().count('ROD TYPES') > 0):
                     line = next(f) # skip this header line, plus channel names and units lines
                     line = next(f)
@@ -362,6 +363,19 @@ class System():
                         #RodTypesName.append(entries[0]) # name string
                         #RodTypesD.append(   entries[1]) # diameter
                         #RodDict[entries[0]] = entries[1] # add dictionary entry with name and diameter
+                        
+                        type_string = entries[0]
+                        d    = float(entries[1])
+                        mass = float(entries[2])
+                        w = (mass - np.pi/4*d**2 *self.rho)*self.g
+                        
+                        rodType = dict(name=type_string, d_vol=d, w=w, m=mass)  # make dictionary for this rod type
+                        
+                        if type_string in self.rodTypes:                        # if there is already a rod type with this name
+                            self.rodTypes[type_string].update(rodType)          # update the existing dictionary values rather than overwriting with a new dictionary
+                        else:
+                            self.rodTypes[type_string] = rodType
+                        
                         line = next(f)
                         
                         
@@ -371,10 +385,10 @@ class System():
                     line = next(f)
                     line = next(f)
                     while line.count('---') == 0:
-                        entries = line.split()                    
-                        entry0 = entries[0].lower() 
-                        
-                        num = np.int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Body #
+                        entries = line.split()  # entries: ID   Attachment  X0  Y0  Z0  r0  p0  y0    M  CG*  I*    V  CdA*  Ca*            
+                        num = int(entries[0])
+                        entry0 = entries[1].lower()                         
+                        #num = np.int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Body #
                         
                         if ("fair" in entry0) or ("coupled" in entry0) or ("ves" in entry0):       # coupled case
                             bodyType = -1                        
@@ -385,12 +399,49 @@ class System():
                             # if we detected there were unrecognized chars here, could: raise ValueError(f"Body type not recognized for Body {num}")
                         #bodyType = -1   # manually setting the body type as -1 for FAST.Farm SM investigation
                         
-                        r6  = np.array(entries[1:7], dtype=float)   # initial position and orientation [m, rad]
+                        r6  = np.array(entries[2:8], dtype=float)   # initial position and orientation [m, rad]
                         r6[3:] = r6[3:]*np.pi/180.0                 # convert from deg to rad
-                        rCG = np.array(entries[7:10], dtype=float)  # location of body CG in body reference frame [m]
-                        m = np.float_(entries[10])                   # mass, centered at CG [kg]
+                        #rCG = np.array(entries[7:10], dtype=float)  # location of body CG in body reference frame [m]
+                        m = np.float_(entries[8])                   # mass, centered at CG [kg]
                         v = np.float_(entries[11])                   # volume, assumed centered at reference point [m^3]
                         
+                        # process CG
+                        strings_rCG = entries[ 9].split("|")                   # split by braces, if any
+                        if len(strings_rCG) == 1:                              # if only one entry, it is the z coordinate
+                            rCG = np.array([0.0, 0.0, float(strings_rCG[0])])
+                        elif len(strings_rCG) == 3:                            # all three coordinates provided
+                            rCG = np.array(strings_rCG, dtype=float)
+                        else:
+                            raise Exception(f"Body {num} CG entry (col 10) must have 1 or 3 numbers.")
+                            
+                        # process mements of inertia
+                        strings_I = entries[10].split("|")                     # split by braces, if any
+                        if len(strings_I) == 1:                                # if only one entry, use it for all directions
+                            Inert = np.array(3*strings_I, dtype=float)
+                        elif len(strings_I) == 3:                              # all three coordinates provided
+                            Inert = np.array(strings_I, dtype=float)
+                        else:
+                            raise Exception(f"Body {num} inertia entry (col 11) must have 1 or 3 numbers.")
+                        
+                        # process drag ceofficient by area product
+                        strings_CdA = entries[12].split("|")                   # split by braces, if any
+                        if len(strings_CdA) == 1:                              # if only one entry, use it for all directions
+                            CdA = np.array(3*strings_CdA, dtype=float)
+                        elif len(strings_CdA) == 3:                            # all three coordinates provided
+                            CdA = np.array(strings_CdA, dtype=float)
+                        else:
+                            raise Exception(f"Body {num} CdA entry (col 13) must have 1 or 3 numbers.")
+                        
+                        # process added mass coefficient
+                        strings_Ca = entries[13].split("|")                    # split by braces, if any				
+                        if len(strings_Ca) == 1:                               # if only one entry, use it for all directions
+                            Ca = np.array(strings_Ca, dtype=float)
+                        elif len(strings_Ca) == 3:                             #all three coordinates provided
+                            Ca = np.array(strings_Ca, dtype=float)
+                        else:
+                            raise Exception(f"Body {num} Ca entry (col 14) must have 1 or 3 numbers.")
+                        
+                        # add the body
                         self.bodyList.append( Body(self, num, bodyType, r6, m=m, v=v, rCG=rCG) )
                                     
                         line = next(f)
@@ -402,17 +453,19 @@ class System():
                     line = next(f)
                     line = next(f)
                     while line.count('---') == 0:
-                        entries = line.split()              
-                        entry0 = entries[0].lower() 
-                        
-                        num = np.int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Rod #
+                        entries = line.split()  # entries: RodID  RodType  Attachment  Xa   Ya   Za   Xb   Yb   Zb  NumSegs  Flags/Outputs
+                        num = int(entries[0])
+                        entry0 = entries[1].lower()
+                        #num = np.int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Rod #
                         lUnstr = 0 # not specified directly so skip for now
-                        dia = RodDict[entries[2]] # find diameter based on specified rod type string
-                        nSegs = np.int(entries[9])
+                        dia = self.rodTypes[entries[1]]['d_vol']  # find diameter based on specified rod type string
+                        nSegs = int(entries[9])
+                        rA = np.array(entries[3:6], dtype=float)
                         
                         # additional things likely missing here <<<
-                        
-                        #RodList.append( Line(dirName, num, lUnstr, dia, nSegs, isRod=1) )
+                        # for now, temporarily initialize Rods as MoorPy Points
+                        self.rodList.append( Point(self, num, 0, rA) )
+                        #rodList.append( Line(dirName, num, lUnstr, dia, nSegs, isRod=1) )
                         line = next(f)
                         
                 
@@ -481,23 +534,56 @@ class System():
                     line = next(f)
                     line = next(f)
                     while line.count('---') == 0:
-                        entries = line.split()
+                        entries = line.split()  # entries: ID  LineType  AttachA  AttachB  UnstrLen  NumSegs   Outputs
                                                 
                         num    = np.int(entries[0])
-                        lUnstr = np.float_(entries[2])
+                        lUnstr = np.float_(entries[4])
                         lineType = self.lineTypes[entries[1]]
-                        nSegs  = np.int(entries[3])         
+                        nSegs  = np.int(entries[5])         
                         
                         #lineList.append( Line(dirName, num, lUnstr, dia, nSegs) )
                         self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs)) #attachments = [int(entries[4]), int(entries[5])]) )
                         
-                        # attach ends
-                        self.pointList[np.int(entries[4])-1].attachLine(num, 0)
-                        self.pointList[np.int(entries[5])-1].attachLine(num, 1)
+                        # attach end A
+                        numA = int("".join(filter(str.isdigit, entries[2])))  # get number from the attachA string
+                        if entries[2][0] in ['r','R']:    # if id starts with an "R" or "Rod"  
+                            if numA <= len(self.rodList) and numA > 0:
+                                if entries[2][-1] in ['a','A']:
+                                    self.rodList[numA-1].attachLine(num, 0)  # add line (end A, denoted by 0) to rod >>end A, denoted by 0<<
+                                elif entries[2][-1] in ['b','B']: 
+                                    self.rodList[numA-1].attachLine(num, 0)  # add line (end A, denoted by 0) to rod >>end B, denoted by 1<<
+                                else:
+                                    raise ValueError(f"Rod end (A or B) must be specified for line {num} end A attachment. Input was: {entries[2]}")
+                            else:
+                                raise ValueError(f"Rod ID out of bounds for line {num} end A attachment.") 
                         
-                        line = next(f)
+                        else:     # if J starts with a "C" or "Con" or goes straight ot the number then it's attached to a Connection
+                           if numA <= len(self.pointList) and numA > 0:  
+                              self.pointList[numA-1].attachLine(num, 0)  # add line (end A, denoted by 0) to Point
+                           else:
+                              raise ValueError(f"Point ID out of bounds for line {num} end A attachment.") 
+
+                        # attach end B
+                        numB = int("".join(filter(str.isdigit, entries[3])))  # get number from the attachA string
+                        if entries[3][0] in ['r','R']:    # if id starts with an "R" or "Rod"  
+                            if numB <= len(self.rodList) and numB > 0:
+                                if entries[3][-1] in ['a','A']:
+                                    self.rodList[numB-1].attachLine(num, 1)  # add line (end B, denoted by 1) to rod >>end A, denoted by 0<<
+                                elif entries[3][-1] in ['b','B']: 
+                                    self.rodList[numB-1].attachLine(num, 1)  # add line (end B, denoted by 1) to rod >>end B, denoted by 1<<
+                                else:
+                                    raise ValueError(f"Rod end (A or B) must be specified for line {num} end B attachment. Input was: {entries[2]}")
+                            else:
+                                raise ValueError(f"Rod ID out of bounds for line {num} end B attachment.") 
                         
-                        
+                        else:     # if J starts with a "C" or "Con" or goes straight ot the number then it's attached to a Connection
+                           if numB <= len(self.pointList) and numB > 0:  
+                              self.pointList[numB-1].attachLine(num, 1)  # add line (end B, denoted by 1) to Point
+                           else:
+                              raise ValueError(f"Point ID out of bounds for line {num} end B attachment.") 
+
+                        line = next(f)  # advance to the next line
+
                 # get options entries
                 if line.count('---') > 0 and "options" in line.lower():
                     #print("READING OPTIONS")
