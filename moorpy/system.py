@@ -156,8 +156,7 @@ class System():
         self.pointList.append( Point(self, len(self.pointList)+1, mytype, r, m=m, v=v, fExt=fExt, DOFs=DOFs, d=d) )
         
         #print("Created Point "+str(self.pointList[-1].number))
-        # handle display message if/when MoorPy is reorganized by classes
-        
+
 
     def addLine(self, lUnstr, lineType, nSegs=40, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
@@ -1169,11 +1168,7 @@ class System():
         CdScaleIC = 4.0
         threshIC = 0.001
         dtOut = 0.0125
-<<<<<<< HEAD
- 
-=======
-        
->>>>>>> - changed default number of segments for addLine from 40 to 20
+
         # Line Type Properties
         BA = -1.0
         Can = 0.8
@@ -1194,10 +1189,7 @@ class System():
             #print('Using Custom value for', key,kwargs[key])
         
         # Outputs List
-<<<<<<< HEAD
-<<<<<<< HEAD
 
-=======
         Outputs = ["L3N1T" , "L10N1T", "L17N1T","L7N1T" , "L14N1T", "L21N1T" ,"L4N10Pz", "L11N10Pz", "L18N10Pz", "L4N10T", "L11N10T", "L18N10T"];
 
         for i in range(24, 54, 3): #iterate through rope anchor lines
@@ -1231,10 +1223,7 @@ class System():
         # for i in range(3, 59,7):
         #     Outputs.append("L" +str(i) +"N1T")
         #     Outputs.append("L" +str(i+4) +"N1T")
->>>>>>> changes to unload_farm for MoorDyn file output (simulation time step, initialization time, output channels, added output timestep)
-=======
 
->>>>>>> - changed default number of segments for addLine from 40 to 20
         print('attempting to write '+fileName +' for MoorDyn FAST.Farm input file')
         
         # Array to add strings to for each line of moordyn input file
@@ -1318,7 +1307,6 @@ class System():
 
         L.append("{:<9.3f}dtM          - time step to use in mooring integration (s)".format(float(dtm)))
         L.append("{:<9.1f}wtrdpth        - water depth (m) <<< must be specified for farm-level mooring".format(float(depth)))
-
         L.append("{:<9.1e}kbot         - bottom stiffness (Pa/m)".format(kbot))
         L.append("{:<9.1e}cbot         - bottom damping (Pa-s/m)".format(cbot))
         L.append("{:<9.1f}dtIC         - time interval for analyzing convergence during IC gen (s)".format(int(dtIC)))
