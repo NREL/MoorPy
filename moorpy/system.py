@@ -555,13 +555,13 @@ class System():
                                 else:
                                     raise ValueError(f"Rod end (A or B) must be specified for line {num} end A attachment. Input was: {entries[2]}")
                             else:
-                                raise ValueError(f"Rod ID out of bounds for line {num} end A attachment.") 
+                                raise ValueError(f"Rod ID ({numA}) out of bounds for line {num} end A attachment.") 
                         
                         else:     # if J starts with a "C" or "Con" or goes straight ot the number then it's attached to a Connection
                            if numA <= len(self.pointList) and numA > 0:  
                               self.pointList[numA-1].attachLine(num, 0)  # add line (end A, denoted by 0) to Point
                            else:
-                              raise ValueError(f"Point ID out of bounds for line {num} end A attachment.") 
+                              raise ValueError(f"Point ID ({numA}) out of bounds for line {num} end A attachment.") 
 
                         # attach end B
                         numB = int("".join(filter(str.isdigit, entries[3])))  # get number from the attachA string
@@ -574,13 +574,13 @@ class System():
                                 else:
                                     raise ValueError(f"Rod end (A or B) must be specified for line {num} end B attachment. Input was: {entries[2]}")
                             else:
-                                raise ValueError(f"Rod ID out of bounds for line {num} end B attachment.") 
+                                raise ValueError(f"Rod ID ({numB}) out of bounds for line {num} end B attachment.") 
                         
                         else:     # if J starts with a "C" or "Con" or goes straight ot the number then it's attached to a Connection
                            if numB <= len(self.pointList) and numB > 0:  
                               self.pointList[numB-1].attachLine(num, 1)  # add line (end B, denoted by 1) to Point
                            else:
-                              raise ValueError(f"Point ID out of bounds for line {num} end B attachment.") 
+                              raise ValueError(f"Point ID ({numB}) out of bounds for line {num} end B attachment.") 
 
                         line = next(f)  # advance to the next line
 
@@ -635,7 +635,7 @@ class System():
         # line types
         for d in data['line_types']:
             dia = float(d['diameter']    )
-            w   = float(d['mass_density'])
+            w   = float(d['mass_density'])*self.g
             EA  = float(d['stiffness']   )
             if d['breaking_load']:
                 MBL = float(d['breaking_load'])
@@ -1031,7 +1031,7 @@ class System():
             for key in self.lineTypes:
             #for key,value in self.lineTypes.items(): (Another way to iterate through dictionary)
                 L.append("{:<15} {:7.4f} {:8.2f} {:7.3e} "
-                         .format(key,self.lineTypes[key].d,self.lineTypes[key].mlin,self.lineTypes[key].EA)
+                         .format(key,self.lineTypes[key]['d_vol'],self.lineTypes[key]['m_lin'],self.lineTypes[key]['EA'])
                           + "{:7.3e} {:7.3e} {:<7.3f} {:<7.3f} {:<7.3f} {:<7.3f}"
                          .format(cIntDamp,EI,Can,Cat,Cdn,Cdt))
             

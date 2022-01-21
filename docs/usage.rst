@@ -160,6 +160,21 @@ Here is an example showing the most important functions:
 (A list of key functions to be added here)
 
 
+Additional Parameters in MoorPy
+-------------------------------
+
+Some of MoorPy's objects have additional parameters beyond those specified in the input file,
+which can be used to add more features to the simulation.
+
+- Body.Awp ...
+
+- Point.zSpan: The zSpan parameter lists the lower and upper extents of the point's 
+  volume, relative to the point coordinate, r. The Point's volume is 
+  assumed evenly distributed between zSpan[0] and zSpan[1], and this 
+  affects hydrostatic calculations when the Point crosses the free 
+  surface (not used any other time).
+
+
 Advice and Frequent Problems
 ----------------------------
    
