@@ -82,8 +82,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         reverseFlag = False
     
     # ensure the input variables are realistic
-    if XF <= 0.0:
-        raise CatenaryError("XF is zero or negative!")
+    if XF < 0.0:
+        raise CatenaryError("XF is negative!")
     if L <= 0.0:
         raise CatenaryError("L is zero or negative!")
     if EA <= 0.0:
@@ -103,10 +103,12 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         # stretched length of the line with seabed interaction beyond which the line would have to 
         # double-back on itself; the line forms an "L" between the anchor and fairlead. Then it 
         # models it as bunched up on the seabed (instead of throwing an error)
+    # ProfileType=5: Similar to above but both ends are off seabed, so it's U shaped and fully slack
+    # ProfileType=6: Completely vertical line that is off the seabed (on the seabed is handled by 4 and 5)
     
     EA_W = EA/W
     
-    # calculate what line length would be hanging it it were fully slack, vertical
+    # calculate the unstretched length that would be hanging if the line was fully slack (vertical down to flat on the seabed)
     if CB < 0:  # free floating (potentially U shaped case)
         LHanging1 = np.sqrt(2.0*(  -CB)*EA_W + EA_W*EA_W) - EA_W  # unstretched hanging length at end A
         LHanging2 = np.sqrt(2.0*(ZF-CB)*EA_W + EA_W*EA_W) - EA_W  # unstretched hanging length at end B
@@ -120,7 +122,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         #return W*(z0*W/H + 1)/np.sqrt( (z0*W/H + 1)**2 - 1)   # inelastic apprxoimation
         return W # returning a fully slack line approximation, 
         #   because a large value here risks adding a bad cross coupling term in the system stiffness matrix
-    
 
     # ProfileType 0 case - entirely along seabed
     if ZF==0.0 and CB >= 0.0 and W > 0:
@@ -185,7 +186,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     # ProfileType 4 case - fully slack
     elif (W > 0.0) and (L >= XF + LHanging):
         
-        if CB >= 0.0:
+        if CB >= 0.0:  # one end on seabed
             ProfileType = 4        
             # this is a special case that requires no iteration
             
@@ -261,7 +262,88 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                         Zs[I] = ZF - Lms - W/EA*(LHanging2*Lms - 0.5*Lms**2 )
                         Te[I] = W*Lms
         
+    
+
+    # ProfileType 6 case - vertical line without seabed contact     
+    elif (XF < 2*Tol):
+        ProfileType = 6    
+        
+        dz_hanging = L + 0.5*W/EA*L**2   # stretched length if it was hanging from one end
+        
+        
+        # slack case
+        if dz_hanging >= ZF:
+        
+            # figure out how line will hang
+            LB = (ZF + L + W*L**2/2/EA)/(2+W*L/EA)  # unstretched length of line from lowest point up to end B
+            hB = LB + W/2/EA*LB**2                  # stretched of the above
+            LA = L - LB
+            hA = hB - ZF
             
+            HF = 0.0
+            VF = W*LB
+            HA = 0.0
+            VA = W*LA
+                    
+            info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
+            info["VF"] = VF
+            info["stiffnessB"]  = np.array([[ 0.0, 0.0], [0.0, 0.5*W]])
+            info["stiffnessA"]  = np.array([[ 0.0, 0.0], [0.0, 0.5*W]]) 
+            info["stiffnessAB"] = np.array([[-0.0, 0.0], [0.0,-0.5*W]])
+            info["LBot"] = 0.0
+            info['ProfileType'] = 6
+            info['Zextreme'] = -hA
+
+
+            if plots > 0:
+        
+                for I in range(nNodes):
+                    if s[I] <   LA:          # the 1st suspended/hanging portion of the line
+                        Xs[I] = 0.0
+                        Zs[I] = -s[I] - W/EA*(LA*s[I] - 0.5*s[I]**2 )
+                        Te[I] = W*(LA - s[I])
+                    else:                           # the 2nd suspended/hanging portion of the line
+                        Lms = L - s[I]              # distance from end B
+                        Xs[I] = XF
+                        Zs[I] = ZF - Lms - W/EA*(LB*Lms - 0.5*Lms**2 )
+                        Te[I] = W*(s[I] - LA)
+        
+        # taut case
+        else:
+        
+            # figure out how line will hang
+            LB = (ZF + L + W*L**2/2/EA)/(2+W*L/EA)  # unstretched length of line from lowest point up to end B
+            hB = LB + W/2/EA*LB**2                  # stretched of the above
+            LA = L - LB
+            hA = hB - ZF
+            
+            uniform_strain = (ZF - dz_hanging)/L  # the constrant strain due only to stretch - to be added to weight-based strain
+            Tstretch = uniform_strain*EA          # the constant tension component to be added to weight-based tension
+            
+            HF = 0.0
+            VF = Tstretch + W*L
+            HA = 0.0
+            VA = Tstretch
+                    
+            info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
+            info["VF"] = VF
+            info["stiffnessB"]  = np.array([[ Tstretch/ZF, 0.0], [0.0, EA/L]])
+            info["stiffnessA"]  = np.array([[ Tstretch/ZF, 0.0], [0.0, EA/L]]) 
+            info["stiffnessAB"] = np.array([[-Tstretch/ZF, 0.0], [0.0,-EA/L]])
+            info["LBot"] = 0.0
+            info['ProfileType'] = 6
+            info['Zextreme'] = 0
+
+
+            if plots > 0:
+                for I in range(nNodes):
+                    Lms = L - s[I]              # distance from end B
+                    Xs[I] = 0.0
+                    Zs[I] = ZF - Lms*L*uniform_strain - W/EA*(L*Lms - 0.5*Lms**2 )
+                    Te[I] = Tstretch + W*s[I]             
+                    
+    
+        
         
     # Use an iterable solver function to solve for the forces on the line
     else: 

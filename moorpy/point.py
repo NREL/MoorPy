@@ -7,7 +7,7 @@ import numpy as np
 class Point():
     '''A class for any object in the mooring system that can be described by three translational coorindates'''
     
-    def __init__(self, mooringSys, num, type, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0, zSpan=[-1,1]):
+    def __init__(self, mooringSys, num, type, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0, zSpan=[-1,1], CdA=0.0, Ca=0.0):
         '''Initialize Point attributes
 
         Parameters
@@ -24,6 +24,10 @@ class Point():
             mass [kg]. The default is 0.
         v : float, optional
             submerged volume [m^3]. The default is 0.
+        CdA : float, optional
+            Product of drag coefficient and cross sectional area in any direction [m^2]. The default is 0.
+        Ca : float, optional
+            Added mass coefficient in any direction.
         fExt : array, optional
             applied external force vector in global orientation (not including weight/buoyancy). The default is np.zeros(3).
         DOFs: list
@@ -47,8 +51,10 @@ class Point():
         self.type = type                # 1: fixed/attached to something, 0 free to move, or -1 coupled externally
         self.r = np.array(r, dtype=np.float_)
                 
-        self.m = np.float_(m)
-        self.v = np.float_(v)
+        self.m  = float(m)
+        self.v  = float(v)
+        self.CdA= float(CdA)
+        self.Ca = float(Ca)
         self.fExt = fExt                # external forces plus weight/buoyancy
         self.fBot = 10.0                # this is a seabed contact force that will be added if a point is specified below the seabed
         self.zSub = 0.0                 # this is the depth that the point is positioned below the seabed (since r[2] will be capped at the depth)

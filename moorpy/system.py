@@ -55,6 +55,7 @@ class System():
         self.pointList = []
         self.lineList = []
         self.lineTypes = {}
+        self.rodTypes = {}
         
         # load mooring line property scaling coefficients for easy use when creating line types
         self.lineProps = loadLineProps(lineProps)
@@ -74,6 +75,8 @@ class System():
         self.cpldDOFs = []  # array of the values of the coupled DOFs of the system at different instants (2D list)
         
         self.display = 0    # a flag that controls how much printing occurs in methods within the System (Set manually. Values > 0 cause increasing output.)
+        
+        self.MDoptions = {} # dictionary that can hold any MoorDyn options read in from an input file, so they can be saved in a new MD file if need be
         
         # read in data from an input file if a filename was provided
         if len(file) > 0:
@@ -249,11 +252,14 @@ class System():
         
         lineType = dict(name=type_string+str(d), d_vol=d, w=w, m=mass, EA=EA, material=type_string)   # make dictionary for this line type
         
+        lineType['material'] = 'unspecified'  # fill this in so it's available later
+        
         if type_string in self.lineTypes:                                # if there is already a line type with this name
             self.lineTypes[type_string].update(lineType)                 # update the existing dictionary values rather than overwriting with a new dictionary
         else:
             self.lineTypes[type_string] = lineType
 
+        
 
 
     def setLineType(self, dnommm, material, source=None, name="", **kwargs):
@@ -348,9 +354,29 @@ class System():
                     line = next(f)
                     line = next(f)
                     while line.count('---') == 0:
-                        entries = line.split()
-                        #self.lineTypes[entries[0]] = LineType(entries[0], np.float_(entries[1]), np.float_(entries[2]), np.float_(entries[3])) 
-                        self.addLineType(entries[0], float(entries[1]), float(entries[2]), float(entries[3])) #<<< also store dynamic coefficients!
+                        entries = line.split()  # entries: TypeName   Diam    Mass/m     EA     BA/-zeta    EI         Cd     Ca     CdAx    CaAx
+                        #self.addLineType(entries[0], float(entries[1]), float(entries[2]), float(entries[3])) 
+                        
+                        type_string = entries[0]
+                        d    = float(entries[1])
+                        mass = float(entries[2])
+                        w = (mass - np.pi/4*d**2 *self.rho)*self.g                        
+                        lineType = dict(name=type_string, d_vol=d, w=w, m=mass)  # make dictionary for this rod type
+                        lineType['EA'] = float(entries[3])
+                        
+                        if len(entries >= 10): # read in other elasticity and hydro coefficients as well if enough columns are provided
+                            lineType['BA'  ] = float(entries[4])
+                            lineType['EI'  ] = float(entries[5])
+                            lineType['Cd'  ] = float(entries[6])
+                            lineType['Ca'  ] = float(entries[7])
+                            lineType['CdAx'] = float(entries[8])
+                            lineType['CaAx'] = float(entries[9])
+                        
+                        if type_string in self.lineTypes:                         # if there is already a line type with this name
+                            self.lineTypes[type_string].update(lineType)          # update the existing dictionary values rather than overwriting with a new dictionary
+                        else:
+                            self.lineTypes[type_string] = lineType
+                        
                         line = next(f)
                         
                         
@@ -360,7 +386,7 @@ class System():
                     line = next(f)
                     line = next(f)
                     while line.count('---') == 0:
-                        entries = line.split()
+                        entries = line.split()  # entries: TypeName      Diam     Mass/m    Cd     Ca      CdEnd    CaEnd
                         #RodTypesName.append(entries[0]) # name string
                         #RodTypesD.append(   entries[1]) # diameter
                         #RodDict[entries[0]] = entries[1] # add dictionary entry with name and diameter
@@ -371,6 +397,12 @@ class System():
                         w = (mass - np.pi/4*d**2 *self.rho)*self.g
                         
                         rodType = dict(name=type_string, d_vol=d, w=w, m=mass)  # make dictionary for this rod type
+                        
+                        if len(entries >= 7): # read in hydro coefficients as well if enough columns are provided
+                            rodType['Cd'   ] = float(entries[3])
+                            rodType['Ca'   ] = float(entries[4])
+                            rodType['CdEnd'] = float(entries[5])
+                            rodType['CaEnd'] = float(entries[6])
                         
                         if type_string in self.rodTypes:                        # if there is already a rod type with this name
                             self.rodTypes[type_string].update(rodType)          # update the existing dictionary values rather than overwriting with a new dictionary
@@ -443,7 +475,7 @@ class System():
                             raise Exception(f"Body {num} Ca entry (col 14) must have 1 or 3 numbers.")
                         
                         # add the body
-                        self.bodyList.append( Body(self, num, bodyType, r6, m=m, v=v, rCG=rCG) )
+                        self.bodyList.append( Body(self, num, bodyType, r6, m=m, v=v, rCG=rCG, I=Inert, CdA=CdA, Ca=Ca) )
                                     
                         line = next(f)
                         
@@ -476,7 +508,7 @@ class System():
                     line = next(f)
                     line = next(f)
                     while line.count('---') == 0:
-                        entries = line.split()         
+                        entries = line.split()         # entries:  ID   Attachment  X       Y     Z      Mass   Volume  CdA    Ca
                         entry0 = entries[0].lower()          
                         entry1 = entries[1].lower() 
                         
@@ -522,10 +554,11 @@ class System():
                         if 'seabed' in entries[4]:
                             entries[4] = -self.depth
                         r = np.array(entries[2:5], dtype=float)
-                        m = np.float_(entries[5])
-                        v = np.float_(entries[6])
-                        fExt = np.array(entries[7:10], dtype=float)
-                        self.pointList.append( Point(self, num, pointType, r, m=m, v=v, fExt=fExt) )
+                        m  = float(entries[5])
+                        v  = float(entries[6])
+                        CdA= float(entries[7])
+                        Ca = float(entries[8])
+                        self.pointList.append( Point(self, num, pointType, r, m=m, v=v, CdA=CdA, Ca=Ca) )
                         line = next(f)
                         
                         
@@ -594,14 +627,16 @@ class System():
                         entry0 = entries[0].lower() 
                         entry1 = entries[1].lower() 
                         
-                        #print(entries)
-                        
+                        # grab any parameters used by MoorPy
                         if entry1 == "g" or entry1 == "gravity":
                             self.g  = np.float_(entry0)
                         elif entries[1] == "WtrDpth" or entries[1] == "depth":
                             self.depth = np.float_(entry0)
                         elif entry1=="rho" or entry1=="wtrdnsty":
                             self.rho = np.float_(entry0)
+                        
+                        # also store a dict of all parameters that can be regurgitated during an unload
+                        self.MDoptions[entry1] = entry0
                         
                         line = next(f)
 
@@ -760,15 +795,17 @@ class System():
     
     
         
-    def unload(self, fileName, MDversion=2, **kwargs):
+    def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0):
         '''Unloads a MoorPy system into a MoorDyn-style input file
 
         Parameters
         ----------
         fileName : string
             file name of output file to hold MoorPy System.
-        **kwargs : TYPE
-            DESCRIPTION.
+        line_dL : float, optional
+            Optional specified for target segment length when discretizing Lines
+        rod_dL : float, optional
+            Optional specified for target segment length when discretizing Rods
 
         Returns
         -------
@@ -815,15 +852,7 @@ class System():
             
             #Line Properties
             flag = "p" # "-" 
-            
-            #If a custom value was given, use that instead of the default value(For some reason this doesnt work)
-            #The exec method isn't working and isn't encouraged. perhaps we have to save all the above variables in a dictionary, and update that dictioanry with kwargs. 
-            for key in kwargs:
-                print('Using Custom value for', key,kwargs[key])
-                #vars()[key] = kwargs[key]
-                #exec(key + ' = ' + str(kwargs[key]))
-                #eval(key + ' = ' + str(kwargs[key]))
-            
+                        
             #Outputs List
             #Outputs = ["FairTen1","FairTen2","FairTen3","FairTen4","FairTen5","FairTen6","FairTen7","FairTen8","FairTen9","FairTen10","FairTen11","FairTen12"]
             #Outputs = ["FairTen1","FairTen2","FairTen3"];
@@ -949,6 +978,7 @@ class System():
             
             print('Successfully written '+fileName +' input file using MoorDyn v1')
         
+        
         elif MDversion==2:
             #For version MoorDyn v?.??
             
@@ -958,56 +988,20 @@ class System():
             #version = 
             #description = 
             
-            #Settings
-            Echo = False        #Echo input data to <RootName>.ech (flag)
-            dtm = 0.0002        #time step to use in mooring integration
-            WaveKin = 3         #wave kinematics flag (1=include(unsupported), 0=neglect, 3=currentprofile.txt
-            kb = 3.0e6          #bottom stiffness
-            cb = 3.0e5          #bottom damping
-            ICDfac = 2.0        #factor by which to scale drag coefficients during dynamic relaxation IC gen
-            ICthresh = 0.01     #threshold for IC convergence
-            ICTmax = 10         #threshold for IC convergence
+            # Set up the dictionary that will be used to write the OPTIONS section
+            MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
+            MDoptionsDict.update(self.MDoptions)                                  # update the dict with any settings saved from an input file
+            MDoptionsDict.update(dict(g=self.g, depth=self.depth, rho=self.rho))  # lastly, apply any settings used by MoorPy
             
-            #Line Properties
-            #! Add Comments
-            cIntDamp = -1.0
-            EI = 0.0
-            Can = 1.0
-            Cat = 0.0
-            Cdn = 1.0 
-            Cdt = 0.0
-            
-            #Body Properties (for each body in bodyList)
-            #! Add Comments
-            IX = 0       
-            IY = 0
-            IZ = 0
-            CdA_xyz = [0,0,0]
-            Ca_xyz = [0,0,0]
-            
-            #Rod List Properties
-            
-            #Point Properties (for each point in pointList)
-            #! Add Comments
-            CdA = 0.
-            Ca = 0.
+            # Some default settings to fill in if coefficients aren't set
+            lineTypeDefaults = dict(BA=-1.0, EI=0.0, Cd=1.2, Ca=1.0, CdAx=0.2, CaAx=0.0)
+            rodTypeDefaults  = dict(Cd=1.2, Ca=1.0, CdEnd=1.0, CaEnd=1.0)
             
             #Line Properties
             flag = "p" # "-" 
             
-            #If a custom value was given, use that instead of the default value(For some reason this doesnt work)
-            #The exec method isn't working and isn't encouraged. perhaps we have to save all the above variables in a dictionary, and update that dictioanry with kwargs. 
-            for key in kwargs:
-                print('Using Custom value for', key,kwargs[key])
-                #vars()[key] = kwargs[key]
-                #exec(key + ' = ' + str(kwargs[key]))
-                #eval(key + ' = ' + str(kwargs[key]))
-    
             #Outputs List
-            #Outputs = ["FairTen1","FairTen2","FairTen3","FairTen4","FairTen5","FairTen6","FairTen7","FairTen8","FairTen9","FairTen10","FairTen11","FairTen12"]
-            Outputs = ["FairTen1","FairTen2","FairTen3"];
-            #! Standard Option (Fairing Tenstion for num of lines)
-            
+            Outputs = [f"FairTen{i+1}" for i in range(len(self.lineList))]        # for now, have a fairlead tension output for each line
             
             print('attempting to write '+fileName +' for MoorDyn v'+str(MDversion))
             #Array to add strings to for each line of moordyn input file
@@ -1019,49 +1013,51 @@ class System():
                 L.append("MoorDyn input for " + description)
             else: 
                 L.append("Generated by MoorPy")
-            
-            #L.append("{:5}    Echo      - echo the input file data (flag)"
-            #          .format(str(Echo).upper()))
                 
-            #Line Dictionary Header
+                
             L.append("---------------------- LINE TYPES -----------------------------------------------------")
-            L.append("LineType         Diam     MassDen   EA        cIntDamp     EI     Can    Cat    Cdn    Cdt")
-            L.append("   (-)           (m)      (kg/m)    (N)        (Pa-s)    (N-m^2)  (-)    (-)    (-)    (-)")
+            L.append("TypeName      Diam     Mass/m     EA     BA/-zeta     EI        Cd      Ca      CdAx    CaAx")
+            L.append("(name)        (m)      (kg/m)     (N)    (N-s/-)    (N-m^2)     (-)     (-)     (-)     (-)")
             
-            #Line Dicationary Table
-            for key in self.lineTypes:
-            #for key,value in self.lineTypes.items(): (Another way to iterate through dictionary)
-                L.append("{:<15} {:7.4f} {:8.2f} {:7.3e} "
-                         .format(key,self.lineTypes[key]['d_vol'],self.lineTypes[key]['m_lin'],self.lineTypes[key]['EA'])
-                          + "{:7.3e} {:7.3e} {:<7.3f} {:<7.3f} {:<7.3f} {:<7.3f}"
-                         .format(cIntDamp,EI,Can,Cat,Cdn,Cdt))
+            for key, lineType in self.lineTypes.items(): 
+                di = lineTypeDefaults.copy()  # start with a new dictionary of just the defaults
+                di.update(lineType)           # then copy in the lineType's existing values
+                L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e} {:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
+                         key, di['d_vol'], di['m_lin'], di['EA'], di['BA'], di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
             
-            # Rod Dictionary Header
+            
             L.append("--------------------- ROD TYPES -----------------------------------------------------")
-            L.append("RodType  Diam    MassDenInAir   Can     Cat    Cdn     Cdt ")
-            L.append("(-)       (m)       (kg/m)      (-)     (-)    (-)     (-)  ")
+            L.append("TypeName      Diam     Mass/m    Cd     Ca      CdEnd    CaEnd")
+            L.append("(name)        (m)      (kg/m)    (-)    (-)     (-)      (-)")
             
-            """
-            # Rod Dictionary Table
-            for i, rod_type in enumerate(self.lineTypes,start=1):
-            """
+            for key, rodType in self.rodTypes.items(): 
+                di = rodTypeDefaults.copy()
+                di.update(rodType)
+                L.append("{:<15} {:7.4f} {:8.2f} {:<7.3f} {:<7.3f} {:<7.3f} {:<7.3f}".format(
+                         key, di['d_vol'], di['m_lin'], di['Cd'], di['Ca'], di['CdEnd'], di['CaEnd']))
             
-            #Body List Header
+            
             L.append("----------------------- BODIES -----------------------------------")
-            L.append("BodyID      X0   Y0   Z0    r0    p0    y0    Xcg   Ycg   Zcg     M      V        IX       IY       IZ     CdA-x,y,z Ca-x,y,z")
-            L.append("   (-)      (m)  (m)  (m)  (deg) (deg) (deg)  (m)   (m)   (m)    (kg)   (m^3)  (kg-m^2) (kg-m^2) (kg-m^2)   (m^2)      (-)")
+            L.append("ID   Attachment    X0     Y0     Z0     r0      p0     y0     Mass     CG*     I*      Volume   CdA*   Ca*")
+            L.append("(#)     (-)        (m)    (m)    (m)   (deg)   (deg)  (deg)   (kg)     (m)    (kg-m^2)  (m^3)   (m^2)  (-)")
             
-            #Body List Table
             for body in self.bodyList:
-                L.append("    {:<4d} {:<5.2f} {:<5.2f} {:<6.2f} {:<6.2f} {:<6.2f} {:<6.2f} {:<6.2f} {:<6.2f} {:<8.2f} {:<7.2f} {:<11.2f}"
-                         .format(body.number,body.r6[0],body.r6[1],body.r6[2],np.rad2deg(body.r6[3]),np.rad2deg(body.r6[4]),np.rad2deg(body.r6[5]),body.rCG[0],body.rCG[1],body.rCG[2],body.m,body.v)    
-                         + "{:<9d} {:<9d} {:<7d} {:<2d} {:<2d} {:<8d} {:<1d}" 
-                         .format(IX,IY,IZ,CdA_xyz[0],CdA_xyz[1],CdA_xyz[2],Ca_xyz[0],Ca_xyz[1],Ca_xyz[2]))
+                attach = ['coupled','free','fixed'][[-1,0,1].index(body.type)]                      # pick correct string based on body type
+                L.append("{:<4d}  {:10}  {:<6.2f} {:<6.2f} {:<6.2f} {:<6.2f} {:<6.2f} {:<6.2f} ".format(
+                         body.number, attach, body.r6[0],body.r6[1],body.r6[2],np.rad2deg(body.r6[3]),np.rad2deg(body.r6[4]),np.rad2deg(body.r6[5])
+                         )+ "{:<9.2f}  {:.2f}|{:.2f}|{:.2f} {:9.3E} {:6.2f}  {:6.2f}  {:6.2f}".format(
+                         body.m, body.rCG[0],body.rCG[1],body.rCG[2], body.I[0], body.v, body.CdA[0], body.Ca[0]))
+                         
+                         
+                         # below is a more thorough approach to see about in future
+                         #)+ "{:<9.2f}  {:<5.2f}|{:<5.2f}|{:<5.2f}  {:<5.2f}|{:<5.2f}|{:<5.2f}  {:<5.2f}  {:<5.2f}|{:<5.2f}|{:<5.2f}  {:<5.2f}|{:<5.2f}|{:<5.2f}".format(
+                         #body.m, body.rCG[0],body.rCG[1],body.rCG[2], body.I[0],body.I[1],body.I[2],
+                         #body.v, body.CdA[0],body.CdA[1],body.CdA[2], body.Ca[0],body.Ca[1],body.Ca[2]))
                           
-            #Rod Properties Header
+            
             L.append("---------------------- RODS --------------------")
-            L.append("RodID  Type/BodyID  RodType   Xa   Ya   Za   Xb   Yb   Zb  NumSegs  Flags/Outputs")
-            L.append("(-)      (-)         (-)      (m)  (m)  (m)  (m)  (m)  (m)    (-)      (-)   ")
+            L.append("ID   RodType  Attachment  Xa    Ya    Za    Xb    Yb    Zb   NumSegs  RodOutputs")
+            L.append("(#)  (name)    (#/key)    (m)   (m)   (m)   (m)   (m)   (m)  (-)       (-)")
             
             """
             #Rod Properties Table
@@ -1069,38 +1065,36 @@ class System():
             
             #Point Properties Header
             L.append("---------------------- POINTS ---------------------------------------------------------")
-            L.append("Node    Type         X        Y        Z        M      V      FX     FY     FZ    CdA    Ca ")
-            L.append("(-)     (-)         (m)      (m)      (m)      (kg)   (m^3)  (kN)   (kN)   (kN)   (m2)   ()")
+            L.append("ID  Attachment     X       Y       Z          Mass   Volume  CdA    Ca")
+            L.append("(#)   (-)         (m)     (m)     (m)         (kg)   (mˆ3)  (m^2)   (-)")
             
             #Point Properties Table
             for point in self.pointList:
-                point_pos = point.r           #Define point position in global reference frame
-                if point.type == 1:             #point is Fized or attached (anch, body, fix)
+                point_pos = point.r             # get point position in global reference frame to start with
+                if point.type == 1:             # point is fixed or attached (anch, body, fix)
                     point_type = 'Fixed'
                     
-                    #import pdb
-                    #pdb.set_trace()
                     #Check if the point is attached to body
                     for body in self.bodyList:
                         for attached_Point in body.attachedP:
                             if attached_Point == point.number:
                                 point_type = "Body" + str(body.number)
-                                point_pos = body.rPointRel[body.attachedP.index(attached_Point)]                #Redefine point position in the body reference frame
+                                point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
                     
-                if point.type == 0:             #point is Coupled Externally (con, free)
-                    point_type = 'Connect'
+                elif point.type == 0:           # point is coupled externally (con, free)
+                    point_type = 'Free'
                         
-                if point.type == -1:            #point is free to move (fair, ves)
-                    point_type = 'Vessel'
+                elif point.type == -1:          # point is free to move (fair, ves)
+                    point_type = 'Coupled'
                 
-                L.append("{:<4d} {:12} {:8.2f} {:8.2f} {:8.2f} {:6.2f} {:6.2f} {:6.2f} {:6.2f} {:6.2f} {:6.2f} {:6.2f}"
-                          .format(point.number,point_type,point_pos[0],point_pos[1],point_pos[2],point.m,point.v,point.fExt[0],point.fExt[1],point.fExt[2],CdA,Ca))
+                L.append("{:<4d} {:9} {:8.2f} {:8.2f} {:8.2f} {:9.2f} {:6.2f} {:6.2f} {:6.2f}".format(
+                          point.number,point_type, point_pos[0],point_pos[1],point_pos[2], point.m, point.v, point.CdA, point.Ca))
                 
             
             #Line Properties Header
             L.append("---------------------- LINES -----------------------------------------------------")
-            L.append("Line      LineType   UnstrLen  NumSegs  AttachA  AttachB  Outputs")
-            L.append("(-)         (-)       (m)        (-)     (-)      (-)     (-)")
+            L.append("ID    LineType      AttachA  AttachB  UnstrLen  NumSegs  LineOutputs")
+            L.append("(#)    (name)        (#)      (#)       (m)       (-)     (-)")
             
             #Line Properties Table
             #(Create a ix2 array of connection points from a list of m points)
@@ -1113,14 +1107,18 @@ class System():
                     elif line_pos == 1:                                                     #If the B side of this line is connected to the point
                         connection_points[line -1,1] = point_ind                                #Save as a Fairlead node
                         #connection_points[line -1,1] = self.pointList.index(point) + 1
-            #Populate text
-            for line in self.lineList:
-                L.append("{:<4d} {:<15} {:8.3f} {:5d} {:7d} {:8d}      {}"
-                          .format(line.number, line.type['name'], line.L, line.nNodes-1, int(connection_points[i,0]), int(connection_points[i,1]), flag))
+            
+            for i,line in enumerate(self.lineList):
+                nSegs = int(np.ceil(line.L/line_dL)) if line_dL>0 else line.nNodes-1  # if target dL given, set nSegs based on it instead of line.nNodes
+            
+                L.append("{:<4d} {:<15} {:^5d}   {:^5d}   {:8.3f}   {:4d}       {}".format(
+                         line.number, line.type['name'], int(connection_points[i,0]), int(connection_points[i,1]), line.L, nSegs, flag))
+            
             
             #Solver Options Header
             L.append("---------------------- OPTIONS ----------------------------------------")
             
+            '''
             #Solver Options
             L.append("{:<9.4f}dtM          - time step to use in mooring integration".format(float(dtm)))
             L.append("{:<9d}WaveKin      - wave kinematics flag (1=include(unsupported), 0=neglect, 3=currentprofile.txt)".format(int(WaveKin)))
@@ -1130,6 +1128,23 @@ class System():
             L.append("{:<9.1f}ICDfac       - factor by which to scale drag coefficients during dynamic relaxation IC gen".format(int(ICDfac)))
             L.append("{:<9.2f}ICthresh     - threshold for IC convergence".format(ICthresh))
             L.append("{:<9d}ICTmax       - threshold for IC convergence".format(int(ICTmax)))
+            
+            
+                        if entry1 == "g" or entry1 == "gravity":
+                            self.g  = np.float_(entry0)
+                        elif entries[1] == "WtrDpth" or entries[1] == "depth":
+                            self.depth = np.float_(entry0)
+                        elif entry1=="rho" or entry1=="wtrdnsty":
+                            self.rho = np.float_(entry0)
+                        
+                        # also store a dict of all parameters that can be regurgitated during an unload
+                        self.MDoptions[entry1] = entry0
+            '''
+            for key, val in MDoptionsDict.items():
+                L.append(f"{val:<15}  {key}")
+            
+            
+            
             
     
             """
@@ -1211,7 +1226,7 @@ class System():
         # Line Dictionary Table
         for key in self.lineTypes:
             L.append("{:<15} {:7.4f} {:8.3f} {:<10.1f} "
-                     .format(key, self.lineTypes[key].d, self.lineTypes[key].mlin, self.lineTypes[key].EA)
+                     .format(key, value.d, value.mlin, value.EA)
                       + "{:<7.1f} {:<7.1f} {:<7.2f} {:<7.1f} {:<7.2f}"
                      .format(BA, Can, Cat, Cdn, Cdt))
         

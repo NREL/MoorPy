@@ -228,6 +228,14 @@ class Line():
             dr =  self.rB - self.rA                 
             LH = np.hypot(dr[0], dr[1])     # horizontal spacing of line ends
             LV = dr[2]                      # vertical offset from end A to end B
+            if LH >0:
+                cosBeta = dr[0]/LH                 # cos of line heading
+                sinBeta = dr[1]/LH                 # sin of line heading
+                self.th = np.arctan2(dr[1],dr[0])  # line heading
+            else:   # special case of vertical line: line heading is undefined - use zero as default
+                cosBeta = 0.0
+                sinBeta = 0.0
+                self.th = 0.0
             
             if np.min([self.rA[2],self.rB[2]]) > -depth:
                 self.cb = -depth - np.min([self.rA[2],self.rB[2]])   # if this line's lower end is off the seabed, set cb negative and to the distance off the seabed
@@ -240,8 +248,8 @@ class Line():
             except CatenaryError as error:
                 raise LineError(self.number, error.message)
             
-            Xs = self.rA[0] + info["X"]*dr[0]/LH
-            Ys = self.rA[1] + info["X"]*dr[1]/LH
+            Xs = self.rA[0] + info["X"]*cosBeta 
+            Ys = self.rA[1] + info["X"]*sinBeta 
             Zs = self.rA[2] + info["Z"]
             Ts = info["Te"]
             return Xs, Ys, Zs, Ts
@@ -593,6 +601,14 @@ class Line():
         dr =  self.rB - self.rA
         LH = np.hypot(dr[0], dr[1])     # horizontal spacing of line ends
         LV = dr[2]                # vertical offset from end A to end B
+        if LH >0:
+            cosBeta = dr[0]/LH                 # cos of line heading
+            sinBeta = dr[1]/LH                 # sin of line heading
+            self.th = np.arctan2(dr[1],dr[0])  # line heading
+        else:   # special case of vertical line: line heading is undefined - use zero as default
+            cosBeta = 0.0
+            sinBeta = 0.0
+            self.th = 0.0
 
         if self.rA[2] < -depth:
             raise LineError("Line {} end A is lower than the seabed.".format(self.number))
@@ -616,7 +632,6 @@ class Line():
         except CatenaryError as error:
             raise LineError(self.number, error.message)
             
-        self.th = np.arctan2(dr[1],dr[0])  # probably a more efficient way to handle this <<<
         self.HF = info["HF"]
         self.VF = info["VF"]
         self.KA2 = info["stiffnessA"]
@@ -624,11 +639,11 @@ class Line():
         self.LBot = info["LBot"]
         self.info = info
             
-        self.fA[0] = fAH*dr[0]/LH
-        self.fA[1] = fAH*dr[1]/LH
+        self.fA[0] = fAH*cosBeta
+        self.fA[1] = fAH*sinBeta
         self.fA[2] = fAV
-        self.fB[0] = fBH*dr[0]/LH
-        self.fB[1] = fBH*dr[1]/LH
+        self.fB[0] = fBH*cosBeta
+        self.fB[1] = fBH*sinBeta
         self.fB[2] = fBV
         self.TA = np.sqrt(fAH*fAH + fAV*fAV) # end tensions
         self.TB = np.sqrt(fBH*fBH + fBV*fBV)
@@ -643,15 +658,21 @@ class Line():
         R = rotationMatrix(0,0,self.th)
         
         # initialize the line's analytic stiffness matrix in the "in-line" plane then rotate the matrix to be about the global frame [K'] = [R][K][R]^T
-        def from2Dto3Drotated(K2D, Kt):
+        def from2Dto3Drotated(K2D, F, L):
+            if L > 0:
+                Kt = F/L         # transverse stiffness term
+            else:
+                Kt = 0.0
+            
             K2 = np.array([[K2D[0,0], 0 , K2D[0,1]],
                            [  0     , Kt,   0     ],
                            [K2D[1,0], 0 , K2D[1,1]]])
             return np.matmul(np.matmul(R, K2), R.T)
+            
         
-        self.KA  = from2Dto3Drotated(info['stiffnessA'], -fBH/LH)   # stiffness matrix describing reaction force on end A due to motion of end A
-        self.KB  = from2Dto3Drotated(info['stiffnessB'], -fBH/LH)   # stiffness matrix describing reaction force on end B due to motion of end B
-        self.KAB = from2Dto3Drotated(info['stiffnessAB'], fBH/LH)  # stiffness matrix describing reaction force on end B due to motion of end A
+        self.KA  = from2Dto3Drotated(info['stiffnessA'], -fBH, LH)   # stiffness matrix describing reaction force on end A due to motion of end A
+        self.KB  = from2Dto3Drotated(info['stiffnessB'], -fBH, LH)   # stiffness matrix describing reaction force on end B due to motion of end B
+        self.KAB = from2Dto3Drotated(info['stiffnessAB'], fBH, LH)  # stiffness matrix describing reaction force on end B due to motion of end A
                 
         #self.K6 = np.block([[ from2Dto3Drotated(self.KA),  from2Dto3Drotated(self.KAB.T)],
         #                    [ from2Dto3Drotated(self.KAB), from2Dto3Drotated(self.KB)  ]])

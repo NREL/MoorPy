@@ -8,7 +8,8 @@ from moorpy.helpers import transformPosition, rotationMatrix, rotatePosition, tr
 class Body():
     '''A class for any object in the mooring system that will have its own reference frame'''
     
-    def __init__(self, mooringSys, num, type, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), f6Ext=np.zeros(6)):
+    def __init__(self, mooringSys, num, type, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), 
+                                   f6Ext=np.zeros(6), I=np.zeros(3), CdA=np.zeros(3), Ca=np.zeros(3)):
         '''Initialize Body attributes
 
         Parameters
@@ -33,6 +34,12 @@ class Body():
             coorindates or height of metacenter relative to body reference frame [m]. The default is np.zeros(3).
         f6Ext : array, optional
             applied external forces and moments vector in global orientation (not including weight/buoyancy) [N]. The default is np.zeros(6).
+        I : array, optional
+            Mass moment of inertia about 3 axes.
+        CdA : array, optional
+            Product of drag coefficient and frontal area in three directions [m^2].
+        Ca : array, optional
+            Added mass coefficient in three directions.
         attachedP: list, int
             list of ID numbers of any Points attached to the Body
         rPointRel: list, float
@@ -56,9 +63,25 @@ class Body():
         if np.isscalar(rM):
             self.rM = np.array([0,0,rM], dtype=np.float_) # coordinates of body metacenter relative to body reference frame [m]
         else:
-            self.rM = np.array(rM, dtype=np.float_)          
+            self.rM = np.array(rM, dtype=np.float_)       
+
+        # >>> should streamline the below <<<
+        if np.isscalar(I):
+            self.I = np.array([I,I,I], dtype=float)
+        else:
+            self.I = np.array(I, dtype=float)    
+
+        if np.isscalar(CdA):
+            self.CdA = np.array([CdA,CdA,CdA], dtype=float)
+        else:
+            self.CdA = np.array(CdA, dtype=float)    
+            
+        if np.isscalar(Ca):
+            self.Ca = np.array([Ca,Ca,Ca], dtype=float) 
+        else:
+            self.Ca = np.array(Ca, dtype=float)                
                 
-        self.f6Ext  = np.array(f6Ext, dtype=np.float_)    # for adding external forces and moments in global orientation (not including weight/buoyancy)
+        self.f6Ext  = np.array(f6Ext, dtype=float)    # for adding external forces and moments in global orientation (not including weight/buoyancy)
         
         
         self.attachedP   = []          # ID numbers of any Points attached to the Body
