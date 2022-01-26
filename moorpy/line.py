@@ -303,7 +303,7 @@ class Line():
         
     
     
-    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], colortension=False, cmap='rainbow'):
+    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], colortension=False, cmap='rainbow', plotnodes=[], plotnodesline=[], label="", alpha=1.0):
         '''Draw the line on 2D plot (ax must be 2D)
 
         Parameters
@@ -368,7 +368,12 @@ class Line():
                     rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
                     linebit.append(ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba))
             else:
-                linebit.append(ax.plot(Xs2d, Ys2d, lw=1, color=color)) # previously had lw=1 (linewidth)
+                linebit.append(ax.plot(Xs2d, Ys2d, lw=1, color=color, label=label, alpha=alpha)) # previously had lw=1 (linewidth)
+            
+            if len(plotnodes) > 0:
+                for i,node in enumerate(plotnodes):
+                    if self.number==plotnodesline[i]:
+                        linebit.append(ax.plot(Xs2d[node], Ys2d[node], 'o', color=color, markersize=5))   
             
         self.linebit = linebit # can we store this internally?
         
