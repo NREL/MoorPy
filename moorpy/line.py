@@ -270,7 +270,7 @@ class Line():
                 
                 # make points for appropriately sized cylinder
                 d = self.type['d_vol']
-                Xs, Ys, Zs = makeTower(self.L, np.array([d, d]))   # add in makeTower method once you start using Rods
+                Xs, Ys, Zs = makeTower(self.L, np.array([d/2, d/2]))   # add in makeTower method once you start using Rods
                 
                 # translate and rotate into proper position for Rod
                 coords = np.vstack([Xs, Ys, Zs])
@@ -852,6 +852,9 @@ class Line():
         Zs = self.rA[2] + z
         
         return np.vstack([ Xs, Ys, Zs])
+    
+    def attachLine(self, lineID, endB):
+        pass
 
     
     
