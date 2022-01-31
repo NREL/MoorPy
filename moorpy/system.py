@@ -495,8 +495,16 @@ class System():
                     while line.count('---') == 0:
                         entries = line.split()  # entries: RodID  RodType  Attachment  Xa   Ya   Za   Xb   Yb   Zb  NumSegs  Flags/Outputs
                         num = int(entries[0])
+<<<<<<< HEAD
                         rodType = self.rodTypes[entries[1]]
                         dia = rodType['d_vol']  # find diameter based on specified rod type string
+=======
+                        entry0 = entries[1].lower()
+                        #num = np.int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Rod #
+                        lUnstr = 0 # not specified directly so skip for now
+                        dia = self.rodTypes[entries[1]]['d_vol']  # find diameter based on specified rod type string
+                        nSegs = int(float(entries[9]))
+>>>>>>> 011bfd3... A couple quick fixes to system.py plotting and load
                         rA = np.array(entries[3:6], dtype=float)
                         rB = np.array(entries[6:9], dtype=float)
                         nSegs = int(entries[9])
@@ -2498,7 +2506,12 @@ class System():
         j = 0
         for line in self.lineList:
             j = j + 1
+<<<<<<< HEAD
             if color==None and 'material' in line.type and isinstance(line.type['material'], str):   # <<< would material ever be something other than a string?
+=======
+            #if color==None and isinstance(line.type['material'], str):
+            if color==None and 'material' in line.type and isinstance(line.type['material'], str):
+>>>>>>> 011bfd3... A couple quick fixes to system.py plotting and load
                 if 'chain' in line.type['material']:
                     line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 elif 'rope' in line.type['material'] or 'polyester' in line.type['material']:
@@ -2891,7 +2904,8 @@ class System():
         res              = kwargs.get('res'            , 10        )     # the resolution of the animation; how fluid the animation is. Higher res means spottier animation. counter-intuitive
         colortension     = kwargs.get("colortension"   , False     )     # toggle to draw the mooring lines in colors based on node tensions
         cmap_tension     = kwargs.get('cmap_tension'   , 'rainbow' )     # the type of color spectrum desired for colortensions
-
+        draw_body        = kwargs.get('draw_body'      , True      )
+        
         # not adding cbar_tension colorbar yet since the tension magnitudes might change in the animation and the colorbar won't reflect that
         # can use any other kwargs that go into self.plot()
         
@@ -2900,7 +2914,7 @@ class System():
             
 
         # create the figure and axes to draw the animation
-        fig, ax = self.plot(bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, colortension=colortension)
+        fig, ax = self.plot(draw_body=draw_body, bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, colortension=colortension)
         '''
         # can do this section instead of self.plot(). They do the same thing
         fig = plt.figure(figsize=(20/2.54,12/2.54))
