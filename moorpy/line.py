@@ -3,7 +3,7 @@
 import numpy as np
 from matplotlib import cm
 from moorpy.Catenary import catenary
-from moorpy.helpers import LineError, CatenaryError, rotationMatrix
+from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower
    
 
  
@@ -262,15 +262,15 @@ class Line():
             # drawing rods
             if self.isRod > 0:
             
-                k1 = np.array([ self.xp[ts,-1]-self.xp[ts,0], self.yp[ts,-1]-self.yp[ts,0], self.zp[ts,-1]-self.zp[ts,0] ]) / self.length # unit vector
+                k1 = np.array([ self.xp[ts,-1]-self.xp[ts,0], self.yp[ts,-1]-self.yp[ts,0], self.zp[ts,-1]-self.zp[ts,0] ]) / self.L # unit vector
                 
                 k = np.array(k1) # make copy
             
                 Rmat = np.array(rotationMatrix(0, np.arctan2(np.hypot(k[0],k[1]), k[2]), np.arctan2(k[1],k[0])))  # <<< should fix this up at some point, MattLib func may be wrong
                 
                 # make points for appropriately sized cylinder
-                d = self.type['d']
-                Xs, Ys, Zs = makeTower(self.length, np.array([d, d]))   # add in makeTower method once you start using Rods
+                d = self.type['d_vol']
+                Xs, Ys, Zs = makeTower(self.L, np.array([d, d]))   # add in makeTower method once you start using Rods
                 
                 # translate and rotate into proper position for Rod
                 coords = np.vstack([Xs, Ys, Zs])
@@ -427,6 +427,9 @@ class Line():
     
         if self.isRod > 0:
             
+            if color==None:
+                color = [0.3, 0.3, 0.3]  # if no color provided, default to dark grey rather than rainbow rods
+                
             Xs, Ys, Zs, Ts = self.getLineCoords(Time)
             
             for i in range(int(len(Xs)/2-1)):
@@ -435,8 +438,8 @@ class Line():
                 linebit.append(ax.plot(Xs[[2*i+1,2*i+3]],Ys[[2*i+1,2*i+3]],Zs[[2*i+1,2*i+3]], color=color))  # end B edges
             
             # scatter points for line ends 
-            if endpoints == True:
-                linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
+            #if endpoints == True:
+            #    linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
         
         # drawing lines...
         else:

@@ -265,11 +265,10 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     
 
     # ProfileType 6 case - vertical line without seabed contact     
-    elif (XF < 2*Tol):
+    elif (XF == 0):
         ProfileType = 6    
         
         dz_hanging = L + 0.5*W/EA*L**2   # stretched length if it was hanging from one end
-        
         
         # slack case
         if dz_hanging >= ZF:

@@ -697,3 +697,33 @@ def getFromDict(dict, key, shape=0, dtype=float, default=None):
             else:
                 return np.tile(default, shape)
 
+
+def makeTower(twrH, twrRad):
+    '''Sets up mesh points for visualizing a cylindrical structure (should align with RAFT eventually.'''
+    
+    n = 8
+    X = []
+    Y = []
+    Z = []
+    ax=np.zeros(n+1)
+    ay=np.zeros(n+1)
+    for jj in range(n+1):
+        ax[jj] = np.cos(float(jj)/float(n)*2.0*np.pi)
+        ay[jj] = np.sin(float(jj)/float(n)*2.0*np.pi)
+        
+    for ii in range(int(len(twrRad)-1)):
+        z0 = twrH*float(ii)/float(len(twrRad)-1)
+        z1 = twrH*float(ii+1)/float(len(twrRad)-1)
+        for jj in range(n+1):
+            X.append(twrRad[ii]*ax[jj])
+            Y.append(twrRad[ii]*ay[jj])
+            Z.append(z0)            
+            X.append(twrRad[ii+1]*ax[jj])
+            Y.append(twrRad[ii+1]*ay[jj])
+            Z.append(z1)
+    
+    Xs = np.array(X)
+    Ys = np.array(Y)
+    Zs = np.array(Z)    
+    
+    return Xs, Ys, Zs

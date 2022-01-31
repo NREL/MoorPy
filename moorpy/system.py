@@ -98,7 +98,14 @@ class System():
                         line.loadData(dirname, rootname, sep='_')  
                 #except:
                 #    raise ValueError("There is likely not a .MD.Line#.out file in the directory. Make sure Line outputs are set to 'p' in the MoorDyn input file")
-
+            
+            for rod in self.rodList:
+                if isinstance(rod, Line):                    
+                    if Fortran:  # for output filename style for MD-F
+                        rod.loadData(dirname, rootname, sep='.MD.')
+                    else:        # for output filename style for MD-C
+                        rod.loadData(dirname, rootname, sep='_')  
+    
     
     def addBody(self, mytype, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), f6Ext=np.zeros(6)):
         '''Convenience function to add a Body to a mooring system
@@ -364,7 +371,7 @@ class System():
                         lineType = dict(name=type_string, d_vol=d, w=w, m=mass)  # make dictionary for this rod type
                         lineType['EA'] = float(entries[3])
                         
-                        if len(entries >= 10): # read in other elasticity and hydro coefficients as well if enough columns are provided
+                        if len(entries) >= 10: # read in other elasticity and hydro coefficients as well if enough columns are provided
                             lineType['BA'  ] = float(entries[4])
                             lineType['EI'  ] = float(entries[5])
                             lineType['Cd'  ] = float(entries[6])
@@ -398,7 +405,7 @@ class System():
                         
                         rodType = dict(name=type_string, d_vol=d, w=w, m=mass)  # make dictionary for this rod type
                         
-                        if len(entries >= 7): # read in hydro coefficients as well if enough columns are provided
+                        if len(entries) >= 7: # read in hydro coefficients as well if enough columns are provided
                             rodType['Cd'   ] = float(entries[3])
                             rodType['Ca'   ] = float(entries[4])
                             rodType['CdEnd'] = float(entries[5])
@@ -488,17 +495,23 @@ class System():
                     while line.count('---') == 0:
                         entries = line.split()  # entries: RodID  RodType  Attachment  Xa   Ya   Za   Xb   Yb   Zb  NumSegs  Flags/Outputs
                         num = int(entries[0])
-                        entry0 = entries[1].lower()
-                        #num = np.int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Rod #
-                        lUnstr = 0 # not specified directly so skip for now
-                        dia = self.rodTypes[entries[1]]['d_vol']  # find diameter based on specified rod type string
-                        nSegs = int(entries[9])
+                        rodType = self.rodTypes[entries[1]]
+                        dia = rodType['d_vol']  # find diameter based on specified rod type string
                         rA = np.array(entries[3:6], dtype=float)
+                        rB = np.array(entries[6:9], dtype=float)
+                        nSegs = int(entries[9])
                         
-                        # additional things likely missing here <<<
-                        # for now, temporarily initialize Rods as MoorPy Points
-                        self.rodList.append( Point(self, num, 0, rA) )
-                        #rodList.append( Line(dirName, num, lUnstr, dia, nSegs, isRod=1) )
+                        # >>> note: this is currently only set up for use with MoorDyn output data <<<
+                        
+                        if nSegs==0:       # this is the zero-length special case
+                            lUnstr = 0
+                            self.rodList.append( Point(self, num, 0, rA) )
+                        else:
+                            lUnstr = np.linalg.norm(rB-rA)
+                            self.rodList.append( Line(self, num, lUnstr, rodType, nSegs=nSegs, isRod=1) )
+                            #self.rodList[-1].setEndPosition(rA, 0)  # set initial end A position
+                            #self.rodList[-1].setEndPosition(rB, 1)  # set initial end B position
+                            
                         line = next(f)
                         
                 
@@ -2465,6 +2478,12 @@ class System():
             for body in self.bodyList:
                 body.draw(ax)
         
+        for rod in self.rodList:
+            #if isinstance(rod, Point):  # zero-length special case
+            #    not plotting points for now
+            if isinstance(rod, Line):
+                rod.drawLine(time, ax, color=color, shadow=shadow)
+        
         if draw_anchors:
             for line in self.lineList:
                 if line.zp[0,0]==-self.depth:
@@ -2479,7 +2498,7 @@ class System():
         j = 0
         for line in self.lineList:
             j = j + 1
-            if color==None and isinstance(line.type['material'], str):
+            if color==None and 'material' in line.type and isinstance(line.type['material'], str):   # <<< would material ever be something other than a string?
                 if 'chain' in line.type['material']:
                     line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 elif 'rope' in line.type['material'] or 'polyester' in line.type['material']:
@@ -2488,7 +2507,6 @@ class System():
                     line.drawLine(time, ax, color=[0.5,0.5,0.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
             else:
                 line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-            
             
             # Add line labels 
             if linelabels == True:
@@ -2632,6 +2650,10 @@ class System():
                 x = r[Xuvec.index(1)]
                 y = r[Yuvec.index(1)]
                 plt.plot(x, y, 'ko', markersize=5)
+            
+        for rod in self.rodList:
+            if isinstance(rod, Line):
+                rod.drawLine2d(time, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec)
             
         if draw_fairlead:
             for line in self.lineList:
@@ -2806,7 +2828,7 @@ class System():
                 body.setPosition(X[i:i+6])  # update position of free Body
                 i += 6
             body.redraw()                   # redraw Body
-                
+        
         # update position of free Points
         for point in self.pointList:
             if point.type in types:
@@ -2826,8 +2848,21 @@ class System():
     
     
     
+    def updateCoords(self, tStep, colortension, cmap_tension): 
+        '''Update animation function. This gets called by animateLines every iteration of the animation and 
+        redraws the lines and rods in their next positions.'''
+        
+        for rod in self.rodList:
+            if isinstance(rod, Line):
+                rod.redrawLine(-tStep)
+            
+        for line in self.lineList:
+            line.redrawLine(-tStep, colortension=colortension, cmap_tension=cmap_tension)
+            
+        return 
     
-    def animatelines(self, interval=200, repeat=True, delay=0, runtime=-1, **kwargs):
+    
+    def animateLines(self, interval=200, repeat=True, delay=0, runtime=-1, **kwargs):
         '''
         Parameters
         ----------
@@ -2863,13 +2898,6 @@ class System():
         if self.qs==1:
             raise ValueError("This System is set to be quasi-static. Import MoorDyn data and make qs=0 to use this method")
             
-        # update animation function. This gets called every iteration of the animation and redraws the line in its next position
-        def update_Coords(tStep, tempLineList, tempax, colortension, cmap_tension):     # not sure why it needs a 'tempax' input but it works better with it
-            
-            for imooring in tempLineList:
-                imooring.redrawLine(-tStep, colortension=colortension, cmap_tension=cmap_tension)
-                
-            return 
 
         # create the figure and axes to draw the animation
         fig, ax = self.plot(bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, colortension=colortension)
@@ -2902,7 +2930,7 @@ class System():
         
         # Animation: update the figure with the updated coordinates from update_Coords function
         # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()
-        line_ani = animation.FuncAnimation(fig, update_Coords, np.arange(1, nFrames-1, res), fargs=(self.lineList, ax, colortension, cmap_tension),
+        line_ani = animation.FuncAnimation(fig, self.updateCoords, np.arange(1, nFrames-1, res), fargs=(colortension, cmap_tension),
                                            interval=1, repeat=repeat, repeat_delay=delay, blit=False)
                                             # works well when np.arange(...nFrames...) is used. Others iterable ways to do this
         
