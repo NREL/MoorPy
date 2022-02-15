@@ -85,6 +85,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     if XF < 0.0:
         raise CatenaryError("XF is negative!")
     if L <= 0.0:
+        breakpoint()
         raise CatenaryError("L is zero or negative!")
     if EA <= 0.0:
         raise CatenaryError("EA is zero or negative!")
@@ -560,7 +561,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             
             
         # handle special case of a U-shaped line that has seabed contact (using 2 new catenary solves)
-        if info['ProfileType']==1 and info["Zextreme"] < CB:
+        if info['ProfileType']==1 and info["Zextreme"] < min(CB, 0):
         
             # we will solve this as two separate lines to form the U shape
             info['ProfileType'] = 'U'

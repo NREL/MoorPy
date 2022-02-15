@@ -51,7 +51,8 @@ class System():
         
         # lists to hold mooring system objects
         self.bodyList = []
-        self.rodList = []    # <<< TODO: add support for Rods eventually, for compatability with MoorDyn systems
+        self.rodList = []  # note: Rods are currently only fully supported when plotting MoorDyn output, not in MoorPy modeling
+        # <<< TODO: add support for Rods eventually, for compatability with MoorDyn systems
         self.pointList = []
         self.lineList = []
         self.lineTypes = {}
@@ -140,6 +141,33 @@ class System():
         # handle display message if/when MoorPy is reorganized by classes
         
         
+    def addRod(self, rodType, rA, rB, nSegs=1, bodyID=0):
+        '''draft method to add a quasi-Rod to the system. Rods are not yet fully figured out for MoorPy'''
+        
+        if not isinstance(rodType, dict):  
+            if rodType in self.rodTypes:
+                rodType = self.rodTypes[rodType]
+            else:
+                ValueError("The specified rodType name does not correspond with any rodType stored in this MoorPy System")
+        
+        rA = np.array(rA)
+        rB = np.array(rB)
+        
+        if nSegs==0:       # this is the zero-length special case
+            lUnstr = 0
+            self.rodList.append( Point(self, num, 0, rA) )
+        else:
+            lUnstr = np.linalg.norm(rB-rA)
+            self.rodList.append( Line(self, len(self.rodList)+1, lUnstr, rodType, nSegs=nSegs, isRod=1) )
+            
+            if bodyID > 0:
+                self.bodyList[bodyID-1].attachRod(len(self.rodList), np.hstack([rA,rB]))
+                
+            else: # (in progress - unsure if htis works) <<<
+                self.rodList[-1].rA = rA  #.setEndPosition(rA, 0)  # set initial end A position
+                self.rodList[-1].rB = rB  #.setEndPosition(rB, 1)  # set initial end B position
+
+    
     def addPoint(self, mytype, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0):
         '''Convenience function to add a Point to a mooring system
 
@@ -300,7 +328,27 @@ class System():
             self.lineTypes[lineType['name']] = lineType                       # otherwise save a new entry
 
         return lineType                              # return the dictionary in case it's useful separately
+
+
+    def setRodType(self, d, name="", **kwargs):
+        '''hasty replication of setLineType for rods'''
+ 
+        # compute the actual values for this line type
         
+        if len(name)==0:
+            name = len(self.rodList)+1
+        
+        rodType = dict(name=name, d_vol=d, w=0, m=0)  # make dictionary for this rod type
+        
+        rodType.update(kwargs)                      # add any custom arguments provided in the call 
+        
+        # add the dictionary to the System's lineTypes master dictionary
+        if rodType['name'] in self.rodTypes:                                # if there is already a line type with this name
+            self.rodTypes[rodType['name']].update(rodType)                 # update the existing dictionary values rather than overwriting with a new dictionary
+        else:
+            self.rodTypes[rodType['name']] = rodType                       # otherwise save a new entry
+
+        return rodType                              # return the dictionary in case it's useful separately
 
 
     def load(self, filename):
@@ -497,6 +545,7 @@ class System():
                         entries = line.split()  # entries: RodID  RodType  Attachment  Xa   Ya   Za   Xb   Yb   Zb  NumSegs  Flags/Outputs
                         num = int(entries[0])
                         rodType = self.rodTypes[entries[1]]
+                        attachment = entries[2].lower()
                         dia = rodType['d_vol']  # find diameter based on specified rod type string
                         rA = np.array(entries[3:6], dtype=float)
                         rB = np.array(entries[6:9], dtype=float)
@@ -510,8 +559,18 @@ class System():
                         else:
                             lUnstr = np.linalg.norm(rB-rA)
                             self.rodList.append( Line(self, num, lUnstr, rodType, nSegs=nSegs, isRod=1) )
-                            #self.rodList[-1].setEndPosition(rA, 0)  # set initial end A position
-                            #self.rodList[-1].setEndPosition(rB, 1)  # set initial end B position
+                            
+                            if ("body" in attachment) or ("turbine" in attachment):
+                                # attach to body here
+                                BodyID = int("".join(filter(str.isdigit, attachment)))
+                                if len(self.bodyList) < BodyID:
+                                    self.bodyList.append( Body(self, 1, 0, np.zeros(6)))
+                                    
+                                self.bodyList[BodyID-1].attachRod(num, np.hstack([rA,rB]))
+                                
+                            else: # (in progress - unsure if htis works) <<<
+                                self.rodList[-1].rA = rA #.setEndPosition(rA, 0)  # set initial end A position
+                                self.rodList[-1].rB = rB #.setEndPosition(rB, 1)  # set initial end B position
                             
                         line = next(f)
                         
@@ -1649,7 +1708,7 @@ class System():
         
         self.DOFtype_solve_for = DOFtype
         # create arrays for the initial positions of the objects that need to find equilibrium, and the max step sizes
-        X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[100, 0.3])
+        X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[30, 0.1])
         
         # temporary for backwards compatibility <<<<<<<<<<
         '''
@@ -1684,7 +1743,7 @@ class System():
                 i+=6
                 rtol = tol/max([np.linalg.norm(rpr) for rpr in body.rPointRel])    # estimate appropriate body rotational tolerance based on attachment point radii
                 tols += 3*[tol] + 3*[rtol]
-        
+                
         for point in self.pointList:
             if point.type in types:
                 if 2 in point.DOFs:

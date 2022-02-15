@@ -220,8 +220,29 @@ class Line():
         
         if n==0: n = self.nNodes
     
+        # special temporary case to draw a rod for visualization. This assumes the rod end points have already been set somehow
+        if self.qs==1 and self.isRod > 0:
+        
+            # make points for appropriately sized cylinder
+            d = self.type['d_vol']
+            Xs, Ys, Zs = makeTower(self.L, np.array([d/2, d/2]))   # add in makeTower method once you start using Rods
+            
+            # get unit vector and orientation matrix
+            k = (self.rB-self.rA)/self.L
+            Rmat = np.array(rotationMatrix(0, np.arctan2(np.hypot(k[0],k[1]), k[2]), np.arctan2(k[1],k[0])))
+        
+            # translate and rotate into proper position for Rod
+            coords = np.vstack([Xs, Ys, Zs])
+            newcoords = np.matmul(Rmat,coords)
+            Xs = newcoords[0,:] + self.rA[0]
+            Ys = newcoords[1,:] + self.rA[1]
+            Zs = newcoords[2,:] + self.rA[2]
+            
+            return Xs, Ys, Zs, None
+        
+    
         # if a quasi-static analysis, just call the catenary function to return the line coordinates
-        if self.qs==1:
+        elif self.qs==1:
         
             depth = self.sys.depth
         
@@ -311,7 +332,7 @@ class Line():
         
     
     
-    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], colortension=False, cmap='rainbow', plotnodes=[], plotnodesline=[], label="", alpha=1.0):
+    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, cmap='rainbow', plotnodes=[], plotnodesline=[], label="", alpha=1.0):
         '''Draw the line on 2D plot (ax must be 2D)
 
         Parameters
@@ -365,8 +386,8 @@ class Line():
                 tensions = self.getLineTens()
             
             # apply any 3D to 2D transformation here to provide desired viewing angle
-            Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] 
-            Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] 
+            Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] + Xoff
+            Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] + Yoff
             
             if colortension:    # if the mooring lines want to be plotted with colors based on node tensions
                 maxt = np.max(tensions); mint = np.min(tensions)
