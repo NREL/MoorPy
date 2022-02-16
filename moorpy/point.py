@@ -7,7 +7,7 @@ import numpy as np
 class Point():
     '''A class for any object in the mooring system that can be described by three translational coorindates'''
     
-    def __init__(self, mooringSys, num, type, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0, zSpan=[-1,1]):
+    def __init__(self, mooringSys, num, type, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0, zSpan=[-1,1], CdA=0.0, Ca=0.0):
         '''Initialize Point attributes
 
         Parameters
@@ -24,6 +24,10 @@ class Point():
             mass [kg]. The default is 0.
         v : float, optional
             submerged volume [m^3]. The default is 0.
+        CdA : float, optional
+            Product of drag coefficient and cross sectional area in any direction [m^2]. The default is 0.
+        Ca : float, optional
+            Added mass coefficient in any direction.
         fExt : array, optional
             applied external force vector in global orientation (not including weight/buoyancy). The default is np.zeros(3).
         DOFs: list
@@ -47,8 +51,10 @@ class Point():
         self.type = type                # 1: fixed/attached to something, 0 free to move, or -1 coupled externally
         self.r = np.array(r, dtype=np.float_)
                 
-        self.m = np.float_(m)
-        self.v = np.float_(v)
+        self.m  = float(m)
+        self.v  = float(v)
+        self.CdA= float(CdA)
+        self.Ca = float(Ca)
         self.fExt = fExt                # external forces plus weight/buoyancy
         self.fBot = 10.0                # this is a seabed contact force that will be added if a point is specified below the seabed
         self.zSub = 0.0                 # this is the depth that the point is positioned below the seabed (since r[2] will be capped at the depth)
@@ -183,24 +189,22 @@ class Point():
             #v = abs(-min(0, np.sign(self.r[2]))*self.v - v_half)    # submerged volume of the point [m^3]
             '''
             f[2] += -self.m*self.sys.g  # add weight 
-            
+
             #f[2] += self.v*self.sys.rho*self.sys.g   # add buoyancy using submerged volume
             
             if self.r[2] + self.zSpan[1] < 0.0:                # add buoyancy if fully submerged
-                f[2] +=  self.v*self.sys.rho*self.sys.g  
+                f[2] +=  self.v*self.sys.rho*self.sys.g
             elif self.r[2] + self.zSpan[0] < 0.0:    # add some buoyancy if part-submerged (linear variation, constant Awp)
                 f[2] +=  self.v*self.sys.rho*self.sys.g * (self.r[2] + self.zSpan[0])/(self.zSpan[0]-self.zSpan[1])
             # (no buoyancy force added if it's fully out of the water, which would be very exciting for the Point)
             
             f += np.array(self.fExt) # add external forces
-            
             #f[2] -= self.sys.rho*self.sys.g*AWP*self.r[2]   # hydrostatic heave stiffness
             
             # handle case of Point resting on or below the seabed, to provide a restoring force
             # add smooth transition to fz=0 at seabed (starts at zTol above seabed)
             f[2] += max(self.m - self.v*self.sys.rho, 0)*self.sys.g * (self.zSub + self.zTol)/self.zTol
 
-        
                 
         # add forces from attached lines
         for LineID,endB in zip(self.attached,self.attachedEndB):

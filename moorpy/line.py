@@ -3,7 +3,7 @@
 import numpy as np
 from matplotlib import cm
 from moorpy.Catenary import catenary
-from moorpy.helpers import LineError, CatenaryError, rotationMatrix
+from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower
    
 
  
@@ -220,14 +220,43 @@ class Line():
         
         if n==0: n = self.nNodes
     
+        # special temporary case to draw a rod for visualization. This assumes the rod end points have already been set somehow
+        if self.qs==1 and self.isRod > 0:
+        
+            # make points for appropriately sized cylinder
+            d = self.type['d_vol']
+            Xs, Ys, Zs = makeTower(self.L, np.array([d/2, d/2]))   # add in makeTower method once you start using Rods
+            
+            # get unit vector and orientation matrix
+            k = (self.rB-self.rA)/self.L
+            Rmat = np.array(rotationMatrix(0, np.arctan2(np.hypot(k[0],k[1]), k[2]), np.arctan2(k[1],k[0])))
+        
+            # translate and rotate into proper position for Rod
+            coords = np.vstack([Xs, Ys, Zs])
+            newcoords = np.matmul(Rmat,coords)
+            Xs = newcoords[0,:] + self.rA[0]
+            Ys = newcoords[1,:] + self.rA[1]
+            Zs = newcoords[2,:] + self.rA[2]
+            
+            return Xs, Ys, Zs, None
+        
+    
         # if a quasi-static analysis, just call the catenary function to return the line coordinates
-        if self.qs==1:
+        elif self.qs==1:
         
             depth = self.sys.depth
         
             dr =  self.rB - self.rA                 
             LH = np.hypot(dr[0], dr[1])     # horizontal spacing of line ends
             LV = dr[2]                      # vertical offset from end A to end B
+            if LH >0:
+                cosBeta = dr[0]/LH                 # cos of line heading
+                sinBeta = dr[1]/LH                 # sin of line heading
+                self.th = np.arctan2(dr[1],dr[0])  # line heading
+            else:   # special case of vertical line: line heading is undefined - use zero as default
+                cosBeta = 0.0
+                sinBeta = 0.0
+                self.th = 0.0
             
             if np.min([self.rA[2],self.rB[2]]) > -depth:
                 self.cb = -depth - np.min([self.rA[2],self.rB[2]])   # if this line's lower end is off the seabed, set cb negative and to the distance off the seabed
@@ -240,8 +269,8 @@ class Line():
             except CatenaryError as error:
                 raise LineError(self.number, error.message)
             
-            Xs = self.rA[0] + info["X"]*dr[0]/LH
-            Ys = self.rA[1] + info["X"]*dr[1]/LH
+            Xs = self.rA[0] + info["X"]*cosBeta 
+            Ys = self.rA[1] + info["X"]*sinBeta 
             Zs = self.rA[2] + info["Z"]
             Ts = info["Te"]
             return Xs, Ys, Zs, Ts
@@ -254,15 +283,15 @@ class Line():
             # drawing rods
             if self.isRod > 0:
             
-                k1 = np.array([ self.xp[ts,-1]-self.xp[ts,0], self.yp[ts,-1]-self.yp[ts,0], self.zp[ts,-1]-self.zp[ts,0] ]) / self.length # unit vector
+                k1 = np.array([ self.xp[ts,-1]-self.xp[ts,0], self.yp[ts,-1]-self.yp[ts,0], self.zp[ts,-1]-self.zp[ts,0] ]) / self.L # unit vector
                 
                 k = np.array(k1) # make copy
             
                 Rmat = np.array(rotationMatrix(0, np.arctan2(np.hypot(k[0],k[1]), k[2]), np.arctan2(k[1],k[0])))  # <<< should fix this up at some point, MattLib func may be wrong
                 
                 # make points for appropriately sized cylinder
-                d = self.type['d']
-                Xs, Ys, Zs = makeTower(self.length, np.array([d, d]))   # add in makeTower method once you start using Rods
+                d = self.type['d_vol']
+                Xs, Ys, Zs = makeTower(self.L, np.array([d/2, d/2]))   # add in makeTower method once you start using Rods
                 
                 # translate and rotate into proper position for Rod
                 coords = np.vstack([Xs, Ys, Zs])
@@ -303,7 +332,7 @@ class Line():
         
     
     
-    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], colortension=False, cmap='rainbow'):
+    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, cmap='rainbow', plotnodes=[], plotnodesline=[], label="", alpha=1.0):
         '''Draw the line on 2D plot (ax must be 2D)
 
         Parameters
@@ -357,8 +386,8 @@ class Line():
                 tensions = self.getLineTens()
             
             # apply any 3D to 2D transformation here to provide desired viewing angle
-            Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] 
-            Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] 
+            Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] + Xoff
+            Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] + Yoff
             
             if colortension:    # if the mooring lines want to be plotted with colors based on node tensions
                 maxt = np.max(tensions); mint = np.min(tensions)
@@ -368,7 +397,12 @@ class Line():
                     rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
                     linebit.append(ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba))
             else:
-                linebit.append(ax.plot(Xs2d, Ys2d, lw=1, color=color)) # previously had lw=1 (linewidth)
+                linebit.append(ax.plot(Xs2d, Ys2d, lw=1, color=color, label=label, alpha=alpha)) # previously had lw=1 (linewidth)
+            
+            if len(plotnodes) > 0:
+                for i,node in enumerate(plotnodes):
+                    if self.number==plotnodesline[i]:
+                        linebit.append(ax.plot(Xs2d[node], Ys2d[node], 'o', color=color, markersize=5))   
             
         self.linebit = linebit # can we store this internally?
         
@@ -414,6 +448,9 @@ class Line():
     
         if self.isRod > 0:
             
+            if color==None:
+                color = [0.3, 0.3, 0.3]  # if no color provided, default to dark grey rather than rainbow rods
+                
             Xs, Ys, Zs, Ts = self.getLineCoords(Time)
             
             for i in range(int(len(Xs)/2-1)):
@@ -422,8 +459,8 @@ class Line():
                 linebit.append(ax.plot(Xs[[2*i+1,2*i+3]],Ys[[2*i+1,2*i+3]],Zs[[2*i+1,2*i+3]], color=color))  # end B edges
             
             # scatter points for line ends 
-            if endpoints == True:
-                linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
+            #if endpoints == True:
+            #    linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
         
         # drawing lines...
         else:
@@ -588,6 +625,14 @@ class Line():
         dr =  self.rB - self.rA
         LH = np.hypot(dr[0], dr[1])     # horizontal spacing of line ends
         LV = dr[2]                # vertical offset from end A to end B
+        if LH >0:
+            cosBeta = dr[0]/LH                 # cos of line heading
+            sinBeta = dr[1]/LH                 # sin of line heading
+            self.th = np.arctan2(dr[1],dr[0])  # line heading
+        else:   # special case of vertical line: line heading is undefined - use zero as default
+            cosBeta = 0.0
+            sinBeta = 0.0
+            self.th = 0.0
 
         if self.rA[2] < -depth:
             raise LineError("Line {} end A is lower than the seabed.".format(self.number))
@@ -611,7 +656,6 @@ class Line():
         except CatenaryError as error:
             raise LineError(self.number, error.message)
             
-        self.th = np.arctan2(dr[1],dr[0])  # probably a more efficient way to handle this <<<
         self.HF = info["HF"]
         self.VF = info["VF"]
         self.KA2 = info["stiffnessA"]
@@ -619,11 +663,11 @@ class Line():
         self.LBot = info["LBot"]
         self.info = info
             
-        self.fA[0] = fAH*dr[0]/LH
-        self.fA[1] = fAH*dr[1]/LH
+        self.fA[0] = fAH*cosBeta
+        self.fA[1] = fAH*sinBeta
         self.fA[2] = fAV
-        self.fB[0] = fBH*dr[0]/LH
-        self.fB[1] = fBH*dr[1]/LH
+        self.fB[0] = fBH*cosBeta
+        self.fB[1] = fBH*sinBeta
         self.fB[2] = fBV
         self.TA = np.sqrt(fAH*fAH + fAV*fAV) # end tensions
         self.TB = np.sqrt(fBH*fBH + fBV*fBV)
@@ -638,15 +682,21 @@ class Line():
         R = rotationMatrix(0,0,self.th)
         
         # initialize the line's analytic stiffness matrix in the "in-line" plane then rotate the matrix to be about the global frame [K'] = [R][K][R]^T
-        def from2Dto3Drotated(K2D, Kt):
+        def from2Dto3Drotated(K2D, F, L):
+            if L > 0:
+                Kt = F/L         # transverse stiffness term
+            else:
+                Kt = 0.0
+            
             K2 = np.array([[K2D[0,0], 0 , K2D[0,1]],
                            [  0     , Kt,   0     ],
                            [K2D[1,0], 0 , K2D[1,1]]])
             return np.matmul(np.matmul(R, K2), R.T)
+            
         
-        self.KA  = from2Dto3Drotated(info['stiffnessA'], -fBH/LH)   # stiffness matrix describing reaction force on end A due to motion of end A
-        self.KB  = from2Dto3Drotated(info['stiffnessB'], -fBH/LH)   # stiffness matrix describing reaction force on end B due to motion of end B
-        self.KAB = from2Dto3Drotated(info['stiffnessAB'], fBH/LH)  # stiffness matrix describing reaction force on end B due to motion of end A
+        self.KA  = from2Dto3Drotated(info['stiffnessA'], -fBH, LH)   # stiffness matrix describing reaction force on end A due to motion of end A
+        self.KB  = from2Dto3Drotated(info['stiffnessB'], -fBH, LH)   # stiffness matrix describing reaction force on end B due to motion of end B
+        self.KAB = from2Dto3Drotated(info['stiffnessAB'], fBH, LH)  # stiffness matrix describing reaction force on end B due to motion of end A
                 
         #self.K6 = np.block([[ from2Dto3Drotated(self.KA),  from2Dto3Drotated(self.KAB.T)],
         #                    [ from2Dto3Drotated(self.KAB), from2Dto3Drotated(self.KB)  ]])
@@ -823,6 +873,9 @@ class Line():
         Zs = self.rA[2] + z
         
         return np.vstack([ Xs, Ys, Zs])
+    
+    def attachLine(self, lineID, endB):
+        pass
 
     
     
