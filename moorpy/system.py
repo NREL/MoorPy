@@ -704,7 +704,7 @@ class System():
                         if entry1 == "g" or entry1 == "gravity":
                             self.g  = np.float_(entry0)
                         elif entries[1] == "WtrDpth" or entries[1] == "depth":
-                            if isinstance(entry0, str):
+                            if '.txt' in entry0:
                                 self.depth = 0.0
                             else:
                                 self.depth = np.float_(entry0)
@@ -2556,8 +2556,10 @@ class System():
             if color==None and 'material' in line.type:
                 if 'chain' in line.type['material'] or 'Cadena80' in line.type['material']:
                     line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                elif 'rope' in line.type['material'] or 'polyester' in line.type['material'] or 'Dpoli169' in line.type['material']:
+                elif 'rope' in line.type['material'] or 'polyester' in line.type['material'] or 'Dpoli169' in line.type['material'] or 'nylon' in line.type['material']:
                     line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                elif 'nylon' in line.type['material']:
+                    line.drawLine(time, ax, color=[.8,.8,.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 else:
                     line.drawLine(time, ax, color=[0.5,0.5,0.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
             else:
@@ -2948,7 +2950,7 @@ class System():
         opacity          = kwargs.get('opacity'        , 1.0       )     # the transparency of the bathymetry plot_surface
         hidebox          = kwargs.get('hidebox'        , False     )     # toggles whether to show the axes or not
         rang             = kwargs.get('rang'           , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
-        res              = kwargs.get('res'            , 10        )     # the resolution of the animation; how fluid the animation is. Higher res means spottier animation. counter-intuitive
+        speed            = kwargs.get('speed'          , 10        )     # the resolution of the animation; how fluid/speedy the animation is
         colortension     = kwargs.get("colortension"   , False     )     # toggle to draw the mooring lines in colors based on node tensions
         cmap_tension     = kwargs.get('cmap_tension'   , 'rainbow' )     # the type of color spectrum desired for colortensions
         draw_body        = kwargs.get('draw_body'      , True      )
@@ -2991,7 +2993,7 @@ class System():
         
         # Animation: update the figure with the updated coordinates from update_Coords function
         # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()
-        line_ani = animation.FuncAnimation(fig, self.updateCoords, np.arange(1, nFrames-1, res), fargs=(colortension, cmap_tension),
+        line_ani = animation.FuncAnimation(fig, self.updateCoords, np.arange(1, nFrames-1, speed), fargs=(colortension, cmap_tension),
                                            interval=1, repeat=repeat, repeat_delay=delay, blit=False)
                                             # works well when np.arange(...nFrames...) is used. Others iterable ways to do this
         

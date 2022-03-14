@@ -100,7 +100,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     # ProfileType=3: A portion of the line must rest on the seabed and the anchor tension is zero
     # ProfileType=4: The line is negatively buoyant, seabed interaction is enabled, and the line 
         # is longer than a full L between end points (including stretching) i.e. it is horizontal
-        # along the seabed from the anchor, then vertical to the fairlaed. Computes the maximum
+        # along the seabed from the anchor, then vertical to the fairlead. Computes the maximum
         # stretched length of the line with seabed interaction beyond which the line would have to 
         # double-back on itself; the line forms an "L" between the anchor and fairlead. Then it 
         # models it as bunched up on the seabed (instead of throwing an error)
