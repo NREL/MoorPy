@@ -8,6 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import yaml
 import warnings
+from os import path
 
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
@@ -101,7 +102,7 @@ class System():
                 #    raise ValueError("There is likely not a .MD.Line#.out file in the directory. Make sure Line outputs are set to 'p' in the MoorDyn input file")
             
             for rod in self.rodList:
-                if isinstance(rod, Line):                    
+                if isinstance(rod, Line):
                     if Fortran:  # for output filename style for MD-F
                         rod.loadData(dirname, rootname, sep='.MD.')
                     else:        # for output filename style for MD-C
@@ -964,6 +965,7 @@ class System():
                     #Check if the point is attached to body
                     for body in self.bodyList:
                         for attached_Point in body.attachedP:
+                            
                             if attached_Point == point.number:
                                 #point_type = "Body" + str(body.number)
                                 point_type = "Vessel"
@@ -2533,10 +2535,15 @@ class System():
         for rod in self.rodList:
             if len(self.rodList)==0:    # usually, there are no rods in the rodList
                 pass
-            elif isinstance(rod, Line):
-                rod.drawLine(time, ax, color=color, shadow=shadow)
-            #if isinstance(rod, Point):  # zero-length special case
-            #    not plotting points for now
+            else:
+                if self.qs==0 and len(rod.Tdata) == 0:
+                    print('pass',rod.number)
+                    pass
+                elif isinstance(rod, Line):
+                    print('draw',rod.number)
+                    rod.drawLine(time, ax, color=color, shadow=shadow)
+                #if isinstance(rod, Point):  # zero-length special case
+                #    not plotting points for now
             
         
         if draw_anchors:
@@ -2552,23 +2559,26 @@ class System():
         
         j = 0
         for line in self.lineList:
-            j = j + 1
-            if color==None and 'material' in line.type:
-                if 'chain' in line.type['material'] or 'Cadena80' in line.type['material']:
-                    line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                elif 'rope' in line.type['material'] or 'polyester' in line.type['material'] or 'Dpoli169' in line.type['material'] or 'nylon' in line.type['material']:
-                    line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                elif 'nylon' in line.type['material']:
-                    line.drawLine(time, ax, color=[.8,.8,.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                else:
-                    line.drawLine(time, ax, color=[0.5,0.5,0.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+            if self.qs==0 and len(line.Tdata) == 0:
+                pass
             else:
-                line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                j = j + 1
+                if color==None and 'material' in line.type:
+                    if 'chain' in line.type['material'] or 'Cadena80' in line.type['material']:
+                        line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                    elif 'rope' in line.type['material'] or 'polyester' in line.type['material'] or 'Dpoli169' in line.type['material']:
+                        line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                    elif 'nylon' in line.type['material']:
+                        line.drawLine(time, ax, color=[.8,.8,.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                    else:
+                        line.drawLine(time, ax, color=[0.5,0.5,0.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                else:
+                    line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                
+                # Add line labels 
+                if linelabels == True:
+                    ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
             
-            # Add line labels 
-            if linelabels == True:
-                ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
-        
         if cbar_tension:
             maxten = max([max(line.getLineTens()) for line in self.lineList])   # find the max tension in the System
             minten = min([min(line.getLineTens()) for line in self.lineList])   # find the min tension in the System
@@ -2915,11 +2925,13 @@ class System():
         redraws the lines and rods in their next positions.'''
         
         for rod in self.rodList:
-            if isinstance(rod, Line):
-                rod.redrawLine(-tStep)
+            if len(rod.Tdata) > 0:
+                if isinstance(rod, Line):
+                    rod.redrawLine(-tStep)
             
         for line in self.lineList:
-            line.redrawLine(-tStep, colortension=colortension, cmap_tension=cmap_tension)
+            if len(line.Tdata) > 0:
+                line.redrawLine(-tStep, colortension=colortension, cmap_tension=cmap_tension)
             
         return 
     
@@ -2954,6 +2966,11 @@ class System():
         colortension     = kwargs.get("colortension"   , False     )     # toggle to draw the mooring lines in colors based on node tensions
         cmap_tension     = kwargs.get('cmap_tension'   , 'rainbow' )     # the type of color spectrum desired for colortensions
         draw_body        = kwargs.get('draw_body'      , True      )
+        # bound kwargs
+        xbounds          = kwargs.get('xbounds'        , None      )     # the bounds of the x-axis. The midpoint of these bounds determines the origin point of orientation of the plot
+        ybounds          = kwargs.get('ybounds'        , None      )     # the bounds of the y-axis. The midpoint of these bounds determines the origin point of orientation of the plot
+        zbounds          = kwargs.get('zbounds'        , None      )     # the bounds of the z-axis. The midpoint of these bounds determines the origin point of orientation of the plot
+
         
         # not adding cbar_tension colorbar yet since the tension magnitudes might change in the animation and the colorbar won't reflect that
         # can use any other kwargs that go into self.plot()
@@ -2963,7 +2980,7 @@ class System():
             
 
         # create the figure and axes to draw the animation
-        fig, ax = self.plot(draw_body=draw_body, bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, colortension=colortension)
+        fig, ax = self.plot(draw_body=draw_body, bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, colortension=colortension, xbounds=xbounds, ybounds=ybounds, zbounds=zbounds)
         '''
         # can do this section instead of self.plot(). They do the same thing
         fig = plt.figure(figsize=(20/2.54,12/2.54))
@@ -2984,11 +3001,16 @@ class System():
         rangez = np.diff(ax.get_zlim3d())[0]
         ax.set_box_aspect([rangex, rangey, rangez])
         
+        for line in self.lineList:
+            if len(line.Tdata) > 0:
+                idyn = line.number-1
+                break
+        
         if runtime==-1:
-            nFrames = len(self.lineList[0].Tdata)
+            nFrames = len(self.lineList[idyn].Tdata)
         else:
-            itime = int(np.where(self.lineList[0].Tdata==runtime)[0])
-            nFrames = len(self.lineList[0].Tdata[0:itime])
+            itime = int(np.where(self.lineList[idyn].Tdata==runtime)[0])
+            nFrames = len(self.lineList[idyn].Tdata[0:itime])
         
         
         # Animation: update the figure with the updated coordinates from update_Coords function

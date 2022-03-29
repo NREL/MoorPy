@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import cm
 from moorpy.Catenary import catenary
 from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower
-   
+from os import path
 
  
 class Line():
@@ -73,76 +73,90 @@ class Line():
         '''Loads line-specific time series data from a MoorDyn output file'''
         
         self.qs = 0 # signals time series data
-    
-        # load time series data
-        if self.isRod > 0:
-            data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, "Rod"+str(self.number)+".out") # remember number starts on 1 rather than 0
-        else:
-            data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, "Line"+str(self.number)+".out") # remember number starts on 1 rather than 0
-                
-        # get time info
-        if ("Time" in ch):
-            self.Tdata = data[:,ch["Time"]]
-            self.dt = self.Tdata[1]-self.Tdata[0]
-        else:
-            raise LineError("loadData: could not find Time channel for mooring line "+str(self.number))
-    
         
-        nT = len(self.Tdata)  # number of time steps
+        if self.isRod==1:
+            strtype='Rod'
+        elif self.isRod==0:
+            strtype='Line'
         
-        # check for position data <<<<<<
+        if path.exists(dirname+rootname+'.MD.'+strtype+str(self.number)+'.out'):
         
-        self.xp = np.zeros([nT,self.nNodes])
-        self.yp = np.zeros([nT,self.nNodes])
-        self.zp = np.zeros([nT,self.nNodes])
-        
-        
-        for i in range(self.nNodes):
-            self.xp[:,i] = data[:, ch['Node'+str(i)+'px']]
-            self.yp[:,i] = data[:, ch['Node'+str(i)+'py']]
-            self.zp[:,i] = data[:, ch['Node'+str(i)+'pz']]
-            
-        if self.isRod==0:
-            self.Te = np.zeros([nT,self.nNodes-1])   # read in tension data if available
-            if "Seg1Te" in ch:
-                for i in range(self.nNodes-1):
-                    self.Te[:,i] = data[:, ch['Seg'+str(i+1)+'Te']]
-                    
-            self.Ku = np.zeros([nT,self.nNodes])   # read in curvature data if available
-            if "Node0Ku" in ch:
-                for i in range(self.nNodes):
-                    self.Ku[:,i] = data[:, ch['Node'+str(i)+'Ku']]
-
-        self.Ux = np.zeros([nT,self.nNodes])   # read in fluid velocity data if available
-        self.Uy = np.zeros([nT,self.nNodes])
-        self.Uz = np.zeros([nT,self.nNodes])
-        if "Node0Ux" in ch:
-            for i in range(self.nNodes):
-                self.Ux[:,i] = data[:, ch['Node'+str(i)+'Ux']]
-                self.Uy[:,i] = data[:, ch['Node'+str(i)+'Uy']]
-                self.Uz[:,i] = data[:, ch['Node'+str(i)+'Uz']]
-
-
-        self.xpi= self.xp[0,:]
-        self.ypi= self.yp[0,:]
-        self.zpi= self.zp[0,:]
-        
-        # calculate the dynamic LBot !!!!!!! doesn't work for sloped bathymetry yet !!!!!!!!!!
-        for i in range(len(self.zp[0])):
-            if np.max(self.zp[:,i]) > self.zp[0,0]:
-                inode = i
-                break
+            # load time series data
+            if self.isRod > 0:
+                data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, "Rod"+str(self.number)+".out") # remember number starts on 1 rather than 0
             else:
-                inode = i
-        self.LBotDyn = (inode-1)*self.L/(self.nNodes-1)
+                data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, "Line"+str(self.number)+".out") # remember number starts on 1 rather than 0
+            
+            # get time info
+            if ("Time" in ch):
+                self.Tdata = data[:,ch["Time"]]
+                self.dt = self.Tdata[1]-self.Tdata[0]
+            else:
+                raise LineError("loadData: could not find Time channel for mooring line "+str(self.number))
         
-        # get length (constant)
-        self.L = np.sqrt( (self.xpi[-1]-self.xpi[0])**2 + (self.ypi[-1]-self.ypi[0])**2 + (self.zpi[-1]-self.zpi[0])**2 )
-        # ^^^^^^^ why are we changing the self.L value to not the unstretched length specified in MoorDyn?
-        # moved this below the dynamic LBot calculation because I wanted to use the original self.L
-        
-        
-        # check for tension data <<<<<<<
+            
+            nT = len(self.Tdata)  # number of time steps
+            
+            # check for position data <<<<<<
+            
+            self.xp = np.zeros([nT,self.nNodes])
+            self.yp = np.zeros([nT,self.nNodes])
+            self.zp = np.zeros([nT,self.nNodes])
+            
+            
+            for i in range(self.nNodes):
+                self.xp[:,i] = data[:, ch['Node'+str(i)+'px']]
+                self.yp[:,i] = data[:, ch['Node'+str(i)+'py']]
+                self.zp[:,i] = data[:, ch['Node'+str(i)+'pz']]
+                
+            if self.isRod==0:
+                self.Te = np.zeros([nT,self.nNodes-1])   # read in tension data if available
+                if "Seg1Te" in ch:
+                    for i in range(self.nNodes-1):
+                        self.Te[:,i] = data[:, ch['Seg'+str(i+1)+'Te']]
+                        
+                self.Ku = np.zeros([nT,self.nNodes])   # read in curvature data if available
+                if "Node0Ku" in ch:
+                    for i in range(self.nNodes):
+                        self.Ku[:,i] = data[:, ch['Node'+str(i)+'Ku']]
+    
+            self.Ux = np.zeros([nT,self.nNodes])   # read in fluid velocity data if available
+            self.Uy = np.zeros([nT,self.nNodes])
+            self.Uz = np.zeros([nT,self.nNodes])
+            if "Node0Ux" in ch:
+                for i in range(self.nNodes):
+                    self.Ux[:,i] = data[:, ch['Node'+str(i)+'Ux']]
+                    self.Uy[:,i] = data[:, ch['Node'+str(i)+'Uy']]
+                    self.Uz[:,i] = data[:, ch['Node'+str(i)+'Uz']]
+    
+    
+            self.xpi= self.xp[0,:]
+            self.ypi= self.yp[0,:]
+            self.zpi= self.zp[0,:]
+            
+            # calculate the dynamic LBot !!!!!!! doesn't work for sloped bathymetry yet !!!!!!!!!!
+            for i in range(len(self.zp[0])):
+                if np.max(self.zp[:,i]) > self.zp[0,0]:
+                    inode = i
+                    break
+                else:
+                    inode = i
+            self.LBotDyn = (inode-1)*self.L/(self.nNodes-1)
+            
+            # get length (constant)
+            self.L = np.sqrt( (self.xpi[-1]-self.xpi[0])**2 + (self.ypi[-1]-self.ypi[0])**2 + (self.zpi[-1]-self.zpi[0])**2 )
+            # ^^^^^^^ why are we changing the self.L value to not the unstretched length specified in MoorDyn?
+            # moved this below the dynamic LBot calculation because I wanted to use the original self.L
+            
+            
+            # check for tension data <<<<<<<
+            
+        else:
+            self.Tdata = []
+            
+            
+            
+            
         
     def read_mooring_file(self, dirName,fileName):
 
@@ -203,10 +217,11 @@ class Line():
         else:           # otherwise it's a time in s, so find closest time step
             for index, item in enumerate(self.Tdata):
                 #print "index is "+str(index)+" and item is "+str(item)
-                ts = -1
-                if item > Time:
-                    ts = index
-                    break
+                if len(self.Tdata) > 0:
+                    ts = -1
+                    if item > Time:
+                        ts = index
+                        break
             if ts==-1:
                 raise LineError("getTimestep: requested time likely out of range")
 
@@ -277,6 +292,7 @@ class Line():
             
         # otherwise, count on read-in time-series data
         else:
+
             # figure out what time step to use
             ts = self.getTimestep(Time)
             
