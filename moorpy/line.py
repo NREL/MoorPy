@@ -144,7 +144,7 @@ class Line():
             self.LBotDyn = (inode-1)*self.L/(self.nNodes-1)
             
             # get length (constant)
-            self.L = np.sqrt( (self.xpi[-1]-self.xpi[0])**2 + (self.ypi[-1]-self.ypi[0])**2 + (self.zpi[-1]-self.zpi[0])**2 )
+            #self.L = np.sqrt( (self.xpi[-1]-self.xpi[0])**2 + (self.ypi[-1]-self.ypi[0])**2 + (self.zpi[-1]-self.zpi[0])**2 )
             # ^^^^^^^ why are we changing the self.L value to not the unstretched length specified in MoorDyn?
             # moved this below the dynamic LBot calculation because I wanted to use the original self.L
             
