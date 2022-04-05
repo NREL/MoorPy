@@ -3031,5 +3031,57 @@ class System():
         
         return line_ani
     
-    
+ 
+    def unload_md_driver(self, outFileName, outroot = 'driver', MDinputfile = 'test.dat',depth = 600):
+
+        '''Function to output moordyn driver input file
+        Parameters
+        ----------
+        outFileName: moordyn driver input file name
+        outroot: root name for output files (ex if outroot = 'driver', the MD output file will be driver.MD.out)
+        MDinputfile: name of the moordyn input file 
+        depth: water depth
+        Returns
+        -------
+        None.
+        '''
+
+        Echo = False
+        density = 1025
+        gravity = 9.80665
+        TMax = 60.0225 
+        dtC = 0.0125  
+        numturbines = 0
+        inputsmode = 0
+        inputsfile =""
+        ref = [0,0]
+        T1 = [0,0,0,0,0,0]
+        L = []                   
+
+        #Input File Header
+        L.append(" MoorDyn Driver Input File ")
+        L.append("Another comment line")
+        L.append("{:5}    Echo      - echo the input file data (flag)".format(str(Echo).upper()))
+        L.append("---------------- ENVIRONMENTAL CONDITIONS ------------------")
+        L.append("{:<1.5f}\t\tgravity      - gravity (m/s^2)".format(gravity))
+        L.append("{:<4.1f}\t\trhoW      - water density (kg/m^3)".format(density))
+        L.append("{:<4.1f}\t\tWtrDpth      - water depth".format(depth))
+        L.append("---------------- MOORDYN ------------------")
+        L.append("{:}\tMDInputFile      - Primary MoorDyn input file name (quoted string)".format(MDinputfile))
+        L.append("\"{:}\"\tOutRootName      -  The name which prefixes all HydroDyn generated files (quoted string)".format(str(outroot)))
+        L.append("{:<2.4f}\t\tTMax       - Number of time steps in the simulations (-)".format(TMax))
+        L.append("{:<1.4f}\t\tdtC      - TimeInterval for the simulation (sec)".format(dtC))
+        L.append("{:<2.0f}\t\tInputsMode       - MoorDyn coupled object inputs (0: all inputs are zero for every timestep, 1: time-series inputs) (switch)".format(inputsmode))
+        L.append("\"{:}\"\t\tInputsFile       - Filename for the MoorDyn inputs file for when InputsMod = 1 (quoted string)".format(inputsfile))
+        L.append("{:<2.0f}\t\tNumTurbines      - Number of wind turbines (-) [>=1 to use FAST.Farm mode. 0 to use OpenFAST mode.]".format(numturbines))
+        L.append("---------------- Initial Positions ------------------")
+        L.append("ref_X    ref_Y    surge_init   sway_init  heave_init  roll_init  pitch_init   yaw_init")
+        L.append("(m)      (m)        (m)          (m)        (m)        (m)         (m)        (m)         [followed by NumTurbines rows of data]")
+        L.append("{:2.8f} {:2.8f} {:2.8f} {:2.8f} {:2.8f} {:2.8f} {:2.8f} {:2.8f} ".format(ref[0],ref[1],T1[0], T1[1], T1[2],T1[3], T1[4], T1[5]))
+        L.append("END of driver input file")
+
+        with open(outFileName, 'w') as out:
+            for x in range(len(L)):
+                out.write(L[x])
+                out.write('\n')    
     
