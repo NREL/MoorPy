@@ -87,6 +87,12 @@ class System():
         # set the quasi-static/dynamic toggle for the entire mooring system
         self.qs = qs
         if self.qs==0:  # if the mooring system is desired to be used as a portrayal of MoorDyn data
+            # Load main mooring file
+            if Fortran:
+                self.loadData(dirname, rootname, sep='.MD.')
+            else:
+                self.loadData(dirname, rootname, sep='_')
+            
             if len(file)==0 or len(rootname)==0:
                 raise ValueError("The MoorDyn input file name and the root name of the MoorDyn output files (e.g. the .fst file name without extension) need to be given.")
             # load in the MoorDyn data for each line to set the xp,yp,zp positions of each node in the line
@@ -196,7 +202,7 @@ class System():
         self.pointList.append( Point(self, len(self.pointList)+1, mytype, r, m=m, v=v, fExt=fExt, DOFs=DOFs, d=d) )
         
         #print("Created Point "+str(self.pointList[-1].number))
-
+        # handle display message if/when MoorPy is reorganized by classes
 
     def addLine(self, lUnstr, lineType, nSegs=40, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
@@ -945,7 +951,7 @@ class System():
                 di = lineTypeDefaults.copy()  # start with a new dictionary of just the defaults
                 di.update(lineType)           # then copy in the lineType's existing values
                 L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e} {:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
-                         key, di['d_vol'], di['m_lin'], di['EA'], di['cIntDamp'], di['EI'], di['Can'], di['Cat'], di['Cdn'], di['Cdt']))
+                         key, di['d_vol'], di['m'], di['EA'], di['cIntDamp'], di['EI'], di['Can'], di['Cat'], di['Cdn'], di['Cdt']))
             
             
             
@@ -1090,7 +1096,7 @@ class System():
                 di = lineTypeDefaults.copy()  # start with a new dictionary of just the defaults
                 di.update(lineType)           # then copy in the lineType's existing values
                 L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e} {:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
-                         key, di['d_vol'], di['m_lin'], di['EA'], di['BA'], di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
+                         key, di['d_vol'], di['m'], di['EA'], di['BA'], di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
             
             
             L.append("--------------------- ROD TYPES -----------------------------------------------------")
@@ -2419,8 +2425,127 @@ class System():
         
         return K
     
-    
+    def getAnchorLoads(self, sfx, sfy, sfz, N):
+        ''' Calculates anchor loads
+        Parameters
+        ----------
+        sfx : float
+            Safety factor for forces in X direction
+        sfy : float
+            Safety factor for forces in Y direction
+        sfz : float
+            Safety factor for forces in Z direction
+        N : int
+            Number of timesteps to skip for transients 
+        Returns
+        -------
+        Array of maximum anchor loads in order of fixed points (tons)
 
+        '''
+        anchorloads = []
+        for point in self.pointList:
+            
+            #Only calculate anchor load if point is fixed 
+            if point.type == 1:
+                confz = self.data[N:,self.ch["CON"+str(point.number)+"FZ"]]/1000
+                confy = self.data[N:,self.ch["CON"+str(point.number)+"FY"]]/1000
+                confx = self.data[N:,self.ch["CON"+str(point.number)+"FZ"]]/1000
+                convec = np.linalg.norm([(confz*sfz), (confx*sfx), (confy*sfy)], axis = 0)/9.81
+                anchorloads.append(max(convec))
+        return(anchorloads)
+    
+    def ropeContact(self, lineNums, N):
+        ''' Determines whether Node 1 is off the ground for lines in lineNums
+        Parameters
+        ----------
+        lineNums : list of integers
+            Line number to calculate rope contact for corresponds to MoorDyn file ***STARTS AT 1
+        N : int
+            Number of timesteps to skip for transients 
+        Returns
+        -------
+        min_node1_z: list of floats
+            Minimum height of node 1 above seabed for lines in lineNums (m)
+
+        '''
+        
+        #iterate through lines in line list.... would be nice to automatically iterate through lines that are attached to fixed points
+        min_node1_z = []
+        for line in self.lineList:
+            if line.number in lineNums:
+                anchorzs = line.zp[N:,1] + float(self.MDoptions['wtrdpth']) #Does not work for bathymetries
+                min_node1_z.append(min(anchorzs))
+        return(min_node1_z)
+    
+    
+    def loadData(self, dirname, rootname, sep='.MD.'):
+        '''Loads line-specific time series data from a MoorDyn output file
+        Parameters
+        ----------
+        dirname: str
+            Directory name
+        rootname: str
+            MoorDyn output file rootname 
+        sep: str
+            MoorDyn file name seperator
+        '''
+        
+        # Temporarily storing all data in main output file in system.data ..... probably will want to change this at some point
+        if path.exists(dirname+rootname+'.MD.out'):
+        
+            self.data, self.ch, self.channels, self.units = self.read_mooring_file(dirname+rootname+sep, "out") # remember number starts on 1 rather than 0
+        
+            
+    
+    def read_mooring_file(self, dirName,fileName):
+        # Taken from line system.... maybe should be a helper function?
+        # load data from time series for single mooring line
+        
+        print('attempting to load '+dirName+fileName)
+        
+        f = open(dirName+fileName, 'r')
+        
+        channels = []
+        units = []
+        data = []
+        i=0
+        
+        for line in f:          # loop through lines in file
+        
+            if (i == 0):
+                for entry in line.split():      # loop over the elemets, split by whitespace
+                    channels.append(entry)      # append to the last element of the list
+                    
+            elif (i == 1):
+                for entry in line.split():      # loop over the elemets, split by whitespace
+                    units.append(entry)         # append to the last element of the list
+            
+            elif len(line.split()) > 0:
+                data.append([])  # add a new sublist to the data matrix
+                import re
+                r = re.compile(r"(?<=\d)\-(?=\d)")  # catch any instances where a large negative exponent has been written with the "E"
+                line2 = r.sub("E-",line)            # and add in the E
+                
+                
+                for entry in line2.split():      # loop over the elemets, split by whitespace
+                    data[-1].append(entry)      # append to the last element of the list
+                
+            else:
+                break
+        
+            i+=1
+        
+        f.close()  # close data file
+        
+        # use a dictionary for convenient access of channel columns (eg. data[t][ch['PtfmPitch'] )
+        ch = dict(zip(channels, range(len(channels))))
+        
+        data2 = np.array(data)
+        
+        data3 = data2.astype(float)
+        
+        return data3, ch, channels, units    
+    
     def plot(self, ax=None, bounds='default', rbound=0, color=None, **kwargs):
         '''Plots the mooring system objects in their current positions
         Parameters
