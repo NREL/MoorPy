@@ -128,8 +128,13 @@ class Line():
                     self.Ux[:,i] = data[:, ch['Node'+str(i)+'Ux']]
                     self.Uy[:,i] = data[:, ch['Node'+str(i)+'Uy']]
                     self.Uz[:,i] = data[:, ch['Node'+str(i)+'Uz']]
-    
-    
+            
+            #Read in tension data if available
+            self.Ten = np.zeros([nT,self.nNodes-1])   
+            if "Seg1Ten" in ch:
+                for i in range(self.nNodes-1):
+                    self.Ten[:,i] = data[:, ch['Seg'+str(i+1)+'Ten']]
+                    
             self.xpi= self.xp[0,:]
             self.ypi= self.yp[0,:]
             self.zpi= self.zp[0,:]
