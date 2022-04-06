@@ -409,7 +409,6 @@ class System():
             
             for line in f:          # loop through each line in the file
 
-
                 # get line type property sets
                 if line.count('---') > 0 and (line.upper().count('LINE DICTIONARY') > 0 or line.upper().count('LINE TYPES') > 0):
                     line = next(f) # skip this header line, plus channel names and units lines
@@ -424,10 +423,14 @@ class System():
                         mass = float(entries[2])
                         w = (mass - np.pi/4*d**2 *self.rho)*self.g                        
                         lineType = dict(name=type_string, d_vol=d, w=w, m=mass)  # make dictionary for this rod type
-                        lineType['EA'] = float(entries[3])
-                        
+                        try:
+                            lineType['EA'] = float(entries[3].split('|')[0])         # get EA, and only take first value if multiples are given
+                        except:
+                            lineType['EA'] = 1e9
+                            print('EA entry not recognized - using placeholder value of 1000 MN')
+                            
                         if len(entries) >= 10: # read in other elasticity and hydro coefficients as well if enough columns are provided
-                            lineType['BA'  ] = float(entries[4])
+                            lineType['BA'  ] = float(entries[4].split('|')[0])
                             lineType['EI'  ] = float(entries[5])
                             lineType['Cd'  ] = float(entries[6])
                             lineType['Ca'  ] = float(entries[7])
@@ -557,7 +560,6 @@ class System():
                         rA = np.array(entries[3:6], dtype=float)
                         rB = np.array(entries[6:9], dtype=float)
                         nSegs = int(entries[9])
-                        
                         # >>> note: this is currently only set up for use with MoorDyn output data <<<
                         
                         if nSegs==0:       # this is the zero-length special case
@@ -702,21 +704,25 @@ class System():
                 if line.count('---') > 0 and "options" in line.lower():
                     #print("READING OPTIONS")
                     line = next(f) # skip this header line
+                    
                     while line.count('---') == 0:
                         entries = line.split()       
                         entry0 = entries[0].lower() 
                         entry1 = entries[1].lower() 
-                        
+                                                
                         # grab any parameters used by MoorPy
                         if entry1 == "g" or entry1 == "gravity":
-                            self.g  = np.float_(entry0)
-                        elif entries[1] == "WtrDpth" or entries[1] == "depth":
-                            if '.txt' in entry0:
+                            self.g  = float(entry0)
+                            
+                        elif entry1 == "wtrdepth" or entry1 == "depth" or entry1 == "wtrdpth":
+                            try:
+                                self.depth = float(entry0)
+                            except:
                                 self.depth = 0.0
-                            else:
-                                self.depth = np.float_(entry0)
+                                print("Warning: non-numeric depth in input file - MoorPy will ignore it.")
+                            
                         elif entry1=="rho" or entry1=="wtrdnsty":
-                            self.rho = np.float_(entry0)
+                            self.rho = float(entry0)
                         
                         # also store a dict of all parameters that can be regurgitated during an unload
                         self.MDoptions[entry1] = entry0
@@ -3053,9 +3059,9 @@ class System():
         redraws the lines and rods in their next positions.'''
         
         for rod in self.rodList:
-            if len(rod.Tdata) > 0:
-                if isinstance(rod, Line):
-                    rod.redrawLine(-tStep)
+
+            if isinstance(rod, Line) and rod.show:  # draw it if MoorPy is representing it as as Rod-Line object, and it's set to be shown
+                rod.redrawLine(-tStep)
             
         for line in self.lineList:
             if len(line.Tdata) > 0:

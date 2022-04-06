@@ -555,7 +555,7 @@ def getLineProps(dnommm, material, source=None, name="", rho=1025.0, g=9.81, **k
     
     # Set up a main identifier for the linetype unless one is provided
     if name=="":
-        typestring = f"{type}{dnom:.0f}"
+        typestring = f"{type}{dnommm:.0f}"
     else:
         typestring = name
     

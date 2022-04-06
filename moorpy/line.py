@@ -64,6 +64,7 @@ class Line():
         self.info = {}        # to hold all info provided by catenary
         
         self.qs = 1  # flag indicating quasi-static analysis (1). Set to 0 for time series data
+        self.show = True      # a flag that will be set to false if we don't want to show the line (e.g. if results missing)
         #print("Created Line "+str(self.number))
         
         
@@ -80,13 +81,12 @@ class Line():
             strtype='Line'
         
         if path.exists(dirname+rootname+'.MD.'+strtype+str(self.number)+'.out'):
+
+        # try:
         
             # load time series data
-            if self.isRod > 0:
-                data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, "Rod"+str(self.number)+".out") # remember number starts on 1 rather than 0
-            else:
-                data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, "Line"+str(self.number)+".out") # remember number starts on 1 rather than 0
-            
+            data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, strtype+str(self.number)+".out") # remember number starts on 1 rather than 0
+
             # get time info
             if ("Time" in ch):
                 self.Tdata = data[:,ch["Time"]]
@@ -119,7 +119,7 @@ class Line():
                 if "Node0Ku" in ch:
                     for i in range(self.nNodes):
                         self.Ku[:,i] = data[:, ch['Node'+str(i)+'Ku']]
-    
+
             self.Ux = np.zeros([nT,self.nNodes])   # read in fluid velocity data if available
             self.Uy = np.zeros([nT,self.nNodes])
             self.Uz = np.zeros([nT,self.nNodes])
@@ -134,7 +134,7 @@ class Line():
             if "Seg1Ten" in ch:
                 for i in range(self.nNodes-1):
                     self.Ten[:,i] = data[:, ch['Seg'+str(i+1)+'Ten']]
-                    
+
             self.xpi= self.xp[0,:]
             self.ypi= self.yp[0,:]
             self.zpi= self.zp[0,:]
@@ -152,16 +152,24 @@ class Line():
             #self.L = np.sqrt( (self.xpi[-1]-self.xpi[0])**2 + (self.ypi[-1]-self.ypi[0])**2 + (self.zpi[-1]-self.zpi[0])**2 )
             # ^^^^^^^ why are we changing the self.L value to not the unstretched length specified in MoorDyn?
             # moved this below the dynamic LBot calculation because I wanted to use the original self.L
-            
+            # >>> this is probably needed for Rods - should look into using for Rods only <<<
             
             # check for tension data <<<<<<<
             
+            self.show = True
+            
         else:
             self.Tdata = []
+            self.show = False
             
-            
-            
-            
+         
+        # >>> this was another option for handling issues - maybe no longer needed <<<
+        #except Exception as e:
+        #    # don't fail if there's an issue finding data, just flag that the line shouldn't be shown/plotted
+        #    print(f"Error geting data for {'Rod' if self.isRod else 'Line'} {self.number}: ")
+        #    print(e)
+        #    self.show = False
+        
         
     def read_mooring_file(self, dirName,fileName):
 
@@ -458,6 +466,9 @@ class Line():
         linebit : list
             list of axes and points on which the line can be plotted
         '''
+        
+        if not self.show:  # exit if this line isn't set to be shown
+            return 0
         
         if color == 'self':
             color = self.color  # attempt to allow custom colors
