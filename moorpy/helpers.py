@@ -561,7 +561,7 @@ def getLineProps(dnommm, material, source=None, name="", rho=1025.0, g=9.81, **k
     
     notes = f"made with getLineProps"
 
-    lineType = dict(name=typestring, d_vol=d_vol, m_lin=mass, EA=EA, w=w,
+    lineType = dict(name=typestring, d_vol=d_vol, m=mass, EA=EA, w=w,
                     MBL=MBL, cost=cost, notes=notes, input_type=type, input_d=d, material=material)
 
     lineType.update(kwargs)   # add any custom arguments provided in the call to the lineType's dictionary
