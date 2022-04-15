@@ -3,7 +3,7 @@
 import numpy as np
 from matplotlib import cm
 from moorpy.Catenary import catenary
-from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower
+from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower, read_mooring_file
 from os import path
 
  
@@ -85,7 +85,7 @@ class Line():
         # try:
         
             # load time series data
-            data, ch, channels, units = self.read_mooring_file(dirname+rootname+sep, strtype+str(self.number)+".out") # remember number starts on 1 rather than 0
+            data, ch, channels, units = read_mooring_file(dirname+rootname+sep, strtype+str(self.number)+".out") # remember number starts on 1 rather than 0
 
             # get time info
             if ("Time" in ch):
@@ -130,8 +130,8 @@ class Line():
                     self.Uz[:,i] = data[:, ch['Node'+str(i)+'Uz']]
             
             #Read in tension data if available
-            self.Ten = np.zeros([nT,self.nNodes-1])   
             if "Seg1Ten" in ch:
+                self.Ten = np.zeros([nT,self.nNodes-1])   
                 for i in range(self.nNodes-1):
                     self.Ten[:,i] = data[:, ch['Seg'+str(i+1)+'Ten']]
 
@@ -171,57 +171,7 @@ class Line():
         #    self.show = False
         
         
-    def read_mooring_file(self, dirName,fileName):
 
-        # load data from time series for single mooring line
-        
-        print('attempting to load '+dirName+fileName)
-        
-        f = open(dirName+fileName, 'r')
-        
-        channels = []
-        units = []
-        data = []
-        i=0
-        
-        for line in f:          # loop through lines in file
-        
-            if (i == 0):
-                for entry in line.split():      # loop over the elemets, split by whitespace
-                    channels.append(entry)      # append to the last element of the list
-                    
-            elif (i == 1):
-                for entry in line.split():      # loop over the elemets, split by whitespace
-                    units.append(entry)         # append to the last element of the list
-            
-            elif len(line.split()) > 0:
-                data.append([])  # add a new sublist to the data matrix
-                import re
-                r = re.compile(r"(?<=\d)\-(?=\d)")  # catch any instances where a large negative exponent has been written with the "E"
-                line2 = r.sub("E-",line)            # and add in the E
-                
-                
-                for entry in line2.split():      # loop over the elemets, split by whitespace
-                    data[-1].append(entry)      # append to the last element of the list
-                
-            else:
-                break
-        
-            i+=1
-        
-        f.close()  # close data file
-        
-        # use a dictionary for convenient access of channel columns (eg. data[t][ch['PtfmPitch'] )
-        ch = dict(zip(channels, range(len(channels))))
-        
-        data2 = np.array(data)
-        
-        data3 = data2.astype(float)
-        
-        return data3, ch, channels, units
-    
-    
-        
     def getTimestep(self, Time):
         '''Get the time step to use for showing time series data'''
         

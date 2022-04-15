@@ -20,7 +20,7 @@ from moorpy.line import Line
 from moorpy.lineType import LineType
 import matplotlib as mpl
 #import moorpy.MoorSolve as msolve
-from moorpy.helpers import rotationMatrix, rotatePosition, getH, printVec, set_axes_equal, dsolve2, SolveError, MoorPyError, loadLineProps, getLineProps
+from moorpy.helpers import rotationMatrix, rotatePosition, getH, printVec, set_axes_equal, dsolve2, SolveError, MoorPyError, loadLineProps, getLineProps, read_mooring_file
 
 
 
@@ -2488,9 +2488,69 @@ class System():
                 min_node1_z.append(min(anchorzs))
         return(min_node1_z)
     
+
+    def sagDistance(self,lineNums,N):
+        ''' Calculates sag distance for center node for each line in lineNums
+        Parameters
+        ----------
+        lineNums : list of integers
+            Line number to calculate sag distance for corresponds to MoorDyn file ***STARTS AT 1
+        N : int
+            Number of timesteps to skip for transients 
+        Returns
+        -------
+        minsagz: list of floats
+            Minimum distance below waterline for center node in order of lines in lineNums(m)
+        maxsagz: list of floats
+            Maximum distance below waterline for center node in order of lines in lineNums (m)
+        '''
+        maxsagz = []
+        minsagz = []
+        for line in self.lineList:
+            if line.number in lineNums:
+                sagz = -line.zp[N:,int(line.nNodes/2)] # maybe add something to handle odd number of nodes
+                maxsagz.append(max(sagz))
+                minsagz.append(min(sagz))
+        return minsagz, maxsagz
     
+    def checkTensions(self, N = None):
+        '''Checks the line tensions and MBLs of a MoorPy system in its current state with the quasi-static model.
+        Returns: list of tension/MBL for each line.
+        Parameters
+        ----------
+        N : int, only required if qs == 0 
+            Number of timesteps to skip for transients         
+        '''
+        
+        # NOTE this function has very limited functionality because imported systems will not have line MBLs.... still thinking about the best way to handle this
+        if self.qs == 1:
+            ratios = []
+            for line in self.lineList:            
+                if hasattr(line.type,'MBL'):
+                     ratios.append(max(line.TA, line.TB)/line.type['MBL'])
+                else:
+                    print('Line does not have an MBL')
+                    return
+            return(ratios)
+        else:
+            ratios = []
+            for line in self.lineList:
+                
+                #Only works if tensions are in lineN.MD.out files
+                if hasattr(line,'Ten'):
+                    
+                    if hasattr(line.type,'MBL'):
+                        ratios.append(np.amax(line.Ten[N:,:])/line.type['MBL'])
+                    else:
+                        print('Line does not have an MBL')
+                        return
+                else:
+                    print('Line does not hold tension data')
+                    return 
+            return(ratios)
+                
     def loadData(self, dirname, rootname, sep='.MD.'):
-        '''Loads line-specific time series data from a MoorDyn output file
+        '''Loads time series data from main MoorDyn output file (for example driver.MD.out)
         Parameters
         ----------
         dirname: str
@@ -2504,59 +2564,9 @@ class System():
         # Temporarily storing all data in main output file in system.data ..... probably will want to change this at some point
         if path.exists(dirname+rootname+'.MD.out'):
         
-            self.data, self.ch, self.channels, self.units = self.read_mooring_file(dirname+rootname+sep, "out") # remember number starts on 1 rather than 0
+            self.data, self.ch, self.channels, self.units = read_mooring_file(dirname+rootname+sep, "out") # remember number starts on 1 rather than 0
         
-            
-    
-    def read_mooring_file(self, dirName,fileName):
-        # Taken from line system.... maybe should be a helper function?
-        # load data from time series for single mooring line
-        
-        print('attempting to load '+dirName+fileName)
-        
-        f = open(dirName+fileName, 'r')
-        
-        channels = []
-        units = []
-        data = []
-        i=0
-        
-        for line in f:          # loop through lines in file
-        
-            if (i == 0):
-                for entry in line.split():      # loop over the elemets, split by whitespace
-                    channels.append(entry)      # append to the last element of the list
-                    
-            elif (i == 1):
-                for entry in line.split():      # loop over the elemets, split by whitespace
-                    units.append(entry)         # append to the last element of the list
-            
-            elif len(line.split()) > 0:
-                data.append([])  # add a new sublist to the data matrix
-                import re
-                r = re.compile(r"(?<=\d)\-(?=\d)")  # catch any instances where a large negative exponent has been written with the "E"
-                line2 = r.sub("E-",line)            # and add in the E
-                
-                
-                for entry in line2.split():      # loop over the elemets, split by whitespace
-                    data[-1].append(entry)      # append to the last element of the list
-                
-            else:
-                break
-        
-            i+=1
-        
-        f.close()  # close data file
-        
-        # use a dictionary for convenient access of channel columns (eg. data[t][ch['PtfmPitch'] )
-        ch = dict(zip(channels, range(len(channels))))
-        
-        data2 = np.array(data)
-        
-        data3 = data2.astype(float)
-        
-        return data3, ch, channels, units    
-    
+             
     def plot(self, ax=None, bounds='default', rbound=0, color=None, **kwargs):
         '''Plots the mooring system objects in their current positions
         Parameters

@@ -727,3 +727,54 @@ def makeTower(twrH, twrRad):
     Zs = np.array(Z)    
     
     return Xs, Ys, Zs
+
+
+def read_mooring_file(dirName,fileName):
+    # Taken from line system.... maybe should be a helper function?
+    # load data from time series for single mooring line
+    
+    print('attempting to load '+dirName+fileName)
+    
+    f = open(dirName+fileName, 'r')
+    
+    channels = []
+    units = []
+    data = []
+    i=0
+    
+    for line in f:          # loop through lines in file
+    
+        if (i == 0):
+            for entry in line.split():      # loop over the elemets, split by whitespace
+                channels.append(entry)      # append to the last element of the list
+                
+        elif (i == 1):
+            for entry in line.split():      # loop over the elemets, split by whitespace
+                units.append(entry)         # append to the last element of the list
+        
+        elif len(line.split()) > 0:
+            data.append([])  # add a new sublist to the data matrix
+            import re
+            r = re.compile(r"(?<=\d)\-(?=\d)")  # catch any instances where a large negative exponent has been written with the "E"
+            line2 = r.sub("E-",line)            # and add in the E
+            
+            
+            for entry in line2.split():      # loop over the elemets, split by whitespace
+                data[-1].append(entry)      # append to the last element of the list
+            
+        else:
+            break
+    
+        i+=1
+    
+    f.close()  # close data file
+    
+    # use a dictionary for convenient access of channel columns (eg. data[t][ch['PtfmPitch'] )
+    ch = dict(zip(channels, range(len(channels))))
+    
+    data2 = np.array(data)
+    
+    data3 = data2.astype(float)
+    
+    return data3, ch, channels, units    
+   
