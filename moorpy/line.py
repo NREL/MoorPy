@@ -66,6 +66,8 @@ class Line():
         self.qs = 1  # flag indicating quasi-static analysis (1). Set to 0 for time series data
         self.show = True      # a flag that will be set to false if we don't want to show the line (e.g. if results missing)
         #print("Created Line "+str(self.number))
+        self.color = 'k'
+        self.lw=0.5
         
         
 
@@ -119,6 +121,16 @@ class Line():
                 if "Node0Ku" in ch:
                     for i in range(self.nNodes):
                         self.Ku[:,i] = data[:, ch['Node'+str(i)+'Ku']]
+            else:
+                # read in Rod buoyancy force data if available
+                if "Node0Box" in ch:
+                    self.Bx = np.zeros([nT,self.nNodes])   
+                    self.By = np.zeros([nT,self.nNodes])
+                    self.Bz = np.zeros([nT,self.nNodes])
+                    for i in range(self.nNodes):
+                        self.Bx[:,i] = data[:, ch['Node'+str(i)+'Box']]
+                        self.By[:,i] = data[:, ch['Node'+str(i)+'Boy']]
+                        self.Bz[:,i] = data[:, ch['Node'+str(i)+'Boz']]
 
             self.Ux = np.zeros([nT,self.nNodes])   # read in fluid velocity data if available
             self.Uy = np.zeros([nT,self.nNodes])
@@ -161,6 +173,7 @@ class Line():
         else:
             self.Tdata = []
             self.show = False
+            print(f"Error geting data for {'Rod' if self.isRod else 'Line'} {self.number}: "+dirname+rootname+'.MD.'+strtype+str(self.number)+'.out')
             
          
         # >>> this was another option for handling issues - maybe no longer needed <<<

@@ -157,7 +157,7 @@ def transformPosition(rRelPoint, r6):
     rRelPoint : array
         x,y,z coordinates of a point relative to a local frame [m]
     r6 : array
-        6DOF position vector of the origin of the local frame, in the global frame coorindates [m]
+        6DOF position vector of the origin of the local frame, in the global frame coorindates [m, rad]
 
     Returns
     -------

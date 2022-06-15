@@ -201,6 +201,7 @@ class System():
 
         self.pointList.append( Point(self, len(self.pointList)+1, mytype, r, m=m, v=v, fExt=fExt, DOFs=DOFs, d=d) )
         
+        return len(self.pointList)  # return the index of the added point
         #print("Created Point "+str(self.pointList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
 
@@ -269,7 +270,7 @@ class System():
             
     """    
         
-    def addLineType(self, type_string, d, mass, EA ):
+    def addLineType(self, type_string, d, mass, EA, name=""):
         '''Convenience function to add a LineType to a mooring system or adjust
         the values of an existing line type if it has the same name/key.
 
@@ -289,10 +290,13 @@ class System():
         None.
 
         '''
+        if len(name)==0:
+            name=type_string+str(d)
+        
         
         w = (mass - np.pi/4*d**2 *self.rho)*self.g
         
-        lineType = dict(name=type_string+str(d), d_vol=d, w=w, m=mass, EA=EA, material=type_string)   # make dictionary for this line type
+        lineType = dict(name=name, d_vol=d, w=w, m=mass, EA=EA, material=type_string)   # make dictionary for this line type
         
         lineType['material'] = 'unspecified'  # fill this in so it's available later
         
@@ -315,7 +319,7 @@ class System():
             string identifier of the material type be used.
         source : dict or filename (optional)
             YAML file name or dictionary containing line property scaling coefficients
-        name : any dict index (optional)
+        name : string (optional)
             Identifier for the line type (otherwise will be generated automatically).
 
         Returns
@@ -1727,7 +1731,7 @@ class System():
         
         self.DOFtype_solve_for = DOFtype
         # create arrays for the initial positions of the objects that need to find equilibrium, and the max step sizes
-        X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[30, 0.1])
+        X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[30, 0.02])
         
         # temporary for backwards compatibility <<<<<<<<<<
         '''
@@ -2649,8 +2653,11 @@ class System():
         
         # set bounds
         if rbound==0:
-            rbound = max([max(xs), max(ys), -min(xs), -min(ys)]) # this is the most extreme coordinate
-            
+            if len(xs) > 0:
+                rbound = max([max(xs), max(ys), -min(xs), -min(ys)]) # this is the most extreme coordinate
+            else:
+                rbound = self.depth
+                
         # set the DATA bounds on the axis
         if bounds=='default':
             ax.set_zlim([-self.depth, 0])
@@ -2682,9 +2689,9 @@ class System():
             if len(self.rodList)==0:    # usually, there are no rods in the rodList
                 pass
             else:
-                if self.qs==0 and len(rod.Tdata) == 0:
-                    pass
-                elif isinstance(rod, Line):
+                #if self.qs==0 and len(rod.Tdata) == 0:
+                #    pass
+                if isinstance(rod, Line) and rod.show:
                     rod.drawLine(time, ax, color=color, shadow=shadow)
                 #if isinstance(rod, Point):  # zero-length special case
                 #    not plotting points for now
@@ -3126,7 +3133,8 @@ class System():
             
 
         # create the figure and axes to draw the animation
-        fig, ax = self.plot(draw_body=draw_body, bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, colortension=colortension, xbounds=xbounds, ybounds=ybounds, zbounds=zbounds)
+        fig, ax = self.plot(draw_body=draw_body, bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, 
+                            colortension=colortension, xbounds=xbounds, ybounds=ybounds, zbounds=zbounds)
         '''
         # can do this section instead of self.plot(). They do the same thing
         fig = plt.figure(figsize=(20/2.54,12/2.54))
@@ -3135,21 +3143,23 @@ class System():
             imooring.drawLine(0, ax)
         '''
         # set figure x/y/z bounds
+        '''
         d = 1600                # can make this an input later
         ax.set_xlim((-d,d))
         ax.set_ylim((-d,d)); 
         ax.set_zlim((-self.depth, 300))
-        ax.set_xlabel('x');    ax.set_ylabel('y');      ax.set_zlabel('z');
+        
         
         # make the axes scaling equal
         rangex = np.diff(ax.get_xlim3d())[0]
         rangey = np.diff(ax.get_ylim3d())[0]
         rangez = np.diff(ax.get_zlim3d())[0]
         ax.set_box_aspect([rangex, rangey, rangez])
-        
+        '''
+        ax.set_xlabel('x');    ax.set_ylabel('y');      ax.set_zlabel('z');
         label = ax.text(-100, 100, 0, 'time=0', ha='center', va='center', fontsize=10, color="k")
    
-        
+        idyn = len(self.lineList)-1    # note, the idyn approach is not robust to different Lines having output, or Rods. Should reconsider.
         for line in self.lineList:
             if len(line.Tdata) > 0:
                 idyn = line.number-1
@@ -3161,7 +3171,7 @@ class System():
             itime = int(np.where(self.lineList[idyn].Tdata==runtime)[0])
             nFrames = len(self.lineList[idyn].Tdata[0:itime])
         
-        dt = self.lineList[idyn].Tdata[1]-self.lineList[idyn].Tdata[0]
+        dt = self.lineList[idyn].Tdata[1]-self.lineList[idyn].Tdata[0] #<<< should get this from main MoorDyn output file <<<
         
         # Animation: update the figure with the updated coordinates from update_Coords function
         # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()

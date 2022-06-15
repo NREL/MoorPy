@@ -113,7 +113,7 @@ class Body():
         self.attachedP.append(pointID)
         self.rPointRel.append(np.array(rAttach))
         
-        #print("attached Point "+str(pointID)+" to Body "+str(self.number))
+        print("attached Point "+str(pointID)+" to Body "+str(self.number))
     
     
     def attachRod(self, rodID, endCoords):
