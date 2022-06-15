@@ -888,7 +888,7 @@ class System():
     
     
         
-    def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p'):
+    def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', outputList=[]):
         '''Unloads a MoorPy system into a MoorDyn-style input file
 
         Parameters
@@ -899,6 +899,8 @@ class System():
             Optional specified for target segment length when discretizing Lines
         rod_dL : float, optional
             Optional specified for target segment length when discretizing Rods
+        outputList : list of strings, optional
+            Optional list of additional requested output channels
 
         Returns
         -------
@@ -1035,6 +1037,8 @@ class System():
             """
             
             L.append("--------------------------- OUTPUTS --------------------------------------------")
+            
+            Output = Output+outputList   # add any user-specified outputs passed to unload
             
             for Output in Outputs:
                 L.append(Output)
@@ -3103,6 +3107,8 @@ class System():
             Whether or not to repeat the animation. The default is True.
         delay : int, optional
             The time between consecutive animation runs in milliseconds. The default is 0.
+        runtime: int, optional
+            The desired time that the animation should run to in seconds. The default is -1, which means to run the full simulation
 
         Returns
         -------
@@ -3159,19 +3165,20 @@ class System():
         ax.set_xlabel('x');    ax.set_ylabel('y');      ax.set_zlabel('z');
         label = ax.text(-100, 100, 0, 'time=0', ha='center', va='center', fontsize=10, color="k")
    
+        # find idyn, the index of the first line in the lineList that contains a series of Tdata
         idyn = len(self.lineList)-1    # note, the idyn approach is not robust to different Lines having output, or Rods. Should reconsider.
         for line in self.lineList:
             if len(line.Tdata) > 0:
                 idyn = line.number-1
                 break
         
-        if runtime==-1:
+        if runtime==-1:     # if the full simulation is desired to be animated
             nFrames = len(self.lineList[idyn].Tdata)
-        else:
+        else:               # if only part of the simulation is to be animated, up to a certain runtime in seconds
             itime = int(np.where(self.lineList[idyn].Tdata==runtime)[0])
             nFrames = len(self.lineList[idyn].Tdata[0:itime])
         
-        dt = self.lineList[idyn].Tdata[1]-self.lineList[idyn].Tdata[0] #<<< should get this from main MoorDyn output file <<<
+        dt = self.lineList[idyn].Tdata[1]-self.lineList[idyn].Tdata[0] # time step length (s) <<< should get this from main MoorDyn output file <<<
         
         # Animation: update the figure with the updated coordinates from update_Coords function
         # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()
