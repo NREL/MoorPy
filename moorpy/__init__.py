@@ -11,3 +11,4 @@ from moorpy.system import System
 
 from moorpy.helpers import *
 from moorpy.Catenary import catenary
+from moorpy.MoorProps import *
