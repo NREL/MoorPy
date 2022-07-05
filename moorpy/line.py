@@ -81,13 +81,16 @@ class Line():
             strtype='Rod'
         elif self.isRod==0:
             strtype='Line'
+
+        filename = dirname+rootname+sep+strtype+str(self.number)+'.out'
         
-        if path.exists(dirname+rootname+'.MD.'+strtype+str(self.number)+'.out'):
+        if path.exists(filename):
+
 
         # try:
         
             # load time series data
-            data, ch, channels, units = read_mooring_file(dirname+rootname+sep, strtype+str(self.number)+".out") # remember number starts on 1 rather than 0
+            data, ch, channels, units = read_mooring_file("", filename) # remember number starts on 1 rather than 0
 
             # get time info
             if ("Time" in ch):
@@ -173,7 +176,7 @@ class Line():
         else:
             self.Tdata = []
             self.show = False
-            print(f"Error geting data for {'Rod' if self.isRod else 'Line'} {self.number}: "+dirname+rootname+'.MD.'+strtype+str(self.number)+'.out')
+            print(f"Error geting data for {'Rod' if self.isRod else 'Line'} {self.number}: {filename}")
             
          
         # >>> this was another option for handling issues - maybe no longer needed <<<
@@ -191,17 +194,17 @@ class Line():
         if Time < 0: 
             ts = np.int(-Time)  # negative value indicates passing a time step index
         else:           # otherwise it's a time in s, so find closest time step
-            for index, item in enumerate(self.Tdata):
-                #print "index is "+str(index)+" and item is "+str(item)
-                if len(self.Tdata) > 0:
+            if len(self.Tdata) > 0:
+                for index, item in enumerate(self.Tdata):                
                     ts = -1
                     if item > Time:
                         ts = index
                         break
-            if ts==-1:
-                raise LineError("getTimestep: requested time likely out of range")
+                if ts==-1:
+                    raise LineError(self.number, "getTimestep: requested time likely out of range")
+            else:
+                raise LineError(self.number, "getTimestep: zero time steps are stored")
 
-                
         return ts
         
         
@@ -298,7 +301,7 @@ class Line():
             else:
                 
                 # handle whether or not there is tension data
-                try:  # use average to go from segment tension to node tensions
+                try:  # use average to go from segment tension to node tensions <<< can skip this once MD is updated to output node tensions
                     Te = 0.5*(np.append(self.Te[ts,0], self.Te[ts,:]) +np.append(self.Te[ts,:], self.Te[ts,-1]))
                 except: # otherwise return zeros to avoid an error (might want a warning in some cases?)
                     Te = np.zeros(self.nNodes)

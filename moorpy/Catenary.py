@@ -214,8 +214,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                     if s[I] > L-LHanging:   # this node is on the suspended/hanging portion of the line
                     
                         Xs[I] = XF
-                        Zs[I] = ZF - ( L-s[I] + 0.5*W/EA*(L-s[I])**2 )   # <<<< double check this
-                        Te[I] = W*(L-s[I])
+                        Zs[I] = ZF - ( L-s[I] + 0.5*W/EA*(L-s[I])**2 )
+                        Te[I] = W*(s[I]-(L-LHanging))
                         
                     else:                   # this node is on the seabed
                         
@@ -613,10 +613,11 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             X, Y, infoU = dsolve2(eval_func_U, [X1_0], step_func=step_func_U, ytol=0.25*Tol, stepfac=1, maxIter=20, a_max=1.2, display=0)
             X1 = X[0]
             X2 = XF-X1
+            nNodes1 = int(L1/L*nNodes + 0.5)  # set number of nodes in the first line proportionally to its length, rounded.
             
             # call one more time to get final values
-            (fAH1, fAV1, fBH1, fBV1, info1) = catenary(X1, Z1, L1, EA, W, CB=0, Tol=0.5*Tol, MaxIter=MaxIter, plots=plots)
-            (fAH2, fAV2, fBH2, fBV2, info2) = catenary(X2, Z2, L2, EA, W, CB=0, Tol=0.5*Tol, MaxIter=MaxIter, plots=plots)
+            (fAH1, fAV1, fBH1, fBV1, info1) = catenary(X1, Z1, L1, EA, W, CB=0, Tol=0.5*Tol, MaxIter=MaxIter, plots=plots, nNodes=nNodes1)
+            (fAH2, fAV2, fBH2, fBV2, info2) = catenary(X2, Z2, L2, EA, W, CB=0, Tol=0.5*Tol, MaxIter=MaxIter, plots=plots, nNodes=nNodes-nNodes1)
 
             if plots > 0 or (info1['error'] and info2['error']):
             
@@ -653,7 +654,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             info['stiffnessB'] = np.array([[ dH_dX               ,  K2[0,1] *K1[0,0]*dxdH        ], 
                                            [K2[1,0] *K1[0,0]*dxdH,  K2[1,1] -K2[1,0]*dxdH*K2[0,1]]])
                                      
-            info['stiffnessAB']= np.array([[-K1[0,0] *K2[0,0]*dxdH, -K1[0,1] *K2[0,0]*dxdH ],    # this is the lower-left submatrix, A motions, B reaction forces
+            info['stiffnessAB']= np.array([[-K1[0,0] *K2[0,0]*dxdH,  K1[0,1] *K2[0,0]*dxdH ],    # this is the lower-left submatrix, A motions, B reaction forces (corrected/flipped sign of entry 0,1)
                                            [-K1[0,0] *dxdH*K2[1,0], -K1[0,1] *dxdH*K2[1,0] ]])
 
             

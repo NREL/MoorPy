@@ -407,7 +407,6 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
             if display > 2:
                 print("  limiting oscillation with alpha="+str(alpha))
                 print(f"   dX_last was {dX_last}, dX was going to be {dX}, now it'll be {alpha*dX}")
-                print(f"   dX_last was {dX_last/1000}, dX was going to be {dX/1000}, now it'll be {alpha*dX/1000}")
             
             dX = alpha*dX  # scale down dX
             
