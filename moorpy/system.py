@@ -967,7 +967,8 @@ class System():
                 di = lineTypeDefaults.copy()  # start with a new dictionary of just the defaults
                 di.update(lineType)           # then copy in the lineType's existing values
                 L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e} {:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
-                         key, di['d_vol'], di['m'], di['EA'], di['cIntDamp'], di['EI'], di['Can'], di['Cat'], di['Cdn'], di['Cdt']))
+                         #key, di['d_vol'], di['m'], di['EA'], di['cIntDamp'], di['EI'], di['Can'], di['Cat'], di['Cdn'], di['Cdt']))
+                         key, di['d_vol'], di['m'], di['EA'], di['BA'], di['Can'], di['Cat'], di['Cdn'], di['Cdt']))
             
             
             #L.append("---------------------- POINTS ---------------------------------------------------------")
@@ -1038,7 +1039,7 @@ class System():
             
             L.append("--------------------------- OUTPUTS --------------------------------------------")
             
-            Output = Output+outputList   # add any user-specified outputs passed to unload
+            Outputs = Outputs+outputList   # add any user-specified outputs passed to unload
             
             for Output in Outputs:
                 L.append(Output)
