@@ -1094,6 +1094,8 @@ class System():
             
             #Outputs List
             Outputs = [f"FairTen{i+1}" for i in range(len(self.lineList))]        # for now, have a fairlead tension output for each line
+            Outputs = Outputs+outputList   # add any user-specified outputs passed to unload
+            
             
             print('attempting to write '+fileName +' for MoorDyn v'+str(MDversion))
             #Array to add strings to for each line of moordyn input file
