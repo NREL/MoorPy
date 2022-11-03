@@ -427,12 +427,39 @@ class System():
                         mass = float(entries[2])
                         w = (mass - np.pi/4*d**2 *self.rho)*self.g                        
                         lineType = dict(name=type_string, d_vol=d, w=w, m=mass)  # make dictionary for this rod type
-                        try:
-                            lineType['EA'] = float(entries[3].split('|')[0])         # get EA, and only take first value if multiples are given
-                        except:
-                            lineType['EA'] = 1e9
-                            print('EA entry not recognized - using placeholder value of 1000 MN')
+                        
+                        # support linear (EA) or nonlinear (filename string) option for elasticity
+                        #if there is a text file in the EA input 
+                        if entries[3].find(".txt") != -1:
+                            #Then we read in ten-strain file
+                            ten_str_fname = entries[3]
+                            ten_str = open(ten_str_fname[1:-1], 'r') 
                             
+                            #Read line in ten-strain file until we hit '---' signifying the end of the file
+                            for line in ten_str:
+                                    #skip first 3 lines (Header for input file)
+                                    line = next(ten_str)
+                                    line = next(ten_str)
+                                    line = next(ten_str)
+                                    #Preallocate Arrays
+                                    str_array = []
+                                    ten_array = []
+                                    #Loop through lines until you hit '---' signifying the end of the file 
+                                    while line.count('---') == 0:
+                                        ten_str_entries = line.split() #split entries ten_str_entries: strain tension
+                                        str_array.append(ten_str_entries[0]) #First one is strain
+                                        ten_array.append(ten_str_entries[1]) #Second one is tension
+                                        line = next(ten_str) #go to next line
+                            lineType['Str'] = str_array #make new entry in the dictionary to carry tension and strain arrays
+                            lineType['Ten'] = ten_array
+
+                        else:
+
+                            try:
+                                lineType['EA'] = float(entries[3].split('|')[0])         # get EA, and only take first value if multiples are given
+                            except:
+                                lineType['EA'] = 1e9
+                                print('EA entry not recognized - using placeholder value of 1000 MN')
                         if len(entries) >= 10: # read in other elasticity and hydro coefficients as well if enough columns are provided
                             lineType['BA'  ] = float(entries[4].split('|')[0])
                             lineType['EI'  ] = float(entries[5])

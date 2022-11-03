@@ -3,6 +3,7 @@
 import numpy as np
 from matplotlib import cm
 from moorpy.Catenary import catenary
+from moorpy.nonlinear import nonlinear                                      
 from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower, read_mooring_file
 from os import path
 
@@ -257,11 +258,22 @@ class Line():
             elif self.cb < 0:   # if a line end is at the seabed, but the cb is still set negative to indicate off the seabed
                 self.cb = 0.0     # set to zero so that the line includes seabed interaction.
         
-            try:
-                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], 
+            # ----- check for linear vs nonlinear line elasticity -----
+        
+            #If EA is found in the line properties we will run the original catenary function 
+            if 'EA' in self.type:
+            
+                try:
+                    (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], 
                                                       self.cb, HF0=self.HF, VF0=self.VF, nNodes=n, plots=1) 
-            except CatenaryError as error:
-                raise LineError(self.number, error.message)
+                except CatenaryError as error:
+                    raise LineError(self.number, error.message)
+
+                 #(fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], CB=self.cb, HF0=self.HF, VF0=self.VF, nNodes=n, plots=1)   # call line model
+
+            #If EA isnt found then we will use the ten-str relationship defined in the input file 
+            else:
+                 (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],self.type['w']) 
             
             Xs = self.rA[0] + info["X"]*cosBeta 
             Ys = self.rA[1] + info["X"]*sinBeta 
@@ -648,11 +660,18 @@ class Line():
         if reset==True:   # Indicates not to use previous fairlead force values to start catenary 
             self.HF = 0   # iteration with, and insteady use the default values.
             
-        try:
-            (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], 
-                                                  CB=self.cb, Tol=tol, HF0=self.HF, VF0=self.VF, plots=profiles)   # call line model
-        except CatenaryError as error:
-            raise LineError(self.number, error.message)
+        # ----- get line results for linear or nonlinear elasticity -----
+        
+        #If EA is found in the line properties we will run the original catenary function 
+        if 'EA' in self.type:
+            try:
+                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], CB=self.cb, Tol=tol, HF0=self.HF, VF0=self.VF, plots=profiles)   # call line model
+                                                                                                                                    
+            except CatenaryError as error:
+                raise LineError(self.number, error.message)       
+       #If EA isnt found then we will use the ten-str relationship defined in the input file 
+        else:
+             (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],self.type['w']) 
             
         self.HF = info["HF"]
         self.VF = info["VF"]
@@ -803,11 +822,16 @@ class Line():
         elif self.cb < 0:   # if a line end is at the seabed, but the cb is still set negative to indicate off the seabed
             self.cb = 0.0     # set to zero so that the line includes seabed interaction.
     
-        try:
-            (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], 
-                                                  self.cb, HF0=self.HF, VF0=self.VF, nNodes=self.nNodes, plots=1) 
-        except CatenaryError as error:
-            raise LineError(self.number, error.message)
+        #If EA is found in the line properties we will run the original catenary function 
+        if 'EA' in self.type:
+            try:
+                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], CB=self.cb, Tol=tol, HF0=self.HF, VF0=self.VF, plots=profiles)   # call line model
+                                                                                                                  
+            except CatenaryError as error:
+                raise LineError(self.number, error.message) 
+        #If EA isnt found then we will use the ten-str relationship defined in the input file 
+        else:
+             (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],self.type['w']) 
 
         Ts = info["Te"]
         return Ts
