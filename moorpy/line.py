@@ -178,6 +178,7 @@ class Line():
             self.Tdata = []
             self.show = False
             print(f"Error geting data for {'Rod' if self.isRod else 'Line'} {self.number}: {filename}")
+            print("dirname: {} or rootname: {} is incorrect".format(dirname, rootname))
             
          
         # >>> this was another option for handling issues - maybe no longer needed <<<
@@ -193,7 +194,7 @@ class Line():
         '''Get the time step to use for showing time series data'''
         
         if Time < 0: 
-            ts = np.int(-Time)  # negative value indicates passing a time step index
+            ts = np.int_(-Time)  # negative value indicates passing a time step index
         else:           # otherwise it's a time in s, so find closest time step
             if len(self.Tdata) > 0:
                 for index, item in enumerate(self.Tdata):                
@@ -825,6 +826,8 @@ class Line():
         #If EA is found in the line properties we will run the original catenary function 
         if 'EA' in self.type:
             try:
+                tol = 0.000001 #TODO figure out why tol and profiles are not defined. These values are hardcoded from defaults in other function calls
+                profiles = 1
                 (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], CB=self.cb, Tol=tol, HF0=self.HF, VF0=self.VF, plots=profiles)   # call line model
                                                                                                                   
             except CatenaryError as error:
