@@ -312,10 +312,10 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         else:
         
             # figure out how line will hang
-            LB = (ZF + L + W*L**2/2/EA)/(2+W*L/EA)  # unstretched length of line from lowest point up to end B
-            hB = LB + W/2/EA*LB**2                  # stretched of the above
-            LA = L - LB
-            hA = hB - ZF
+            #LB = (ZF + L + W*L**2/2/EA)/(2+W*L/EA)  # unstretched length of line from lowest point up to end B
+            #hB = LB + W/2/EA*LB**2                  # stretched of the above
+            #LA = L - LB
+            #hA = hB - ZF
             
             uniform_strain = (ZF - dz_hanging)/L  # the constrant strain due only to stretch - to be added to weight-based strain
             Tstretch = uniform_strain*EA          # the constant tension component to be added to weight-based tension

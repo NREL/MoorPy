@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import cm
 from moorpy.Catenary import catenary
 from moorpy.nonlinear import nonlinear                                      
-from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower, read_mooring_file
+from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower, read_mooring_file, quiver_data_to_segments
 from os import path
 
  
@@ -114,7 +114,8 @@ class Line():
                 self.xp[:,i] = data[:, ch['Node'+str(i)+'px']]
                 self.yp[:,i] = data[:, ch['Node'+str(i)+'py']]
                 self.zp[:,i] = data[:, ch['Node'+str(i)+'pz']]
-                
+            
+            '''
             if self.isRod==0:
                 self.Te = np.zeros([nT,self.nNodes-1])   # read in tension data if available
                 if "Seg1Te" in ch:
@@ -136,10 +137,10 @@ class Line():
                         self.By[:,i] = data[:, ch['Node'+str(i)+'Boy']]
                         self.Bz[:,i] = data[:, ch['Node'+str(i)+'Boz']]
 
-            self.Ux = np.zeros([nT,self.nNodes])   # read in fluid velocity data if available
-            self.Uy = np.zeros([nT,self.nNodes])
-            self.Uz = np.zeros([nT,self.nNodes])
             if "Node0Ux" in ch:
+                self.Ux = np.zeros([nT,self.nNodes])   # read in fluid velocity data if available
+                self.Uy = np.zeros([nT,self.nNodes])
+                self.Uz = np.zeros([nT,self.nNodes])
                 for i in range(self.nNodes):
                     self.Ux[:,i] = data[:, ch['Node'+str(i)+'Ux']]
                     self.Uy[:,i] = data[:, ch['Node'+str(i)+'Uy']]
@@ -150,7 +151,86 @@ class Line():
                 self.Ten = np.zeros([nT,self.nNodes-1])   
                 for i in range(self.nNodes-1):
                     self.Ten[:,i] = data[:, ch['Seg'+str(i+1)+'Ten']]
+            '''
+            
+            
+            
+            # --- Read in additional data if available ---
 
+            # segment tension  <<< to be changed to nodal tensions in future MD versions
+            #if "Seg1Te" in ch
+            if "Seg1Ten" in ch:
+                self.Tendata = True
+                self.Ten = np.zeros([nT,self.nNodes-1])
+                for i in range(self.nNodes-1):
+                    self.Ten[:,i] = data[:, ch['Seg'+str(i+1)+'Ten']]
+            else:
+                self.Tendata = False
+                        
+            # curvature at node
+            if "Node0Ku" in ch:
+                self.Kudata = True
+                self.Ku = np.zeros([nT,self.nNodes])   
+                for i in range(self.nNodes):
+                    self.Ku[:,i] = data[:, ch['Node'+str(i)+'Ku']]
+            else:
+                self.Kudata = False
+            
+            # water velocity data 
+            if "Node0Ux" in ch:  
+                self.Udata = True
+                self.Ux = np.zeros([nT,self.nNodes])
+                self.Uy = np.zeros([nT,self.nNodes])
+                self.Uz = np.zeros([nT,self.nNodes])
+                for i in range(self.nNodes):
+                    self.Ux[:,i] = data[:, ch['Node'+str(i)+'Ux']]
+                    self.Uy[:,i] = data[:, ch['Node'+str(i)+'Uy']]
+                    self.Uz[:,i] = data[:, ch['Node'+str(i)+'Uz']]
+            else:
+                self.Udata = False
+                
+            # buoyancy force data
+            if "Node0Box" in ch:  
+                self.Bdata = True
+                self.Bx = np.zeros([nT,self.nNodes])
+                self.By = np.zeros([nT,self.nNodes])
+                self.Bz = np.zeros([nT,self.nNodes])
+                for i in range(self.nNodes):
+                    self.Bx[:,i] = data[:, ch['Node'+str(i)+'Box']]
+                    self.By[:,i] = data[:, ch['Node'+str(i)+'Boy']]
+                    self.Bz[:,i] = data[:, ch['Node'+str(i)+'Boz']]
+            else:
+                self.Bdata = False
+                
+            # hydro drag data
+            if "Node0Dx" in ch: 
+                self.Ddata = True
+                self.Dx = np.zeros([nT,self.nNodes])   # read in fluid velocity data if available
+                self.Dy = np.zeros([nT,self.nNodes])
+                self.Dz = np.zeros([nT,self.nNodes])
+                for i in range(self.nNodes):
+                    self.Dx[:,i] = data[:, ch['Node'+str(i)+'Dx']]
+                    self.Dy[:,i] = data[:, ch['Node'+str(i)+'Dy']]
+                    self.Dz[:,i] = data[:, ch['Node'+str(i)+'Dz']]
+            else:
+                self.Ddata = False
+                
+            # weight data
+            if "Node0Wx" in ch: 
+                self.Wdata = True
+                self.Wx = np.zeros([nT,self.nNodes])   # read in fluid velocity data if available
+                self.Wy = np.zeros([nT,self.nNodes])
+                self.Wz = np.zeros([nT,self.nNodes])
+                for i in range(self.nNodes):
+                    self.Wx[:,i] = data[:, ch['Node'+str(i)+'Wx']]
+                    self.Wy[:,i] = data[:, ch['Node'+str(i)+'Wy']]
+                    self.Wz[:,i] = data[:, ch['Node'+str(i)+'Wz']]
+            else:
+                self.Wdata = False
+            
+            
+            
+            # initialize positions (is this used?)
             self.xpi= self.xp[0,:]
             self.ypi= self.yp[0,:]
             self.zpi= self.zp[0,:]
@@ -382,15 +462,15 @@ class Line():
                 linebit.append(ax.plot(Xs2d[[2*i+1,2*i+3]],Ys2d[[2*i+1,2*i+3]], lw=0.5, color=color))  # end B edges
         
         # drawing lines...
-        else:
-            
+        else:            
+            # >>> can probably streamline the next bit of code a fair bit <<<
             if self.qs==1:
                 Xs, Ys, Zs, tensions = self.getLineCoords(Time)
             elif self.qs==0:
                 Xs, Ys, Zs, Ts = self.getLineCoords(Time)
                 self.rA = np.array([Xs[0], Ys[0], Zs[0]])
                 self.rB = np.array([Xs[-1], Ys[-1], Zs[-1]])
-                tensions = self.getLineTens()
+                tensions = self.getLineTens()   
             
             # apply any 3D to 2D transformation here to provide desired viewing angle
             Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] + Xoff
@@ -474,7 +554,7 @@ class Line():
         
         # drawing lines...
         else:
-            
+            # >>> can probably streamline the next bit of code a fair bit <<<
             if self.qs==1:  # returns the node positions and tensions of the line, doesn't matter what time
                 Xs, Ys, Zs, tensions = self.getLineCoords(Time)
             elif self.qs==0: # returns the node positions and time data at the given time
@@ -499,15 +579,25 @@ class Line():
             if endpoints == True:
                 linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
                 
-            # drawing water velocity vectors (not for Rods for now) <<< should handle this better (like in getLineCoords) <<<
-            if self.qs == 0:
+                    
+            # draw additional data if available (should make this for rods too eventually - drawn along their axis nodes)
+            if self.qs == 0:              
                 ts = self.getTimestep(Time)
-                Ux = self.Ux[ts,:]
-                Uy = self.Uy[ts,:]
-                Uz = self.Uz[ts,:]      
-                self.Ubits = ax.quiver(Xs, Ys, Zs, Ux, Uy, Uz)  # make quiver plot and save handle to line object
                 
-            
+                if self.Tendata:
+                    pass
+                if self.Kudata:
+                    pass        
+                if self.Udata:
+                    self.Ubits = ax.quiver(Xs, Ys, Zs, self.Ux[ts,:], self.Uy[ts,:], self.Uz[ts,:], color="blue")  # make quiver plot and save handle to line object
+                if self.Bdata:
+                    self.Bbits = ax.quiver(Xs, Ys, Zs, self.Bx[ts,:], self.By[ts,:], self.Bz[ts,:], color="red")
+                if self.Ddata:
+                    self.Dbits = ax.quiver(Xs, Ys, Zs, self.Dx[ts,:], self.Dy[ts,:], self.Dz[ts,:], color="green")
+                if self.Wdata:
+                    self.Wbits = ax.quiver(Xs, Ys, Zs, self.Wx[ts,:], self.Wy[ts,:], self.Wz[ts,:], color="orange")
+                
+                
         self.linebit = linebit # can we store this internally?
         
         self.X = np.array([Xs, Ys, Zs])
@@ -519,7 +609,7 @@ class Line():
 
         
         
-    def redrawLine(self, Time, colortension=False, cmap_tension='rainbow'):  #, linebit):
+    def redrawLine(self, Time, colortension=False, cmap_tension='rainbow', drawU=True):  #, linebit):
         '''Update 3D line drawing based on instantaneous position'''
         
         linebit = self.linebit
@@ -562,14 +652,25 @@ class Line():
                     
             
         
-            # drawing water velocity vectors (not for Rods for now)
+            # draw additional data if available (should make this for rods too eventually - drawn along their axis nodes)
             if self.qs == 0:
-                ts = self.getTimestep(Time)
-                Ux = self.Ux[ts,:]
-                Uy = self.Uy[ts,:]
-                Uz = self.Uz[ts,:]                  
-                #segments = quiver_data_to_segments(Xs, Ys, Zs, Ux, Uy, Uz, scale=2)
-                #self.Ubits.set_segments(segments)
+                ts = self.getTimestep(Time)                    
+                s = 0.0002
+                
+                if self.Tendata:
+                    pass
+                if self.Kudata:
+                    pass        
+                if self.Udata:
+                    self.Ubits.set_segments(quiver_data_to_segments(Xs, Ys, Zs, self.Ux[ts,:], self.Uy[ts,:], self.Uz[ts,:], scale=10.))
+                if self.Bdata:
+                    self.Bbits.set_segments(quiver_data_to_segments(Xs, Ys, Zs, self.Bx[ts,:], self.By[ts,:], self.Bz[ts,:], scale=s))
+                if self.Ddata:
+                    self.Dbits.set_segments(quiver_data_to_segments(Xs, Ys, Zs, self.Dx[ts,:], self.Dy[ts,:], self.Dz[ts,:], scale=s))
+                if self.Wdata:
+                    self.Wbits.set_segments(quiver_data_to_segments(Xs, Ys, Zs, self.Wx[ts,:], self.Wy[ts,:], self.Wz[ts,:], scale=s))
+                
+                
         
         return linebit
         

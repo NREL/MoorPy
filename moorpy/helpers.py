@@ -201,6 +201,41 @@ def translateForce3to6DOF(r, Fin):
     return Fout
 
 
+def set_plot_center(ax, x=None, y=None, z=None):
+    '''Sets the center point in x and y of a 3d plot'''
+    
+    # adjust the center point of the figure if requested, by moving out one of the bounds
+    if not x is None:
+        xlims = ax.get_xlim3d()
+        if   x > np.mean(xlims): ax.set_xlim([xlims[0], x + (x - xlims[0])])
+        elif x < np.mean(xlims): ax.set_xlim([x - (xlims[1] - x), xlims[1]])
+        
+    if not y is None:
+        ylims = ax.get_ylim3d()
+        if   y > np.mean(ylims): ax.set_ylim([ylims[0], y + (y - ylims[0])])
+        elif y < np.mean(ylims): ax.set_ylim([y - (ylims[1] - y), ylims[1]])
+    
+    if not z is None:
+        zlims = ax.get_zlim3d()
+        if   z > np.mean(zlims): ax.set_zlim([zlims[0], z + (z - zlims[0])])
+        elif z < np.mean(zlims): ax.set_zlim([z - (zlims[1] - z), zlims[1]])
+        
+    # make sure the aspect ratio stays equal
+    set_axes_equal(ax)
+        
+    '''    
+        # set the AXIS bounds on the axis (changing these bounds can change the perspective of the matplotlib figure)
+        if xbounds != None:
+            ax.set_xbound(xbounds[0], xbounds[1])
+            ax.autoscale(enable=False, axis='x')
+        if ybounds != None:
+            ax.set_ybound(ybounds[0], ybounds[1])
+            ax.autoscale(enable=False, axis='y')
+        if zbounds != None:
+            ax.set_zbound(zbounds[0], zbounds[1])
+            ax.autoscale(enable=False, axis='x')
+    '''
+
 def set_axes_equal(ax):
     '''Sets 3D plot axes to equal scale
 
@@ -222,7 +257,16 @@ def set_axes_equal(ax):
     ax.set_box_aspect([rangex, rangey, rangez])  # note: this may require a matplotlib update
     
 
+def quiver_data_to_segments(X, Y, Z, u, v, w, scale=1):
+    '''function to help with animation of 3d quivers'''
+    
+    if scale < 0.0:  # negative scale input will be treated as setting the desired RMS quiver length
+        scale = -scale/np.sqrt(np.mean(u**2 + v**2 + w**2))
 
+    segments = (X, Y, Z, X+u*scale, Y+v*scale, Z+w*scale)
+    segments = np.array(segments).reshape(6,-1)
+    return [[[x1, y1, z1], [x2, y2, z2]] for x1, y1, z1, x2, y2, z2 in zip(*list(segments))]
+    
 
 def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol=0, maxIter=20, 
            Xmin=[], Xmax=[], a_max=2.0, dX_last=[], stepfac=4, display=0, dodamping=False):

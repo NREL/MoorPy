@@ -20,7 +20,7 @@ from moorpy.line import Line
 from moorpy.lineType import LineType
 import matplotlib as mpl
 #import moorpy.MoorSolve as msolve
-from moorpy.helpers import rotationMatrix, rotatePosition, getH, printVec, set_axes_equal, dsolve2, SolveError, MoorPyError, loadLineProps, getLineProps, read_mooring_file
+from moorpy.helpers import rotationMatrix, rotatePosition, getH, printVec, set_axes_equal, dsolve2, SolveError, MoorPyError, loadLineProps, getLineProps, read_mooring_file, printMat, printVec
 
 
 
@@ -1845,21 +1845,39 @@ class System():
                 K = self.getSystemStiffnessA(DOFtype=DOFtype) 
             
             # adjust positions according to stiffness matrix to move toward net zero forces
+                        
+            '''
+            detK = np.linalg.det(K)
+            if detK < 0:
+                for i in range(n):
+                    K[i,i] += K[i,i] # double the diagonal entries as a hack
+                    
+                print(f'doubled K diagonals to avoid negative det of {detK:8.2e}')
+                detK = np.linalg.det(K)
+                print(f'                                   now it is {detK:8.2e}')
+                
+                # >>>> since det is expensive, could replace the if statement with a check for sum(y*dX) < 0 
+            breakpoint()
+            '''
             
-
+            """
+            # ------ modified approach 1 --------
+            detK = np.linalg.det(K)
+            if detK < 0:
+                for i in range(n):
+                    K[i,i] += K[i,i] # double the diagonal entries as a hack
+                    
+                print(f'doubled K diagonals to avoid negative det of {detK:8.2e}')
+                detK = np.linalg.det(K)
+                print(f'                                   now it is {detK:8.2e}')
+            #breakpoint()
             #else:                                       # Normal case where all DOFs are adjusted
             try:               # try the normal solve first to avoid calculating the determinant every time
-                if n > 20: # if huge, count on the system being sparse and use a sparse solver
-                    #with warnings.catch_warnings():
-                    #    warnings.simplefilter("error", category=MatrixRankWarning)
-                    Kcsr = csr_matrix(K)
-                    dX = spsolve(Kcsr, Y)
-                else:
-                    dX = np.linalg.solve(K, Y)              # calculate position adjustment according to Newton's method
-            except:
-            
-                if np.linalg.det(K) == 0.0:                 # if the stiffness matrix is singular, we will modify the approach
-
+                
+                if detK == 0.0:                 # if the stiffness matrix is singular, we will modify the approach
+                    
+                    # >>> consider adjusting order relative to detK < 0 check <<<
+                    
                     # first try ignoring any DOFs with zero stiffness
                     indices = list(range(n))                # list of DOF indices that will remain active for this step
                     mask = [True]*n                         # this is a mask to be applied to the array K indices
@@ -1872,21 +1890,185 @@ class System():
                     K_select = K[mask,:][:,mask]
                     Y_select = Y[mask]
                     
-                    dX = np.zeros(n)
+                    
                     
                     if np.linalg.det(K_select) == 0.0:      
                         dX_select = Y_select/np.diag(K_select)   # last-ditch attempt to get a step despite matrix singularity
                     else:
-                        dX_select = np.linalg.solve(K_select, Y_select)
+                        if n > 20: # if huge, count on the system being sparse and use a sparse solver
+                            Kcsr = csr_matrix(K_select)
+                            dX_select = spsolve(Kcsr, Y_select)
+                        else:
+                            dX_select = np.linalg.solve(K_select, Y_select)     
+                    
+                    dX = np.zeros(n)
                     dX[indices] = dX_select                 # assign active step DOFs, other DOFs will be zero
+                
+                elif n > 20: # if huge, count on the system being sparse and use a sparse solver
+                    #with warnings.catch_warnings():
+                    #    warnings.simplefilter("error", category=MatrixRankWarning)
+                    Kcsr = csr_matrix(K)
+                    dX = spsolve(Kcsr, Y)
+                    
+                else:
+                    dX = np.linalg.solve(K, Y)              # calculate position adjustment according to Newton's method
+            except:
+
+                #else:
+                raise Exception("why did it fail even though det isn't zero?")
+                
+            
+            
+            
+            
+            """
+            # ------ modified approach 2 --------
+            kmean = np.mean(K.diagonal()) # mean value of diagonal stiffness entries
+            
+             # first check for any DOFs with zero stiffness, and also DOFs on seabed
+            indices = list(range(n))                # list of DOF indices that will remain active for this step
+            mask = [True]*n                         # this is a mask to be applied to the array K indices
+            
+            for i in range(n-1, -1, -1):            # go through DOFs and flag any with zero stiffness for exclusion
+                
+                
+                # ignore any vertical DOFs that are happily resting on the seabed and not gonna lift off
+                if i in zInds:  # if this is a z coordinate
+                    if X[i] <= -self.depth and Y[i] <= 0.0:
+                        mask[i] = False
+                        del indices[i]
+                
+                
+                elif K[i,i] == 0:
+                    if abs(Y[i]) == 0:  # if no applied force and no stiffness, remove the DOF <<< just a try
+                        mask[i] = False
+                        del indices[i]
+                    else:               # if applied force, set some stiffness
+                        K[i,i] = kmean
+                    
+                elif K[i,i] < 0:
+                    pass #breakpoint()
+            
+            K_select = K[mask,:][:,mask]
+            Y_select = Y[mask]
+            
+            n_select = len(Y_select)
+            
+            
+            if n_select < n:  #could streamline for typical case with something like this <<<
+                n2 = n_select
+                K2 = K_select
+                Y2 = Y_select
+            else:
+                n2 = n
+                K2 = K
+                Y2 = Y
+            
+            '''
+            kmean = np.mean(K.diagonal()) # mean value of diagonal stiffness entries
+            for i in range(n):
+                if K[i,i] == 0:
+                    K[i,i] = kmean
+            n2 = n
+            K2 = K
+            Y2 = Y
+            '''
+            try:
+                if n2 > 20: # if huge, count on the system being sparse and use a sparse solver
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("error", category=MatrixRankWarning)
+                        Kcsr = csr_matrix(K2)
+                        dX2 = spsolve(Kcsr, Y2)
+                        '''
+                        for iTry in range(10):
+                            if sum(dX2*Y2) < 0:
+                                print(f"sum(dX2*Y2) is negative so enlarging the diagonals   {sum(dX2*Y2):.2e}")
+                                for i in range(n2):
+                                    K2[i,i] += 0.1*abs(K2[i,i]) # double the diagonal entries as a hack
+                            
+                                Kcsr = csr_matrix(K2)
+                                dX2 = spsolve(Kcsr, Y2) 
+                            else:
+                                print(f" UPDATEdet is                           sum of dx*y is {sum(dX2*Y2):.2e}  after {iTry} adjustments")
+                                break
+                        '''
+                        
+                
+                else:
+
+                    dX2 = np.linalg.solve(K2, Y2)              # calculate position adjustment according to Newton's method
+                    
+                    
+                    if np.linalg.det(K2) < 0:
+                        print(f" Determinant is {np.linalg.det(K2)} while sum of dx*y is {sum(dX2*Y2)}")
+                        #breakpoint()
+                   
+                    # check sign for backward result (potentially a result of bad numerics?) and strengthen diagonals if so to straighten it out
+                    for iTry in range(10):
+                        if sum(dX2*Y2) < 0:
+                            print("sum(dX2*Y2) is negative so enlarging the diagonals")
+                            for i in range(n2):
+                                K2[i,i] += 0.1*abs(K2[i,i]) # double the diagonal entries as a hack
+                        
+                            dX2 = np.linalg.solve(K2, Y2)    
+                        else:
+                            #>>>print(f" UPDATEdet is {np.linalg.det(K2)} while sum of dx*y is {sum(dX2*Y2)}  after {iTry} adjustments")
+                            break
+                            
+                #if 
+                
+                    
+            except Exception as ex:
+                print(f"EXCEPTION   n2 is {n2}  "+str(ex))
+                
+                #print("trying to enlarge the diagonals")
+                for i in range(n2):
+                    K2[i,i] += K2[i,i] # double the diagonal entries as a hack
+                    
+                try:
+                    #with warnings.catch_warnings():
+                    #    warnings.simplefilter("error", category=MatrixRankWarning)
+                    Kcsr = csr_matrix(K2)
+                    dX2 = spsolve(Kcsr, Y2)
+                    #print('worked')    
+                except Exception as e2:
+                    dX2 = Y2/np.diag(K2)
+                    print('failed'+str(e2)+" after "+str(ex))
+            
+            dX = np.zeros(n)
+            dX[indices] = dX2 # dX_select
+            #dX = dX2
+            
+            
+            
+            
+            #breakpoint()
+            
+            '''
+            if np.linalg.det(K_select) == 0.0:      
+                dX_select = Y_select/np.diag(K_select)   # last-ditch attempt to get a step despite matrix singularity
+            else:
+                dX_select = np.linalg.solve(K_select, Y_select)
+            dX[indices] = dX_select                 # assign active step DOFs, other DOFs will be zero
+            
+
+            # Normal case where all DOFs are adjusted
+            try:               # try the normal solve first to avoid calculating the determinant every time
+
+            except:
+                if detK == 0.0:                 # if the stiffness matrix is singular, we will modify the approach
+
+                   
                 
                 else:
                     raise Exception("why did it fail even though det isn't zero?")
+            '''
             
             # but limit adjustment magnitude (still preserve direction) to keep things under control
             overratio = np.max(np.abs(dX)/db)            
             if overratio > 1.0:
                 dX = dX/overratio
+                if iter in [177,178,179,180]: print("overatio")
             '''
             for i in range(n):             
                 if dX[i] > db[i]:
@@ -1899,7 +2081,25 @@ class System():
             for i in zInds:
                 if X[i] + dX[i] <= -self.depth or (X[i] <= -self.depth and Y[i] <= 0.0):
                     dX[i] = -self.depth - X[i]
-                    
+            
+            
+            #print(f" LBot  {self.lineList[1].LBot:6.2f}  dz1 {dX[2]:7.2f}  dz2 {dX[5]:7.2f}  detK {np.linalg.det(K2):8.2e}")
+            '''
+            if iter in [177,178,179,180]:
+            
+                
+                print('x  '); printVec(X)
+                #print('k  '); printMat(K)
+                print('y  '); printVec(Y)
+                print('dx '); printVec(dX)
+                #breakpoint()
+            if iter==180:
+                self.plot()
+                plt.show()
+                
+                breakpoint()
+            '''
+            
             #if iter > 100:
             #    print(iter)
             #    breakpoint()
@@ -2184,7 +2384,7 @@ class System():
                 X2 = np.array(X1, dtype=np.float_)  
                 X2[i] += dX[i]                                # perturb positions by dx in each DOF in turn            
                 self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
-                self.solveEquilibrium()                       # let the system settle into equilibrium 
+                self.solveEquilibrium()                       # let the system settle into equilibrium  (note that this might prompt a warning if there are no free DOFs)
                 F2p = self.getForces(DOFtype="coupled", lines_only=lines_only)  # get resulting coupled DOF net force/moment response
                 if tensions:  T2p = self.getTensions()
                 
@@ -2646,6 +2846,7 @@ class System():
         linelabels      = kwargs.get('linelabels'     , False     )     # toggle to include line number labels in the plot
         pointlabels     = kwargs.get('pointlabels'    , False     )     # toggle to include point number labels in the plot
         draw_body       = kwargs.get("draw_body"      , True      )     # toggle to draw the Bodies or not
+        draw_clumps     = kwargs.get('draw_clumps'    , False     )     # toggle to draw clump weights and float of the mooring system
         draw_anchors    = kwargs.get('draw_anchors'   , False     )     # toggle to draw the anchors of the mooring system or not  
         bathymetry      = kwargs.get("bathymetry"     , False     )     # toggle (and string) to include bathymetry or not. Can do full map based on text file, or simple squares
         cmap_bath       = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
@@ -2666,6 +2867,7 @@ class System():
         xbounds         = kwargs.get('xbounds'        , None      )     # the bounds of the x-axis. The midpoint of these bounds determines the origin point of orientation of the plot
         ybounds         = kwargs.get('ybounds'        , None      )     # the bounds of the y-axis. The midpoint of these bounds determines the origin point of orientation of the plot
         zbounds         = kwargs.get('zbounds'        , None      )     # the bounds of the z-axis. The midpoint of these bounds determines the origin point of orientation of the plot
+        center          = kwargs.get('center'         , None      )     # x and y coordinates to be at center of image (shifts center to zoom/rotate about)
         
         # sort out bounds
         xs = []
@@ -2705,15 +2907,25 @@ class System():
             ax.set_ylim([-rbound/2,rbound/2])
             ax.set_zlim([-self.depth, 0])
         
+        # adjust the center point of the figure if requested, by moving out one of the bounds >>> should put this and the next section into helper functions <<<
+        if not center is None:
+            xlims = ax.get_xlim3d()
+            if   center[0] > np.mean(xlims): ax.set_xlim([xlims[0], center[0] + (center[0]-xlims[0])])
+            elif center[0] < np.mean(xlims): ax.set_xlim([center[0] - (xlims[0] - center[0]), xlims[1]])
+            ylims = ax.get_ylim3d()
+            if   center[1] > np.mean(ylims): ax.set_ylim([ylims[0], center[1] + (center[1]-ylims[0])])
+            elif center[1] < np.mean(ylims): ax.set_ylim([center[1] - (ylims[0] - center[1]), ylims[1]])
+        
         # set the AXIS bounds on the axis (changing these bounds can change the perspective of the matplotlib figure)
-        if (np.array([xbounds, ybounds, zbounds]) != None).any():
-            ax.autoscale(enable=False,axis='both')
         if xbounds != None:
-            ax.set_xbound(xbounds[0], xbounds[1])
+            ax.set_xlim(xbounds[0], xbounds[1])
+            #ax.autoscale(enable=False, axis='x')
         if ybounds != None:
-            ax.set_ybound(ybounds[0], ybounds[1])
+            ax.set_ylim(ybounds[0], ybounds[1])
+            #ax.autoscale(enable=False, axis='y')
         if zbounds != None:
-            ax.set_zbound(zbounds[0], zbounds[1])
+            ax.set_zlim(zbounds[0], zbounds[1])
+            #ax.autoscale(enable=False, axis='x')
         
         # draw things
         if draw_body:
@@ -2730,8 +2942,14 @@ class System():
                     rod.drawLine(time, ax, color=color, shadow=shadow)
                 #if isinstance(rod, Point):  # zero-length special case
                 #    not plotting points for now
-            
         
+        if draw_clumps:
+            for point in self.pointList:
+                if point.v*self.rho > point.m:   # if it has positive buoyancy
+                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='b', markeredgecolor='k', marker='o', markersize=5)
+                elif point.m > 0:   # if it is a weight
+                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='r', markeredgecolor='k', marker='o', markersize=5)
+                    
         if draw_anchors:
             for line in self.lineList:
                 if line.zp[0,0]==-self.depth:
@@ -2899,7 +3117,7 @@ class System():
         if ax == None:
             fig, ax = plt.subplots(1,1, figsize=figsize)
         else:
-            fig = plt.gcf()   # will this work like this? <<<
+            fig = ax.get_figure()
         
         if draw_body:
             for body in self.bodyList:
