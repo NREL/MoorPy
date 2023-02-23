@@ -9,20 +9,25 @@ MoorPy is a design-oriented mooring system library for Python based around a qua
 
 ### Installation
 
-For development use:
+For development use run:
+```console
+pip install -e .[dev]
+```
+from the command line in the main MoorPy directory.
 
-run ```python setup.py develop``` or ```pip install -e .``` from the command line in the main MoorPy directory.
+For non-development use run:
 
-For non-development use:
-
-run ```python setup.py``` or ```pip install .``` from the command line in the main MoorPy directory.
+```console
+pip install .
+```
+from the command line in the main MoorPy directory.
 
 
 ### Documentation
 
 MoorPy's documentation website is under development at https://moorpy.readthedocs.io
 
-The MoorPy software can be cited as: 
+The MoorPy software can be cited as:
 M. Hall, S. Housner, S. Sirnivas, and S. Wilson.
 *MoorPy: Quasi-Static Mooring Analysis in Python.*
 National Renewable Energy Laboratory, 2021.
