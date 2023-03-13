@@ -541,7 +541,7 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     return X, Y, dict(iter=iter, err=err, dX=dX_last, oths=oths, Xs=Xs, Es=Es, success=success, dXlist=dXlist, dXlist2=dXlist2)
 
 
-def getLineProps(dnommm, material, source=None, name="", rho=1025.0, g=9.81, **kwargs):
+def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=1025.0, g=9.81, **kwargs):
     '''Sets up a dictionary that represents a mooring line type based on the 
     specified diameter and material type. The
 
@@ -578,9 +578,15 @@ def getLineProps(dnommm, material, source=None, name="", rho=1025.0, g=9.81, **k
         Identifier for the line type (otherwise will be generated automatically).    
     '''
     
-    # deal with the source (is it a dictionary, or reading in a new yaml?)
-    lineProps = loadLineProps(source)
+    if lineProps==None and source==None:
+        raise Exception("Either lineProps or source keyword arguments must be provided")
     
+    # deal with the source (is it a dictionary, or reading in a new yaml?)
+    if not source==None:
+        lineProps = loadLineProps(source)
+        if not lineProps==None:
+            print('Warning: both lineProps and source arguments were passed to getLineProps. lineProps will be ignored.')
+        
     # raise an error if the material isn't in the source dictionary
     if not material in lineProps:
         raise ValueError(f'Specified mooring line material, {material}, is not in the database.')
@@ -590,8 +596,8 @@ def getLineProps(dnommm, material, source=None, name="", rho=1025.0, g=9.81, **k
     d = dnommm*0.001                # convert nominal diameter from mm to m    
     d_vol = mat['dvol_dnom']*d    
     mass = mat['mass_0'] + mat['mass_d']*d + mat['mass_d2']*d**2 + mat['mass_d3']*d**3 
-    EA   = mat[  'EA_0'] + mat[  'EA_d']*d + mat[  'EA_d2']*d**2 + mat[  'EA_d3']*d**3 
     MBL  = mat[ 'MBL_0'] + mat[ 'MBL_d']*d + mat[ 'MBL_d2']*d**2 + mat[ 'MBL_d3']*d**3 
+    EA   = mat[  'EA_0'] + mat[  'EA_d']*d + mat[  'EA_d2']*d**2 + mat[  'EA_d3']*d**3 + mat['EA_MBL']*MBL 
     cost =(mat['cost_0'] + mat['cost_d']*d + mat['cost_d2']*d**2 + mat['cost_d3']*d**3 
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
     w = (mass - np.pi/4*d_vol**2 *rho)*g
@@ -636,7 +642,7 @@ def loadLineProps(source):
         with open(os.path.join(mpdir,"MoorProps_default.yaml")) as file:
             source = yaml.load(file, Loader=yaml.FullLoader)
         
-    elif type(source) is string:
+    elif type(source) is str:
         with open(source) as file:
             source = yaml.load(file, Loader=yaml.FullLoader)
 
@@ -662,6 +668,7 @@ def loadLineProps(source):
         output[mat]['EA_d'     ] = getFromDict(props, 'EA_d'     , default=0.0)
         output[mat]['EA_d2'    ] = getFromDict(props, 'EA_d2'    , default=0.0)
         output[mat]['EA_d3'    ] = getFromDict(props, 'EA_d3'    , default=0.0)
+        output[mat]['EA_MBL'   ] = getFromDict(props, 'EA_MBL'   , default=0.0)
         output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
         output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
         output[mat]['MBL_d2'   ] = getFromDict(props, 'MBL_d2'   , default=0.0)

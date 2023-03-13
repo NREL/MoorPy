@@ -12,6 +12,7 @@
 #    EA_d      :     # stiffness per diameter [N/m]
 #    EA_d2     :     # stiffness per diameter^2 [N/m^2]
 #    EA_d3     :     # stiffness per diameter^3 [N/m^3]
+#    EA_MBL    :     # stiffness per MBL [N/N]
 #    
 #    MBL_0     :     # minimum breaking load offset [N]
 #    MBL_d     :     # minimum breaking load per diameter [N/m]

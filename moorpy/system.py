@@ -318,7 +318,8 @@ class System():
         material : string
             string identifier of the material type be used.
         source : dict or filename (optional)
-            YAML file name or dictionary containing line property scaling coefficients
+            YAML file name or dictionary containing line property scaling coefficients. If not provided,
+            whatever has already been loaded into the MoorPy system will be used.
         name : string (optional)
             Identifier for the line type (otherwise will be generated automatically).
 
@@ -328,7 +329,10 @@ class System():
         '''
  
         # compute the actual values for this line type
-        lineType = getLineProps(dnommm, material, source=source, name=name, rho=self.rho, g=self.g)  
+        if source==None:
+            lineType = getLineProps(dnommm, material, lineProps=self.lineProps, name=name, rho=self.rho, g=self.g)  
+        else:
+            lineType = getLineProps(dnommm, material, source=source, name=name, rho=self.rho, g=self.g)  
         
         lineType.update(kwargs)                      # add any custom arguments provided in the call to the lineType's dictionary
         
