@@ -49,7 +49,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         (end 1 horizontal tension, end 1 vertical tension, end 2 horizontal tension, end 2 vertical tension, info dictionary) [N] (positive up)
     
     '''
-
+    #Hardcode Seabed Slope (for now)
+    alpha = -2
     
     # make info dict to contain any additional outputs
     info = dict(error=False)
@@ -106,6 +107,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         # models it as bunched up on the seabed (instead of throwing an error)
     # ProfileType=5: Similar to above but both ends are off seabed, so it's U shaped and fully slack
     # ProfileType=6: Completely vertical line that is off the seabed (on the seabed is handled by 4 and 5)
+    # ProfileType = 7: Portion of the line is resting on the seabed, and the seabed has a slope
     
     EA_W = EA/W
     
@@ -787,6 +789,47 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                             Xs[I] = LBot + HF_W*np.log( VFMinWLs_HF + SQRT1VFMinWLs_HF2 ) + HF*s_EA + 0.5*CB*W/EA *(-LBot*LBot + xB*xBlim);
                             Zs[I] = ( -1.0  + SQRT1VFMinWLs_HF2)*HF_W + s_EA*(VFMinWL + 0.5*Ws ) + 0.5*   VFMinWL*VFMinWL/WEA;
                             Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs )
+                            
+                            # No portion of the line rests on the seabed
+                    ## WWest comment: Again this could be cleaned up a little bit, but wanted to get something working.  I have done very little testing at this point (todo soon)
+                    ## Also be aware that Alpha is hardcoded in to both lines 53 and 956.  We will need to strategize a way to get that value into the code (potentially simplified slope from a 
+                    ## bathymetry file).  Also alpha is used in a different function so might be wise to change it to another variable to avoid any potential confusion down the road.
+                    
+                    elif ProfileType==7: 
+                    
+                        VTD = VF - W*(L-LBot)  #Vertical Force at the touchdownpoint
+            
+                        TTD = np.sqrt(VTD * VTD + HF * HF) #Tension at the Touchdown Point
+            
+                        TA = TTD - W*(np.sin(np.pi*alpha/180)+CB)*LBot #Tension at the anchor
+                        
+                        X_TD = (LBot+(TA*LBot)/EA+(W*(np.sin(np.pi*alpha/180)+CB)*LBot*LBot)/(2*EA))*np.cos(np.pi*alpha/180)
+                        Z_TD = (LBot+(TA*LBot)/EA+(W*(np.sin(np.pi*alpha/180)+CB)*LBot*LBot)/(2*EA))*np.sin(np.pi*alpha/180)
+                    
+                        if CB > 0:
+                            xB = LBot - TTD/(W*(np.sin(np.pi*alpha/180)+CB))    # location of point at which line tension reaches zero (WWest Check this!!!!)
+                        else:
+                            xB = 0.0
+
+                        xBlim = max(xB, 0.0) 
+                            
+                        if  s[I] <= xB and CB > 0:  # (aka Lbot - s > HF/(CB*W) ) if this node rests on the seabed and the tension is zero
+                        
+                            Xs[I] = np.cos(np.pi*alpha/180)*s[I];
+                            Zs[I] = np.sin(np.pi*alpha/180)*s[I];
+                            Te[I] = 0.0;
+                        
+                        elif( s[I] <= LBot ): # // .TRUE. if this node rests on the seabed and the tension is nonzero
+                                             
+                            Xs[I] = (s[I]+(TA*s[I])/EA+(W*(np.sin(np.pi*alpha/180)+CB)*s[I]*s[I])/(2*EA))*np.cos(np.pi*alpha/180)
+                            Zs[I] = (s[I]+(TA*s[I])/EA+(W*(np.sin(np.pi*alpha/180)+CB)*s[I]*s[I])/(2*EA))*np.sin(np.pi*alpha/180)
+                            Te[I] = TA + W*(np.sin(np.pi*alpha/180)+CB)*LBot;
+                        
+                        else:  #  // LBot < s <= L ! This node must be above the seabed
+                        
+                            Xs[I] = X_TD + HF_W*(np.arcsinh((VTD+W*(s[I]-LBot))/HF)-np.arcsinh(VTD/HF))+(HF*(s[I]-LBot))/EA;
+                            Zs[I] = Z_TD +  HF_W*(np.sqrt(1+((VTD+W*(s[I]-LBot))/HF)*((VTD+W*(s[I]-LBot))/HF))-np.sqrt(1+(VTD/HF)*(VTD/HF)))+(1/EA)*(VTD*(s[I]-LBot)+(W*(s[I]-LBot)*(s[I]-LBot))/2);
+                            Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs )
     
     if plots > 0:            
         # re-reverse line distributed data back to normal if applicable
@@ -816,7 +859,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         info['stiffnessA'] = np.array(info['stiffnessB'])
         info['stiffnessAB'] = -info['stiffnessB']
         
-    elif ProfileType in [2,3]:
+    elif ProfileType in [2,3,7]:
         if CB == 0.0:
             info['stiffnessA'] = np.array([[info['stiffnessB'][0,0], 0], [0, dV_dZ_s(Tol, HF)]])  # vertical term is very approximate 
             info['stiffnessAB'] = np.array([[-info['stiffnessB'][0,0], 0], [0, 0]])  # note: A and AB stiffnesses for this case only valid if zero friction
@@ -878,6 +921,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
 def eval_func_cat(X, args):  
     '''returns target outputs and also secondary outputs for constraint checks etc.'''
     
+    alpha = -2
+    
     info = dict(error=False)                                 # a dict of extra outputs to be returned
     
     ## Step 1. break out design variables and arguments into nice names
@@ -908,12 +953,18 @@ def eval_func_cat(X, args):
 
 
     # determine line profile type
-    if(( CB < 0.0) or ( W  <  0.0) or ( VFMinWL >  0.0 ) ): # no portion of the line rests on the seabed
-        ProfileType = 1
-    elif( -CB*VFMinWL < HF ):          # a portion of the line rests on the seabed and the anchor tension is nonzero
-        ProfileType = 2
-    else:   # must be 0.0 < HF <= -CB*VFMinWL, meaning a portion of the line must rest on the seabed and the anchor tension is zero
-        ProfileType = 3
+    #Check for seabed slope
+    if (alpha == 0):
+    
+        if(( CB < 0.0) or ( W  <  0.0) or ( VFMinWL >  0.0 ) ): # no portion of the line rests on the seabed
+            ProfileType = 1
+        elif( -CB*VFMinWL < HF ): # a portion of the line rests on the seabed and the anchor tension is nonzero
+            ProfileType = 2
+        else:   # must be 0.0 < HF <= -CB*VFMinWL, meaning a portion of the line must rest on the seabed and the anchor tension is zero
+            ProfileType = 3
+             
+    else: #Seabed is sloped 
+        ProfileType = 7    
         
    
     # Compute the error functions (to be zeroed) and the Jacobian matrix
@@ -970,7 +1021,7 @@ def eval_func_cat(X, args):
             dZFdHF = ( SQRT1VF_HF2 - 1.0 - VF_HF2 /SQRT1VF_HF2 )/ W
 
             dZFdVF = ( VF_HF /SQRT1VF_HF2 )/ W + VF_WEA
-            breakpoint()
+
 
     # A portion of the line must rest on the seabed and the anchor tension is zero
     elif ProfileType in [2, 3]:  
@@ -1003,6 +1054,56 @@ def eval_func_cat(X, args):
             dZFdHF = ( SQRT1VF_HF2 - 1.0 - VF_HF2 /SQRT1VF_HF2 )/ W
             
             dZFdVF = ( VF_HF /SQRT1VF_HF2 )/ W + VF_WEA
+            
+    if ProfileType==7: 
+        
+        if (VF_HF + SQRT1VF_HF2 <= 0):
+            info['error'] = True
+            info['message'] = "ProfileType 7: VF_HF + SQRT1VF_HF2 <= 0"
+            
+        else:
+        
+            LBot = L - (VF - HF * np.tan(np.pi*alpha/180))/W  # Lb on the seafloor
+            
+            VTD = VF - W*(L-LBot)  #Vertical Force at the touchdownpoint
+            
+            TTD = np.sqrt(VTD * VTD + HF * HF) #Tension at the Touchdown Point
+            
+            TA = TTD - W*(np.sin(np.pi*alpha/180)+CB)*LBot #Tension at the anchor
+            
+            if CB > 0:
+                xB = LBot - TTD/(W*(np.sin(np.pi*alpha/180)+CB))    # location of point at which line tension reaches zero (WWest Check this!!!!)
+            else:
+                xB = 0.0
+            xBlim = max(xB, 0.0)
+            
+            TA = max(0,TA) #Anchor Tension Cannot be Negative
+            
+            #X and Z Excursions along the sloped seabed
+            X_TD = (LBot+(TA*LBot)/EA+(W*(np.sin(np.pi*alpha/180)+CB)*LBot*LBot)/(2*EA))*np.cos(np.pi*alpha/180)
+            Z_TD = (LBot+(TA*LBot)/EA+(W*(np.sin(np.pi*alpha/180)+CB)*LBot*LBot)/(2*EA))*np.sin(np.pi*alpha/180)
+
+            # WWest Comment: Could clean this up for readibility (Will do at somepoint)
+            EXF = HF_W*(np.arcsinh((VTD+W*(L-LBot))/HF)-np.arcsinh(VTD/HF))+(HF*(L-LBot))/EA +  X_TD - XF # error in horizontal distance
+            
+            EZF  = HF_W*(np.sqrt(1+((VTD+W*(L-LBot))/HF)*((VTD+W*(L-LBot))/HF))-np.sqrt(1+(VTD/HF)*(VTD/HF)))+(1/EA)*(VTD*(L-LBot)+(W*(L-LBot)*(L-LBot))/2) + Z_TD - ZF  # error in vertical distance
+
+            
+            dXFdHF = np.log( VF_HF + SQRT1VF_HF2 ) / W - ( ( VF_HF + VF_HF2 /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + L_EA - xBlim/EA
+            
+            #dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + HF_WEA +xBlim*CB/EA- 1.0/W   <<<< incorrect, at least when CB=0
+            
+            #WWest Comment: Potentially some of these stiffnesses would need some work.  Matt and I both assumed that the line end stiffness would be the same
+            #That potentially could not be true especially in the case that seabed frictoin is important (i.e. profile type 2 below)
+            if xB <= 0:
+                dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + CB_EA*LBot - 1.0/W   # from ProfileType 2
+            else:
+                dXFdVF = ( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) )/ W + HF_WEA - 1.0/W   # from ProfileType 3
+            
+            
+            dZFdHF = ( SQRT1VF_HF2 - 1.0 - VF_HF2 /SQRT1VF_HF2 )/ W
+            
+            dZFdVF = ( VF_HF /SQRT1VF_HF2 )/ W + VF_WEA
 
 
     # Now compute the tensions at the anchor    
@@ -1017,7 +1118,10 @@ def eval_func_cat(X, args):
     elif ProfileType==3:        # A portion of the line must rest on the seabed and the anchor tension is zero
         HA = 0.0
         VA = 0.0
-        
+       
+    elif ProfileType==7:        # A portion of the line must rest on the seabed and the anchor tension is zero
+        HA = TA*np.cos(np.pi*alpha/180)
+        VA = TA*np.sin(np.pi*alpha/180)      
 
     # if there was an error, send the stop signal
     if info['error']==True:

@@ -2366,6 +2366,7 @@ class System():
                             KB = self.lineList[lineID-1].KAB
                         else:
                             KB = self.lineList[lineID-1].KAB.T
+                        
                         '''    
                         KA, KB = self.lineList[lineID-1].getStiffnessMatrix()
                         # flip sign for coupling
@@ -2463,7 +2464,6 @@ class System():
                                     KB = self.lineList[lineID-1].KAB.T
                                  
                                 KB = KB[point.DOFs,:][:,point2.DOFs]                     # trim the matrix to only use the enabled DOFs of each point
-                                
                                 K[i:i+n          , j:j+point2.nDOF] += KB
                                 K[j:j+point2.nDOF, i:i+n          ] += KB.T  # mirror
                                 
