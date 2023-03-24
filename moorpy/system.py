@@ -518,7 +518,7 @@ class System():
                         entries = line.split()  # entries: ID   Attachment  X0  Y0  Z0  r0  p0  y0    M  CG*  I*    V  CdA*  Ca*            
                         num = int(entries[0])
                         entry0 = entries[1].lower()                         
-                        #num = np.int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Body #
+                        #num = np.int_("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Body #
                         
                         if ("fair" in entry0) or ("coupled" in entry0) or ("ves" in entry0):       # coupled case
                             bodyType = -1                        
@@ -616,7 +616,7 @@ class System():
                         
                 
                 # get properties of each Point
-                if line.count('---') > 0 and (line.upper().count('POINTS') > 0 or line.upper().count('POINT LIST') > 0 or line.upper().count('POINT PROPERTIES') > 0):
+                if line.count('---') > 0 and (line.upper().count('POINTS') > 0 or line.upper().count('POINT LIST') > 0 or line.upper().count('POINT PROPERTIES') > 0 or line.upper().count('CONNECTION PROPERTIES') > 0 or line.upper().count('NODE PROPERTIES') > 0):
                     line = next(f) # skip this header line, plus channel names and units lines
                     line = next(f)
                     line = next(f)
@@ -626,7 +626,7 @@ class System():
                         entry1 = entries[1].lower() 
                         
                         
-                        num = np.int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Point #
+                        num = np.int_("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Point #
                         
                         
                         if ("anch" in entry1) or ("fix" in entry1):
@@ -683,10 +683,10 @@ class System():
                     while line.count('---') == 0:
                         entries = line.split()  # entries: ID  LineType  AttachA  AttachB  UnstrLen  NumSegs   Outputs
                                                 
-                        num    = np.int(entries[0])
+                        num    = np.int_(entries[0])
                         lUnstr = np.float_(entries[4])
                         lineType = self.lineTypes[entries[1]]
-                        nSegs  = np.int(entries[5])         
+                        nSegs  = np.int_(entries[5])         
                         
                         #lineList.append( Line(dirName, num, lUnstr, dia, nSegs) )
                         self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs)) #attachments = [int(entries[4]), int(entries[5])]) )
@@ -816,7 +816,7 @@ class System():
             entry0 = d['name'].lower()          
             entry1 = d['type'].lower()
             
-            #num = np.int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Point #
+            #num = np.int_("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Point #
             num = i+1   # not counting on things being numbered in YAML files
             
             if ("anch" in entry1) or ("fix" in entry1):
@@ -3342,7 +3342,7 @@ class System():
         return 
     
     
-    def animateLines(self, interval=200, repeat=True, delay=0, runtime=-1, **kwargs):
+    def animateLines(self, figure=None, axis=None, color=None, interval=200, repeat=True, delay=0, runtime=-1, **kwargs):
         '''
         Parameters
         ----------
@@ -3388,7 +3388,7 @@ class System():
             
 
         # create the figure and axes to draw the animation
-        fig, ax = self.plot(draw_body=draw_body, bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, 
+        fig, ax = self.plot(ax=axis, color=color, draw_body=draw_body, bathymetry=bathymetry, opacity=opacity, hidebox=hidebox, rang=rang, 
                             colortension=colortension, xbounds=xbounds, ybounds=ybounds, zbounds=zbounds)
         '''
         # can do this section instead of self.plot(). They do the same thing
