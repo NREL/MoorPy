@@ -50,6 +50,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     
     '''
 
+    vertical_threshold = 0.0001  # the XF/ZF ratio below which the line will be approximated as vertical to avoid catenary errors (this could become an input parameter)
     
     # make info dict to contain any additional outputs
     info = dict(error=False)
@@ -266,7 +267,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
     
 
     # ProfileType 6 case - vertical line without seabed contact     
-    elif (XF == 0):
+    elif (ZF > 0 and XF/ZF < vertical_threshold):
         ProfileType = 6    
         
         dz_hanging = L + 0.5*W/EA*L**2   # stretched length if it was hanging from one end
@@ -287,9 +288,9 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                     
             info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
             info["VF"] = VF
-            info["stiffnessB"]  = np.array([[ 0.0, 0.0], [0.0, 0.5*W]])
-            info["stiffnessA"]  = np.array([[ 0.0, 0.0], [0.0, 0.5*W]]) 
-            info["stiffnessAB"] = np.array([[-0.0, 0.0], [0.0,-0.5*W]])
+            info["stiffnessB"]  = np.array([[ VF/ZF, 0.0], [0.0, 0.5*W]])
+            info["stiffnessA"]  = np.array([[ VF/ZF, 0.0], [0.0, 0.5*W]]) 
+            info["stiffnessAB"] = np.array([[-VF/ZF, 0.0], [0.0,-0.5*W]])
             info["LBot"] = 0.0
             info['ProfileType'] = 6
             info['Zextreme'] = -hA
@@ -299,12 +300,12 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
         
                 for I in range(nNodes):
                     if s[I] <   LA:          # the 1st suspended/hanging portion of the line
-                        Xs[I] = 0.0
+                        Xs[I] = XF*(s[I]/L)         # approximate
                         Zs[I] = -s[I] - W/EA*(LA*s[I] - 0.5*s[I]**2 )
                         Te[I] = W*(LA - s[I])
                     else:                           # the 2nd suspended/hanging portion of the line
                         Lms = L - s[I]              # distance from end B
-                        Xs[I] = XF
+                        Xs[I] = XF*(s[I]/L)         # approximate
                         Zs[I] = ZF - Lms - W/EA*(LB*Lms - 0.5*Lms**2 )
                         Te[I] = W*(s[I] - LA)
         
@@ -327,9 +328,9 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                     
             info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
             info["VF"] = VF
-            info["stiffnessB"]  = np.array([[ Tstretch/ZF, 0.0], [0.0, EA/L]])
-            info["stiffnessA"]  = np.array([[ Tstretch/ZF, 0.0], [0.0, EA/L]]) 
-            info["stiffnessAB"] = np.array([[-Tstretch/ZF, 0.0], [0.0,-EA/L]])
+            info["stiffnessB"]  = np.array([[ VF/ZF, 0.0], [0.0, EA/L]])
+            info["stiffnessA"]  = np.array([[ VF/ZF, 0.0], [0.0, EA/L]]) 
+            info["stiffnessAB"] = np.array([[-VF/ZF, 0.0], [0.0,-EA/L]])
             info["LBot"] = 0.0
             info['ProfileType'] = 6
             info['Zextreme'] = 0
@@ -338,7 +339,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
             if plots > 0:
                 for I in range(nNodes):
                     Lms = L - s[I]              # distance from end B
-                    Xs[I] = 0.0
+                    Xs[I] = XF*(s[I]/L)         # approximate
                     Zs[I] = ZF - Lms*L*uniform_strain - W/EA*(L*Lms - 0.5*Lms**2 )
                     Te[I] = Tstretch + W*s[I]             
                     
@@ -1039,7 +1040,7 @@ def eval_func_cat(X, args):
     info["ProfileType"] = ProfileType
         
     #print("EX={:5.2e}, EZ={:5.2e}".format(EXF, EZF))
-        
+    
     return Y, info, False
 
 
@@ -1139,12 +1140,14 @@ if __name__ == "__main__":
     #(fAH, fAV, fBH, fBV, info) = catenary(205, -3.9, 250, 1229760000.0, 2442, CB=-55, Tol=1e-06, MaxIter=50, plots=3)
     
     
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary( 400, 100,  470, 1e12, 100.0, CB=-10, Tol=0.001, MaxIter=50, plots=4)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary( 400, 100,  470, 1e12, 100.0, CB=-10, Tol=0.001, MaxIter=50, plots=4)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(2306.4589923684835, 1.225862496312402e-05, 1870.0799339749528, 203916714.02425563, 405.04331583394304, CB=0.0, HF0=58487689.78903873, VF0=0.0, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(459.16880261639346, 0.0004792939078015479, 447.67890341877506, 2533432597.6567926, 5032.201233267459, CB=0.0, HF0=65021800.32966018, VF0=17487.252675845888, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.00040612281105723014, 391.558570722038, 400.0, 3300142385.3140063, 6555.130220040344, CB=-287.441429277962, HF0=2127009.4122708915, VF0=10925834.69512347, Tol=4.000000000000001e-06, MaxIter=100, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.0004959907076624859, 69.87150531147275, 110.89397565668423, 80297543.26800226, 146.26820268238743, CB=-509.12849468852727, HF0=1322712.3676957292, VF0=1045583.1849462093, Tol=4.000000000000001e-06, MaxIter=50, plots=1)
     
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(2.203138228651369e-05, 378.2807133834522, 383.34011790636976, 260525391.7172965, 474.5672065262173, CB=-7.719286616547777, 
+             HF0=0.012438428537800724, VF0=179721.2163869108, Tol=4.000000000000001e-06, MaxIter=100, plots=1)
     
     plt.plot(info1['X'], info1['Z'] )
     #plt.plot(infoU['X'], infoU['Z'] )
@@ -1159,8 +1162,6 @@ if __name__ == "__main__":
     print('')
     
     from moorpy.helpers import printMat
-    printMat(info1['K'])
-    print('')
     printMat(info1['stiffnessA'])
     print('')
     printMat(info1['stiffnessB'])
