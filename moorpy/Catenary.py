@@ -308,7 +308,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                         Xs[I] = XF*(s[I]/L)         # approximate
                         Zs[I] = ZF - Lms - W/EA*(LB*Lms - 0.5*Lms**2 )
                         Te[I] = W*(s[I] - LA)
-        
+                    
         # taut case
         else:
         
@@ -340,8 +340,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxI
                 for I in range(nNodes):
                     Lms = L - s[I]              # distance from end B
                     Xs[I] = XF*(s[I]/L)         # approximate
-                    Zs[I] = ZF - Lms*L*uniform_strain - W/EA*(L*Lms - 0.5*Lms**2 )
-                    Te[I] = Tstretch + W*s[I]             
+                    Zs[I] = ZF - Lms*(1+uniform_strain) - W/EA*(L*Lms - 0.5*Lms**2 )
+                    Te[I] = Tstretch + W*s[I]
                     
     
         
