@@ -1,0 +1,108 @@
+[project]
+name = "MoorPy"
+version = "0.9.0"
+description = "A design-oriented mooring system library for Python"
+readme = "README.rst"
+requires-python = ">=3.7"
+license = {file = "LICENSE.txt"}
+keywords = ["NREL", "mooring"]
+authors = [
+  {email = "matthew.hall@nrel.gov"},
+  {name = "Matthew Hall"}
+]
+maintainers = [
+  {name = "Matthew Hall", email = "matthew.hall@nrel.gov"},
+    {name = "Stein Housner", email = "stein.housner@nrel.gov"},
+    {name = "Stefan Dalecki", email = "sjdalecki@gmail.com"},
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: LGPL",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+  "matplotlib",
+    "numpy",
+    "pandas",
+    "scipy",
+]
+
+[project.optional-dependencies]
+dev = ["pre-commit"]
+docs = [
+    "sphinx",
+    "sphinx-rtd-theme"
+]
+test = [
+  "pytest",
+  "pytest-cov",
+    "pytest-xdist",
+]
+
+[project.urls]
+repository = "https://github.com/NREL/MoorPy"
+
+[project.scripts]
+#spam-cli = "spam:main_cli"  # unsure if any direct ways to call scripts
+
+[build-system]
+# Minimum requirements for the build system to execute.
+requires = ["setuptools", "wheel"]  # PEP 508 specifications.
+
+[tool.ruff]
+select = ["A", "C", "E", "F", "I"]
+ignore = []
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["A", "C", "E", "F", "I"]
+unfixable = []  # fix all
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+per-file-ignores = {}  # ignore no specific files and checks
+
+line-length = 88
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+target-version = "py311"
+
+[tool.ruff.mccabe]
+max-complexity = 10
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+preview=true
+
+[tool.docformatter]
+blank=true
+close-quotes-on-newline=true
+in-place=true
+make-summary-multi-line=true
+pre-summary-newline=true
+recursive=true
+wrap-descriptions=68
+wrap-summaries=88
