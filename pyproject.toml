@@ -44,13 +44,6 @@ classifiers = [  # Optional
   "Operating System :: OS Independent",
 ]
 
-dependencies = [
-  "numpy",
-  "matplotlib",
-  "pyyaml"
-  "scipy"
-]
-
 # List additional groups of dependencies here (e.g. development
 # dependencies). Users will be able to install these using the "extras"
 # syntax, for example:
@@ -59,11 +52,6 @@ dependencies = [
 #
 # Similar to `dependencies` above, these must be valid existing
 # projects.
-classifiers = [
-  "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: LGPL",
-]
-
 dependencies = [
   "matplotlib",
   "numpy",
