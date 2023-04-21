@@ -8,8 +8,8 @@ on:
     push:
     pull_request:
     release:
-    types:
-      - published
+        types:
+            - published
 
 jobs:
     build_and_upload_pypi:
