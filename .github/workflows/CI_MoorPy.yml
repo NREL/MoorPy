@@ -1,4 +1,4 @@
-name: CI_pyHAMS
+name: CI_MoorPy
 
 # We run CI on push commits and pull requests on all branches
 on: [push, pull_request]
