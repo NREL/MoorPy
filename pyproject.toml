@@ -102,23 +102,23 @@ namespaces = true
 # installed, specify them here.
 "*" = ["*.txt", "*.md"]
 
-[tool.black]
-line-length = 120
-target-version = ['py311']
-preview=true
-exclude = '''
-/(
-    \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
+#[tool.black]
+#line-length = 120
+#target-version = ['py311']
+#preview=true
+#exclude = '''
+#/(
+#    \.git
+#  | \.hg
+#  | \.mypy_cache
+#  | \.tox
+#  | \.venv
+#  | _build
+#  | buck-out
+#  | build
+#  | dist
+#)/
+#'''
 
 [tool.isort]
 # https://github.com/PyCQA/isort
@@ -179,12 +179,12 @@ target-version = "py311"
 [tool.ruff.mccabe]
 max-complexity = 10
 
-[tool.docformatter]
-blank=true
-close-quotes-on-newline=true
-in-place=true
-make-summary-multi-line=true
-pre-summary-newline=true
-recursive=true
-wrap-descriptions=68
-wrap-summaries=88
+#[tool.docformatter]
+#blank=true
+#close-quotes-on-newline=true
+#in-place=true
+#make-summary-multi-line=true
+#pre-summary-newline=true
+#recursive=true
+#wrap-descriptions=68
+#wrap-summaries=88
