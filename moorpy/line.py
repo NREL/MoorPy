@@ -924,6 +924,8 @@ class Line():
         elif self.cb < 0:   # if a line end is at the seabed, but the cb is still set negative to indicate off the seabed
             self.cb = 0.0     # set to zero so that the line includes seabed interaction.
     
+        tol = 0.0001
+    
         #If EA is found in the line properties we will run the original catenary function 
         if 'EA' in self.type:
             try:

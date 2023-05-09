@@ -13,6 +13,14 @@
 #    EA_d2     :     # stiffness per diameter^2 [N/m^2]
 #    EA_d3     :     # stiffness per diameter^3 [N/m^3]
 #    EA_MBL    :     # stiffness per MBL [N/N]
+
+NEW:
+#    Krs       or EAs_MBL      :     # quasi-static stiffness per MBL [N/N]
+#    Krd_alpha or EAd_MBL      :     # dynamic stiffness per MBL [N/N]
+#    Krd_beta  or EAd_MBL_PML  :     # dynamic stiffness per MBL per % mean load [N/N]
+# (% mean load will be input later in the modeling code)
+
+
 #    
 #    MBL_0     :     # minimum breaking load offset [N]
 #    MBL_d     :     # minimum breaking load per diameter [N/m]
@@ -56,7 +64,7 @@ lineProps:
     MBL_d2    :  170.5e6   # minimum breaking load per diameter^2 [N/m^2]   
     dvol_dnom :  0.86      # volume-equivalent diameter per nominal diameter [-]    
     cost_MBL  :  1.65e-05  # cost per MBL [$/m/N]
-
+    
   nylon       :            # nylon synthetic rope
     mass_d2   :  647.6     # linear mass density per diameter^2 [kg/m^3]
     EA_d2     :  1.18e8    # stiffness per diameter^2 [N/m^2] 

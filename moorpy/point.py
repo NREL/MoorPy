@@ -209,7 +209,7 @@ class Point():
         # add forces from attached lines
         for LineID,endB in zip(self.attached,self.attachedEndB):
             f += self.sys.lineList[LineID-1].getEndForce(endB)
-            
+        
         if xyz:
             return f
         else:

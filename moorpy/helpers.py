@@ -541,6 +541,30 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     return X, Y, dict(iter=iter, err=err, dX=dX_last, oths=oths, Xs=Xs, Es=Es, success=success, dXlist=dXlist, dXlist2=dXlist2)
 
 
+def dsolvePlot(info):
+    '''Plots dsolve or dsolve solution process based on based dict of dsolve output data'''
+
+    import matplotlib.pyplot as plt
+
+    n = info['Xs'].shape[1]  # number of variables
+
+    if n < 8:
+        fig, ax = plt.subplots(2*n, 1, sharex=True)
+        for i in range(n):
+            ax[  i].plot(info['Xs'][:info['iter']+1,i])
+            ax[n+i].plot(info['Es'][:info['iter']+1,i])
+        ax[-1].set_xlabel("iteration")
+    else:
+        fig, ax = plt.subplots(n, 2, sharex=True)
+        for i in range(n):
+            ax[i,0].plot(info['Xs'][:info['iter']+1,i])
+            ax[i,1].plot(info['Es'][:info['iter']+1,i])
+        ax[-1,0].set_xlabel("iteration, X")
+        ax[-1,1].set_xlabel("iteration, Error")
+    plt.show()
+
+
+
 def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=1025.0, g=9.81, **kwargs):
     '''Sets up a dictionary that represents a mooring line type based on the 
     specified diameter and material type. The

@@ -187,6 +187,8 @@ class Body():
    
     def getForces(self, lines_only=False):
         '''Sums the forces and moments on the Body, including its own plus those from any attached objects.
+        Forces and moments are aligned with global x/y/z directions but are relative 
+        to the body's local reference point.
 
         Parameters
         ----------
@@ -231,21 +233,19 @@ class Body():
             
             
         # All forces and moments on the body should now be summed, and are in global/unrotated orientations.
-        
+        '''
         # For application to the body DOFs, convert the moments to be about the body's local/rotated x/y/z axes <<< do we want this in all cases? 
         rotMat = rotationMatrix(*self.r6[3:])                                       # get rotation matrix for body
         moment_about_body_ref = np.matmul(rotMat.T, f6[3:])                         # transform moments so that they are about the body's local/rotated axes
         f6[3:] = moment_about_body_ref                                              # use these moments
-        
-        
+        '''
         return f6
     
 
     
     def getStiffness(self, X = [], tol=0.0001, dx = 0.1):
         '''Gets the stiffness matrix of a Body due only to mooring lines with all other objects free to equilibriate.
-        The rotational indicies of the stiffness matrix correspond to the local/rotated axes of the body rather than
-        the global x/y/z directions.
+        The rotational indices of the stiffness matrix correspond to the global x/y/z directions.
         
         Parameters
         ----------
@@ -308,11 +308,11 @@ class Body():
             6x6 analytic stiffness matrix.
 
         '''
-        
-        #print("Getting Body "+str(self.number)+" stiffness matrix...")
-        
+                
         K = np.zeros([6,6])
         
+        
+        # stiffness contributions from attached points (and any of their attached lines)
         for PointID,rPointRel in zip(self.attachedP,self.rPointRel):
             
             r = rotatePosition(rPointRel, self.r6[3:])          # relative position of Point about body ref point in unrotated reference frame  
@@ -323,12 +323,12 @@ class Body():
             H = getH(r)
             K[:3,:3] += K3
             K[:3,3:] += np.matmul(K3, H)                        # only add up one off-diagonal sub-matrix for now, then we'll mirror at the end
-            K[3:,3:] += np.matmul(np.matmul(H, K3), H.T) + np.matmul( getH(f3), H.T)
-            #K[3:,3:] += np.matmul(np.matmul(H, K3), H.T) - np.matmul( getH(f3), H)  # <<< should be the same
-                
+            K[3:,3:] += -np.matmul(getH(f3), H) - np.matmul(H, np.matmul(K3,H))   # updated 2023-05-02
+   
         K[3:,:3] = K[:3,3:].T                                   # copy over other off-diagonal sub-matrix
         
         
+        # body's own stiffness components
         if lines_only == False:
         
             # rotational stiffness effect of weight
@@ -344,6 +344,7 @@ class Body():
             
             K[3:,3:] += Kw + Kb
             K[2 ,2 ] += Kwp
+            
         
         return K
     
@@ -407,8 +408,4 @@ class Body():
         linebit[2][0].set_3d_properties([self.r6[2], rz[2]])
         '''
         return linebit
-    
-    
-    
-#
     

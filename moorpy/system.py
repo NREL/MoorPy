@@ -175,7 +175,7 @@ class System():
                 self.rodList[-1].rB = rB  #.setEndPosition(rB, 1)  # set initial end B position
 
     
-    def addPoint(self, mytype, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0):
+    def addPoint(self, mytype, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0, body=0):
         '''Convenience function to add a Point to a mooring system
 
         Parameters
@@ -192,6 +192,8 @@ class System():
             applied external force vector in global orientation (not including weight/buoyancy) [N]. The default is np.zeros(3).
         DOFs : list, optional
             list of which coordinate directions are DOFs for this point (default 0,1,2=x,y,z). E.g. set [2] for vertical motion only.. The default is [0,1,2].
+        body : int, optional
+            ID of body that point is attached to, in which case r is the relative position on the body.
 
         Returns
         -------
@@ -200,6 +202,14 @@ class System():
         '''
 
         self.pointList.append( Point(self, len(self.pointList)+1, mytype, r, m=m, v=v, fExt=fExt, DOFs=DOFs, d=d) )
+        
+        
+        if body > 0:
+            if body <= len(self.bodyList):
+                self.bodyList[body-1].attachPoint(self.pointList[-1].number, r)
+            else:
+                raise Exception(f"Provided body ID of {body} exceeds number of bodies in the system.")
+        
         
         return len(self.pointList)  # return the index of the added point
         #print("Created Point "+str(self.pointList[-1].number))
@@ -231,8 +241,8 @@ class System():
             if lineType in self.lineTypes:                      # So make sure it matches up with a System.LineType
                 lineType = self.lineTypes[lineType]             # in which case that entry will get passed to Line.init
             else:
-                ValueError("The specified lineType name does not correspond with any lineType stored in this MoorPy System")
-                
+                raise ValueError(f"The specified lineType name ({lineType}) does not correspond with any lineType stored in this MoorPy System")
+        
         self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, lineType, nSegs=nSegs, cb=cb) )
         
         if pointA > 0:
@@ -305,7 +315,7 @@ class System():
         else:
             self.lineTypes[type_string] = lineType
 
-        
+        # <<< the "name" keyword in this method is confusing in that it isn't the index key. Does it have a purpose? <<<
 
 
     def setLineType(self, dnommm, material, source=None, name="", **kwargs):
@@ -366,13 +376,15 @@ class System():
         return rodType                              # return the dictionary in case it's useful separately
 
 
-    def load(self, filename):
+    def load(self, filename, clear=True):
         '''Loads a MoorPy System from a MoorDyn-style input file
 
         Parameters
         ----------
         filename : string
             the file name of a MoorDyn-style input file.
+        clear : boolean
+            Starts from a clean slate when true. When false, will build on existing mooring system objects.
 
         Raises
         ------
@@ -386,16 +398,15 @@ class System():
         '''
         
         # create/empty the lists to start with
+        if clear:
+            RodDict   = {}  # create empty dictionary for rod types
+            self.lineTypes = {}  # create empty dictionary for line types
+            self.rodTypes = {}  # create empty dictionary for line types
 
-        RodDict   = {}  # create empty dictionary for rod types
-        self.lineTypes = {}  # create empty dictionary for line types
-        self.rodTypes = {}  # create empty dictionary for line types
-
-        # ensure the mooring system's object lists are empty before adding to them
-        self.bodyList = []
-        self.rodList  = []
-        self.pointList= []
-        self.lineList = []
+            self.bodyList = []
+            self.rodList  = []
+            self.pointList= []
+            self.lineList = []
 
         
         # figure out if it's a YAML file or MoorDyn-style file based on the extension, then open and process
@@ -526,6 +537,8 @@ class System():
                         
                         if ("fair" in entry0) or ("coupled" in entry0) or ("ves" in entry0):       # coupled case
                             bodyType = -1                        
+                        elif ("fix" in entry0) or ("anchor" in entry0):                            # fixed case
+                            bodyType = 1
                         elif ("con" in entry0) or ("free" in entry0):                              # free case
                             bodyType = 0
                         else:                                                                      # for now assuming unlabeled free case
@@ -644,6 +657,7 @@ class System():
                             BodyID = int("".join(filter(str.isdigit, entry1)))
                             if len(self.bodyList) < BodyID:
                                 self.bodyList.append( Body(self, 1, 0, np.zeros(6)))
+                                print("New body added")  # <<< should add consistent warnings in these cases
                             
                             rRel = np.array(entries[2:5], dtype=float)
                             self.bodyList[BodyID-1].attachPoint(num, rRel)
@@ -792,6 +806,23 @@ class System():
 
         '''
         
+        
+        # get options entries
+        if 'water_depth' in data:
+            self.depth = data['water_depth']
+            
+        if 'rho' in data:
+            self.rho = data['rho']
+        elif 'water_density' in data:
+            self.rho = data['water_density']
+            
+        # check if a MoorDyn input file is specified, in which case load it
+        if 'file' in data:
+            if len(data['file']) > 0:
+                self.load(data['file'])
+        
+                return  # stop here.  Otherwise, proceed and load mooring system objects from YAML dictionary
+        
         # line types
         for d in data['line_types']:
             dia = float(d['diameter']    )
@@ -879,17 +910,7 @@ class System():
             # attach ends (name matching here)
             self.pointList[pointDict[d['endA']]].attachLine(num, 0)
             self.pointList[pointDict[d['endB']]].attachLine(num, 1)
-                    
-                
-        # get options entries
-        if 'water_depth' in data:
-            self.depth = data['water_depth']
-            
-        if 'rho' in data:
-            self.rho = data['rho']
-        elif 'water_density' in data:
-            self.rho = data['water_density']
-            
+
         
     def readBathymetryFile(self, filename):
         f = open(filename, 'r')
@@ -1267,18 +1288,27 @@ class System():
 
         '''
         
-        nDOF = 0
-        nCpldDOF = 0
+        nDOF = 0       # number of (free) degrees of freedom
+        nCpldDOF = 0   # number of coupled degrees of freedom
+        DOFtypes = []  # list of each DOF and whether it is free (0) or coupled (-1)
         
         for body in self.bodyList:
-            if body.type == 0: nDOF     += 6
-            if body.type ==-1: nCpldDOF += 6
+            if body.type == 0: 
+                nDOF += 6
+                DOFtypes += [0]*6
+            if body.type ==-1: 
+                nCpldDOF += 6
+                DOFtypes += [-1]*6
         
         for point in self.pointList:
-            if point.type == 0: nDOF     += point.nDOF
-            if point.type ==-1: nCpldDOF += point.nDOF
+            if point.type == 0: 
+                nDOF += point.nDOF
+                DOFtypes += [0]*point.nDOF
+            if point.type ==-1: 
+                nCpldDOF += point.nDOF
+                DOFtypes += [-1]*point.nDOF
         
-        return nDOF, nCpldDOF
+        return nDOF, nCpldDOF, DOFtypes
     
     
     def initialize(self, plots=0):
@@ -1295,7 +1325,7 @@ class System():
 
         '''
         
-        self.nDOF, self.nCpldDOF = self.getDOFs()
+        self.nDOF, self.nCpldDOF, _ = self.getDOFs()
         
         for body in self.bodyList:
             body.setPosition(body.r6)
@@ -1438,7 +1468,7 @@ class System():
         i = 0 # index used to split off input positions X for each free object
                 
         # check to ensure len(X) matches nDOF, nCpldDOF or nDOF+nCpldDOF
-        nDOF, nCpldDOF = self.getDOFs()
+        nDOF, nCpldDOF, _ = self.getDOFs()
         if DOFtype=="free":
             types = [0]
             if len(X) != nDOF:
@@ -1487,7 +1517,7 @@ class System():
 
         '''
         
-        nDOF, nCpldDOF = self.getDOFs()
+        nDOF, nCpldDOF, _ = self.getDOFs()
         
         # initialize force array based on DOFtype specified
         if DOFtype == "free":
@@ -2185,7 +2215,7 @@ class System():
         
         
     
-    def getSystemStiffness(self, DOFtype="free", dx = 0.1, dth = 0.1, solveOption=1, lines_only=False, plots=0):
+    def getSystemStiffness(self, DOFtype="free", dx=0.1, dth=0.1, solveOption=1, lines_only=False, plots=0):
         '''Calculates the stiffness matrix for all selected degrees of freedom of a mooring system 
         whether free, coupled, or both (other DOFs are considered fixed).
 
@@ -2313,8 +2343,8 @@ class System():
             raise ValueError("getSystemStiffness was called with an invalid solveOption (only 0 and 1 are supported)")
         
         
-        # ----------------- restore the system back to previous positions ------------------
-        self.setPositions(X1, DOFtype=DOFtype)
+        # ----------------- restore the system back to previous state ------------------
+        self.mooringEq(X1, DOFtype=DOFtype)  # this restores positions and recalculates forces
         
         # show an animation of the stiffness perturbations if applicable
         if plots > 0:
@@ -2353,7 +2383,7 @@ class System():
             nCpldDOF x nCpldDOF stiffness matrix of the system
 
         '''
-        self.nDOF, self.nCpldDOF = self.getDOFs()
+        self.nDOF, self.nCpldDOF, _ = self.getDOFs()
         
         if self.display > 2:
             print("Getting mooring system stiffness matrix...")
@@ -2481,7 +2511,59 @@ class System():
             return K    
         
         
+    
+    def getCoupledStiffnessA(self, dx=0.1, dth=0.1, solveOption=1, lines_only=False, tensions=False, nTries=3, plots=0):
+        '''Calculates the stiffness matrix for coupled degrees of freedom of a mooring system
+        with free uncoupled degrees of freedom equilibrated - analytical appraoch. 
         
+        Parameters
+        ----------
+        plots : boolean, optional
+            Determines whether the stiffness calculation process is plotted and/or animated or not. The default is 0.
+        lines_only : boolean
+            Whether to consider only line forces and ignore body/point properties.
+        tensions : boolean
+            Whether to also compute and return mooring line tension jacobians
+
+        Returns
+        -------
+        K : matrix
+            nCpldDOF x nCpldDOF stiffness matrix of the system
+
+        '''
+        
+        self.nDOF, self.nCpldDOF, DOFtypes = self.getDOFs()
+        
+        n = self.nDOF + self.nCpldDOF
+        
+        if self.display > 2:
+            print("Getting mooring system stiffness matrix...")
+
+        # get full system stiffness matrix
+        K_all = self.getSystemStiffnessA(DOFtype="both", lines_only=lines_only)
+        
+        # invert matrix
+        K_inv_all = np.linalg.inv(K_all)
+        
+        # remove free DOFs (this corresponds to saying that the same of forces on these DOFs will remain zero)
+        #indices = list(range(n))                # list of DOF indices that will remain active for this step
+        mask = [True]*n                         # this is a mask to be applied to the array K indices
+        
+        for i in range(n-1, -1, -1):            # go through DOFs and flag free ones for exclusion
+            if DOFtypes[i] == 0:
+                mask[i] = False
+                #del indices[i]
+        
+        K_inv_coupled = K_inv_all[mask,:][:,mask]
+        
+        # invert reduced matrix to get coupled stiffness matrix (with free DOFs assumed to equilibrate linearly)
+        K_coupled = np.linalg.inv(K_inv_coupled)
+        
+        #if tensions:
+        #    return K_coupled, J
+        #else:
+        return K_coupled    
+            
     
     
     def getSystemStiffnessA(self, DOFtype="free", lines_only=False, rho=1025, g=9.81):
@@ -2516,7 +2598,7 @@ class System():
         
         
         # find the total number of free and coupled DOFs in case any object types changed
-        self.nDOF, self.nCpldDOF = self.getDOFs()
+        self.nDOF, self.nCpldDOF, _ = self.getDOFs()
         
         #self.solveEquilibrium()   # should we make sure the system is in equilibrium?
         
@@ -3494,4 +3576,4 @@ class System():
             for x in range(len(L)):
                 out.write(L[x])
                 out.write('\n')    
-    
+

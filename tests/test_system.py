@@ -268,6 +268,43 @@ def test_basicU():
                     np.hstack([msU.pointList[1].r, msU.pointList[2].r]), rtol=0, atol=0.001, verbose=True)
 
 
+
+
+def test_bodyStiffness():
+    '''Compares the stiffness calculated for a body with numerical and analytical 
+    methods.'''
+    
+    ms = mp.System(depth=60)
+
+    ms.setLineType(120, 'chain', name='chain')    # add a line type
+    
+    # more involved case with a body
+    ms.addPoint(1, [  0,  0, -60])   # anchor
+    ms.addPoint(1, [100, 40, -30], v = 30)   # free point between line sections
+    ms.addPoint(1, [200,  0, 0])     # fairlead
+        
+    ms.addPoint(1, [400,  0, -60])   # anchor 2
+    ms.addPoint(1, [200,  0, 0])     # fairlead 2
+
+    # line sloping up from A to B, and another in the opposite order
+    ms.addLine(120, 'chain', pointA=1, pointB=2)
+    ms.addLine(110, 'chain', pointA=2, pointB=3)
+    ms.addLine(220, 'chain', pointA=4, pointB=5)
+
+    # create body and attach lines to it
+    ms.addBody(-1, [200,0,0,0,0,0], v=20, m=2050, AWP=100, rM=20)
+    ms.bodyList[0].attachPoint(3, [-5, 2, -10])
+    ms.bodyList[0].attachPoint(5, [-5, 0, -10])
+    
+    ms.initialize()
+    
+    Kn = ms.bodyList[0].getStiffness(tol=0.00001, dx = 0.001)
+    Ka = ms.bodyList[0].getStiffnessA(lines_only=True)
+    
+    assert_allclose(Ka, Kn, rtol=0.02, atol=100.0, verbose=True)
+
+
+
 @pytest.mark.parametrize('CB', inCBs)
 def test_seabed(CB):
     '''Compares a single catenary mooring line along the seabed with a two-line system
