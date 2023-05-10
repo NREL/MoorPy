@@ -4,11 +4,17 @@ MoorPy is a design-oriented mooring system library for Python based around a qua
 
 ### Prerequisites
 
-- Python 3.7 or greater
-- The following packages: NumPy, MatPlotLib, yaml, scipy
+- Python 3.9 or greater
+- The following packages: NumPy, MatPlotLib, pyyaml, scipy
 
 ### Installation
-From the command line in thh main MoorPy directory, run the following commands based on your additional needs...
+
+MoorPy is available on PyPi via:
+```pycon
+pip install MoorPy
+```
+
+For an editable install that relies on the local source code, first clone the repository.  Then, from the command line in the main MoorPy directory, run the following commands based on your additional needs...
 
 #### General
 ```pycon
