@@ -55,7 +55,10 @@ def catenary(XF, ZF, L, EA, W, alpha, CB=0, HF0=0, VF0=0, Tol=0.00001, nNodes=20
     info = dict(error=False)
     
     info['call'] = f"catenary({XF}, {ZF}, {L}, {EA}, {W}, {alpha}, CB={CB}, HF0={HF0}, VF0={VF0}, Tol={Tol}, MaxIter={MaxIter}, plots=1)"
-    
+    #print(info['call'])
+    #if alpha != 0:
+     #   ProfileType = 7
+
     
     # make some arrays if needed for plotting each node
     if plots > 0:
@@ -954,19 +957,32 @@ def eval_func_cat(X, args):
 
 
     # determine line profile type
-    #Check for seabed slope
-    if (alpha == 0):
+    # #Check for seabed slope
+    # if (alpha == 0):
     
-        if(( CB < 0.0) or ( W  <  0.0) or ( VFMinWL >  0.0 ) ): # no portion of the line rests on the seabed
-            ProfileType = 1
-        elif( -CB*VFMinWL < HF ): # a portion of the line rests on the seabed and the anchor tension is nonzero
-            ProfileType = 2
-        else:   # must be 0.0 < HF <= -CB*VFMinWL, meaning a portion of the line must rest on the seabed and the anchor tension is zero
-            ProfileType = 3
+        # if(( CB < 0.0) or ( W  <  0.0) or ( VFMinWL >  0.0 ) ): # no portion of the line rests on the seabed
+            # ProfileType = 1
+        # elif( -CB*VFMinWL < HF ): # a portion of the line rests on the seabed and the anchor tension is nonzero
+            # ProfileType = 2
+        # else:   # must be 0.0 < HF <= -CB*VFMinWL, meaning a portion of the line must rest on the seabed and the anchor tension is zero
+            # ProfileType = 3
              
-    else: #Seabed is sloped 
-        ProfileType = 7    
-        
+    # else: #Seabed is sloped 
+        # ProfileType = 7   
+
+    #Check for seabed slope
+
+    if(( CB < 0.0) or ( W  <  0.0) or ( VFMinWL >  0.0 ) ): # no portion of the line rests on the seabed
+        ProfileType = 1
+    elif( -CB*VFMinWL < HF ): # a portion of the line rests on the seabed and the anchor tension is nonzero
+        ProfileType = 2
+    else:   # must be 0.0 < HF <= -CB*VFMinWL, meaning a portion of the line must rest on the seabed and the anchor tension is zero
+        ProfileType = 3
+             
+    if (ProfileType == 2 or ProfileType == 3) and alpha != 0: #Seabed is sloped 
+        ProfileType = 7        
+    #print(alpha)
+    #print(ProfileType)
    
     # Compute the error functions (to be zeroed) and the Jacobian matrix
     #   (these depend on the anticipated configuration of the mooring line):   
@@ -1090,26 +1106,40 @@ def eval_func_cat(X, args):
             EXF = HF_W*(np.arcsinh((VTD+W*(L-LBot))/HF)-np.arcsinh(VTD/HF))+(HF*(L-LBot))/EA +  X_TD - XF # error in horizontal distance
             
             EZF  = HF_W*(np.sqrt(1+((VTD+W*(L-LBot))/HF)*((VTD+W*(L-LBot))/HF))-np.sqrt(1+(VTD/HF)*(VTD/HF)))+(1/EA)*(VTD*(L-LBot)+(W*(L-LBot)*(L-LBot))/2) + Z_TD - ZF  # error in vertical distance
-
+            
+            if LBot > 0:
             #Line stiffness values
             #Re-assign some helpful values
-            VFMinWL            = VF - W*(L-LBot)      # = VTD Point, the vertical anchor load (positive-up, but VF is positive-down)
-            L_EA = (L-LBot)/EA
-            VFMinWL_HF       = VFMinWL/HF
-            VFMinWL_HF2      = VFMinWL_HF*VFMinWL_HF
-            SQRT1VFMinWL_HF2 = np.sqrt( 1.0 + VFMinWL_HF2 )
+                VFMinWL            = VF - W*(L-LBot)      # = VTD Point, the vertical anchor load (positive-up, but VF is positive-down)
+                L_EA = (L-LBot)/EA
+                VFMinWL_HF       = VFMinWL/HF
+                VFMinWL_HF2      = VFMinWL_HF*VFMinWL_HF
+                SQRT1VFMinWL_HF2 = np.sqrt( 1.0 + VFMinWL_HF2 )
             
             #Line stiffness values
-            dXFdHF = ((   np.log( VF_HF + SQRT1VF_HF2 ) - np.log( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )/ W - 
-                ( ( VF_HF + VF_HF2 /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) 
-                - ( VFMinWL_HF + VFMinWL_HF2/SQRT1VFMinWL_HF2 )/( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )/ W + L_EA)
+                dXFdHF = ((   np.log( VF_HF + SQRT1VF_HF2 ) - np.log( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )/ W - 
+                    ( ( VF_HF + VF_HF2 /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) 
+                    - ( VFMinWL_HF + VFMinWL_HF2/SQRT1VFMinWL_HF2 )/( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )/ W + L_EA)
                 
-            dXFdVF = (( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) 
+                dXFdVF = (( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) 
+                            - ( 1.0 + VFMinWL_HF /SQRT1VFMinWL_HF2 )/( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )/ W)
+            
+                dZFdHF = ( SQRT1VF_HF2 - SQRT1VFMinWL_HF2 )/ W - ( VF_HF2 /SQRT1VF_HF2 - VFMinWL_HF2/SQRT1VFMinWL_HF2 )/ W
+            
+                dZFdVF = ( VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA  
+
+            else:
+            
+                dXFdHF = ((   np.log( VF_HF + SQRT1VF_HF2 ) - np.log( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )/ W - 
+                    ( ( VF_HF + VF_HF2 /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) 
+                    - ( VFMinWL_HF + VFMinWL_HF2/SQRT1VFMinWL_HF2 )/( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )/ W + L_EA)
+                
+                dXFdVF = (( ( 1.0 + VF_HF /SQRT1VF_HF2 )/( VF_HF + SQRT1VF_HF2 ) 
                         - ( 1.0 + VFMinWL_HF /SQRT1VFMinWL_HF2 )/( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )/ W)
             
-            dZFdHF = ( SQRT1VF_HF2 - SQRT1VFMinWL_HF2 )/ W - ( VF_HF2 /SQRT1VF_HF2 - VFMinWL_HF2/SQRT1VFMinWL_HF2 )/ W
+                dZFdHF = ( SQRT1VF_HF2 - SQRT1VFMinWL_HF2 )/ W - ( VF_HF2 /SQRT1VF_HF2 - VFMinWL_HF2/SQRT1VFMinWL_HF2 )/ W;
             
-            dZFdVF = ( VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA    
+                dZFdVF = ( VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA
             
             #Ensure LBot is not less than zero 
             LBot = max(LBot, 0)

@@ -49,6 +49,7 @@ class System():
         None.
 
         '''
+
         
         # lists to hold mooring system objects
         self.bodyList = []
@@ -69,6 +70,7 @@ class System():
         self.depth = depth  # water depth [m]
         self.rho   = rho    # water density [kg/m^3]
         self.g     = g      # gravitational acceleration [m/s^2]
+        self.current = []   # Empty vector to hold the current [m/s] (if applicable)
         
         self.nDOF = 0       # number of (free) degrees of freedom of the mooring system (needs to be set elsewhere)        
         self.freeDOFs = []  # array of the values of the free DOFs of the system at different instants (2D list)
@@ -1311,6 +1313,7 @@ class System():
         # draw initial mooring system if desired
         if plots==1:
             self.plot(title="Mooring system at initialization")
+            
     
  
  
@@ -1728,6 +1731,77 @@ class System():
         if plots > 0:   
             self.animateSolution()
     """
+    
+    def solveCurrentRotation(self, DOFtype="free", plots=0, tol=0.05, rmsTol=0.0, maxIter=500, display=0, no_fail=False, finite_difference=False):
+        current = np.array([2.1213, 2.1213, 0]) #Hardcode current for now
+        #Solve Equilibrium
+        self.solveEquilibrium(DOFtype=DOFtype, plots=plots, tol=tol, rmsTol=rmsTol, maxIter=maxIter, display=display, no_fail=no_fail, finite_difference=finite_difference)
+        #Loop through all lines and find the coordinates
+        count = 0
+        for line in self.lineList:
+            self.lineList[count].Xs, self.lineList[count].Ys, self.lineList[count].Zs, self.lineList[count].Ts = line.getLineCoords(self, n=0)    # formerly UpdateLine
+            #Construct q vector for each line
+
+            for i in range(1,self.lineList[count].nNodes):
+                if i == 1:
+                    q0 = (self.lineList[count].Xs[i+1] - self.lineList[count].Xs[i])/np.sqrt(((self.lineList[count].Xs[i+1] - self.lineList[count].Xs[i])**2+(self.lineList[count].Ys[i+1] - self.lineList[count].Ys[i])**2+(self.lineList[count].Zs[i+1] - self.lineList[count].Zs[i])**2))
+                    q1 = (self.lineList[count].Ys[i+1] - self.lineList[count].Ys[i])/np.sqrt(((self.lineList[count].Xs[i+1] - self.lineList[count].Xs[i])**2+(self.lineList[count].Ys[i+1] - self.lineList[count].Ys[i])**2+(self.lineList[count].Zs[i+1] - self.lineList[count].Zs[i])**2))
+                    q2 = (self.lineList[count].Zs[i+1] - self.lineList[count].Zs[i])/np.sqrt(((self.lineList[count].Xs[i+1] - self.lineList[count].Xs[i])**2+(self.lineList[count].Ys[i+1] - self.lineList[count].Ys[i])**2+(self.lineList[count].Zs[i+1] - self.lineList[count].Zs[i])**2))
+                    q = np.array([q0, q1, q2])
+                    dp = 0.5*self.rho*self.lineList[0].type["Cd"]*self.lineList[0].type["d_vol"]*(self.lineList[0].L/(self.lineList[0].nNodes-1))*np.linalg.norm(np.dot(-current,q)*q+current)*(np.dot(-current,q)*q+current)
+                    dp0 = dp[0]
+                    dp1 = dp[1]
+                    dp2 = dp[2]
+                    dq = 0.5*self.rho*self.lineList[0].type["CdAx"]*np.pi*self.lineList[0].type["d_vol"]*(self.lineList[0].L/(self.lineList[0].nNodes-1))*np.linalg.norm(np.dot(current,q)*q)*(np.dot(current,q)*q)
+                    dq0 = dq[0]
+                    dq1 = dq[1]
+                    dq2 = dq[2]
+                elif i == self.lineList[count].nNodes:
+                    q0 = (self.lineList[count].Xs[i] - self.lineList[count].Xs[i-1])/np.sqrt(((self.lineList[count].Xs[i] - self.lineList[count].Xs[i-1])**2+(self.lineList[count].Ys[i] - self.lineList[count].Ys[i-1])**2+(self.lineList[count].Zs[i] - self.lineList[count].Zs[i-1])**2))
+                    q1 = (self.lineList[count].Ys[i] - self.lineList[count].Ys[i-1])/np.sqrt(((self.lineList[count].Xs[i] - self.lineList[count].Xs[i-1])**2+(self.lineList[count].Ys[i] - self.lineList[count].Ys[i-1])**2+(self.lineList[count].Zs[i] - self.lineList[count].Zs[i-1])**2))
+                    q2 = (self.lineList[count].Zs[i] - self.lineList[count].Zs[i-1])/np.sqrt(((self.lineList[count].Xs[i] - self.lineList[count].Xs[i-1])**2+(self.lineList[count].Ys[i] - self.lineList[count].Ys[i-1])**2+(self.lineList[count].Zs[i] - self.lineList[count].Zs[i-1])**2))
+                    q = np.array([q0, q1, q2])
+                    dp = 0.5*self.rho*self.lineList[0].type["Cd"]*self.lineList[0].type["d_vol"]*(self.lineList[0].L/(self.lineList[0].nNodes-1))*np.linalg.norm(np.dot(-current,q)*q+current)*(np.dot(-current,q)*q+current)
+                    dp0 = dp[0] + dp0
+                    dp1 = dp[1] + dp1
+                    dp2 = dp[2] + dp2
+                    dq = 0.5*self.rho*self.lineList[0].type["CdAx"]*np.pi*self.lineList[0].type["d_vol"]*(self.lineList[0].L/(self.lineList[0].nNodes-1))*np.linalg.norm(np.dot(current,q)*q)*(np.dot(current,q)*q)
+                    dq0 = dq[0] + dq0
+                    dq1 = dq[1] + dq1
+                    dq2 = dq[2] + dq2
+                else:
+                    q0 = (self.lineList[count].Xs[i+1] - self.lineList[count].Xs[i-1])/(np.sqrt(((self.lineList[count].Xs[i+1] - self.lineList[count].Xs[i-1])**2+(self.lineList[count].Ys[i+1] - self.lineList[count].Ys[i-1])**2+(self.lineList[count].Zs[i+1] - self.lineList[count].Zs[i-1])**2)))
+                    q1 = (self.lineList[count].Ys[i+1] - self.lineList[count].Ys[i-1])/(np.sqrt(((self.lineList[count].Xs[i+1] - self.lineList[count].Xs[i-1])**2+(self.lineList[count].Ys[i+1] - self.lineList[count].Ys[i-1])**2+(self.lineList[count].Zs[i+1] - self.lineList[count].Zs[i-1])**2)))
+                    q2 = (self.lineList[count].Zs[i+1] - self.lineList[count].Zs[i-1])/(np.sqrt(((self.lineList[count].Xs[i+1] - self.lineList[count].Xs[i-1])**2+(self.lineList[count].Ys[i+1] - self.lineList[count].Ys[i-1])**2+(self.lineList[count].Zs[i+1] - self.lineList[count].Zs[i-1])**2)))
+                    q = np.array([q0, q1, q2])
+                    dp = 0.5*self.rho*self.lineList[0].type["Cd"]*self.lineList[0].type["d_vol"]*(self.lineList[0].L/(self.lineList[0].nNodes-1))*np.linalg.norm(np.dot(-current,q)*q+current)*(np.dot(-current,q)*q+current)
+                    dp0 = dp[0] + dp0
+                    dp1 = dp[1] + dp1
+                    dp2 = dp[2] + dp2
+                    dq = 0.5*self.rho*self.lineList[0].type["CdAx"]*np.pi*self.lineList[0].type["d_vol"]*(self.lineList[0].L/(self.lineList[0].nNodes-1))*np.linalg.norm(np.dot(current,q)*q)*(np.dot(current,q)*q)
+                    dq0 = dq[0] + dq0
+                    dq1 = dq[1] + dq1
+                    dq2 = dq[2] + dq2
+                Fxtemp = dp0 + dq0
+                Fytemp = dp1 + dq1
+                Fztemp = dp2 + dq2
+             
+            if count == 0:
+                Fx = np.array([Fxtemp])
+                Fy = np.array([Fytemp])
+                Fz = np.array([Fztemp])
+                print("count 0")
+                print(Fx)
+                
+            else:
+                Fx = np.append([Fx],[Fxtemp])
+                Fy = np.append([Fy],[Fytemp])
+                Fz = np.append([Fz],[Fztemp])
+
+            count = count +1
+        breakpoint()       
+                  
+            
     
     def solveEquilibrium3(self, DOFtype="free", plots=0, tol=0.05, rmsTol=0.0, maxIter=500, display=0, no_fail=False, finite_difference=False):
         self.solveEquilibrium(DOFtype=DOFtype, plots=plots, tol=tol, rmsTol=rmsTol, maxIter=maxIter, display=display, no_fail=no_fail, finite_difference=finite_difference)
