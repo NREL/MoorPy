@@ -158,12 +158,16 @@ class Line():
             # --- Read in additional data if available ---
 
             # segment tension  <<< to be changed to nodal tensions in future MD versions
-            #if "Seg1Te" in ch
             if "Seg1Ten" in ch:
                 self.Tendata = True
-                self.Ten = np.zeros([nT,self.nNodes-1])
+                self.Te = np.zeros([nT,self.nNodes-1])
                 for i in range(self.nNodes-1):
-                    self.Ten[:,i] = data[:, ch['Seg'+str(i+1)+'Ten']]
+                    self.Te[:,i] = data[:, ch['Seg'+str(i+1)+'Ten']]
+            elif "Seg1Te" in ch:
+                self.Tendata = True
+                self.Te = np.zeros([nT,self.nNodes-1])
+                for i in range(self.nNodes-1):
+                    self.Te[:,i] = data[:, ch['Seg'+str(i+1)+'Te']]
             else:
                 self.Tendata = False
                         
@@ -398,7 +402,7 @@ class Line():
                     Te = 0.5*(np.append(self.Te[ts,0], self.Te[ts,:]) +np.append(self.Te[ts,:], self.Te[ts,-1]))
                 except: # otherwise return zeros to avoid an error (might want a warning in some cases?)
                     Te = np.zeros(self.nNodes)
-                    
+                
                 return self.xp[ts,:], self.yp[ts,:], self.zp[ts,:], Te
     
     
