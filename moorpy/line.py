@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import cm
 from moorpy.Catenary import catenary
 from moorpy.nonlinear import nonlinear                                      
-from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower, read_mooring_file
+from moorpy.helpers import LineError, CatenaryError, rotationMatrix, makeTower, read_mooring_file, unitVector
 from os import path
 
  
@@ -888,7 +888,7 @@ class Line():
             alpha = np.sign(v_hat[2])*(180/np.pi)*np.arccos(cosArg) 
         #Throw an error if the seabed slope is more than the arctan(Zf/Xf) then line would be fully on the slope and or would need to go through the slope which cannot be handled by our equations
         if alpha > (180/np.pi)*np.arctan((self.rB[2]-self.rA[2])/total_xy_dist):    
-            raise LineError(22,"Fairlead/Anchor Position not compatible with Positive Seabed Slope")    
+            raise LineError(self.number,"Fairlead/Anchor Position not compatible with Positive Seabed Slope")    
        
             
         # ----- get line results for linear or nonlinear elasticity -----
@@ -975,56 +975,34 @@ class Line():
 
             
         if currentflag == 1: #If there is a current applied to the model
-           #Calculate the current loading on the line
+            #Calculate the current loading on the line
+            
+            dl = self.L/(self.nNodes-1)  # segment length
+            
+            FCurrent = np.zeros(3)  # total current force on line in x, y, z [N]        
+            
             for i in range(1,self.nNodes-1): #Loop through each node (minus anchor and fairlead) in the line and calculate the current loading
+            
                 #For each node find the line tangent vector and then calculate the current loading on the line
                 if i == 1:
-                    q0 = (Xs[i+1] - Xs[i])/np.sqrt(((Xs[i+1] - Xs[i])**2+(Ys[i+1] - Ys[i])**2+(Zs[i+1] - Zs[i])**2))
-                    q1 = (Ys[i+1] - Ys[i])/np.sqrt(((Xs[i+1] - Xs[i])**2+(Ys[i+1] - Ys[i])**2+(Zs[i+1] - Zs[i])**2))
-                    q2 = (Zs[i+1] - Zs[i])/np.sqrt(((Xs[i+1] - Xs[i])**2+(Ys[i+1] - Ys[i])**2+(Zs[i+1] - Zs[i])**2))
-                    q = np.array([q0, q1, q2])
-                    dp = 0.5*self.sys.rho*self.type["Cd"]*self.type["d_vol"]*(self.L/(self.nNodes-1))*np.linalg.norm(np.dot(-current,q)*q+current)*(np.dot(-current,q)*q+current)
-                    dp0 = dp[0]
-                    dp1 = dp[1]
-                    dp2 = dp[2]
-                    dq = 0.5*self.sys.rho*self.type["CdAx"]*np.pi*self.type["d_vol"]*(self.L/(self.nNodes-1))*np.linalg.norm(np.dot(current,q)*q)*(np.dot(current,q)*q)
-                    dq0 = dq[0]
-                    dq1 = dq[1]
-                    dq2 = dq[2]
+                    q = unitVector([Xs[i+1] - Xs[i], Ys[i+1] - Ys[i], Zs[i+1] - Zs[i]])
                 elif i == self.nNodes:
-                    q0 = (Xs[i] - Xs[i-1])/np.sqrt(((Xs[i] - Xs[i-1])**2+(Ys[i] - Ys[i-1])**2+(Zs[i] - Zs[i-1])**2))
-                    q1 = (Ys[i] - Ys[i-1])/np.sqrt(((Xs[i] - Xs[i-1])**2+(Ys[i] - Ys[i-1])**2+(Zs[i] - Zs[i-1])**2))
-                    q2 = (Zs[i] - Zs[i-1])/np.sqrt(((Xs[i] - Xs[i-1])**2+(Ys[i] - Ys[i-1])**2+(Zs[i] - Zs[i-1])**2))
-                    q = np.array([q0, q1, q2])
-                    dp = 0.5*self.sys.rho*self.type["Cd"]*self.type["d_vol"]*(self.L/(self.nNodes-1))*np.linalg.norm(np.dot(-current,q)*q+current)*(np.dot(-current,q)*q+current)
-                    dp0 = dp[0] + dp0
-                    dp1 = dp[1] + dp1
-                    dp2 = dp[2] + dp2
-                    dq = 0.5*self.sys.rho*self.type["CdAx"]*np.pi*self.type["d_vol"]*(self.L/(self.nNodes-1))*np.linalg.norm(np.dot(current,q)*q)*(np.dot(current,q)*q)
-                    dq0 = dq[0] + dq0
-                    dq1 = dq[1] + dq1
-                    dq2 = dq[2] + dq2
+                    q = unitVector([Xs[i] - Xs[i-1], Ys[i] - Ys[i-1], Zs[i] - Zs[i-1]])
                 else:
-                    q0 = (Xs[i+1] - Xs[i-1])/(np.sqrt(((Xs[i+1] - Xs[i-1])**2+(Ys[i+1] - Ys[i-1])**2+(Zs[i+1] - Zs[i-1])**2)))
-                    q1 = (Ys[i+1] - Ys[i-1])/(np.sqrt(((Xs[i+1] - Xs[i-1])**2+(Ys[i+1] - Ys[i-1])**2+(Zs[i+1] - Zs[i-1])**2)))
-                    q2 = (Zs[i+1] - Zs[i-1])/(np.sqrt(((Xs[i+1] - Xs[i-1])**2+(Ys[i+1] - Ys[i-1])**2+(Zs[i+1] - Zs[i-1])**2)))
-                    q = np.array([q0, q1, q2])
-                    dp = 0.5*self.sys.rho*self.type["Cd"]*self.type["d_vol"]*(self.L/(self.nNodes-1))*np.linalg.norm(np.dot(-current,q)*q+current)*(np.dot(-current,q)*q+current)
-                    dp0 = dp[0] + dp0
-                    dp1 = dp[1] + dp1
-                    dp2 = dp[2] + dp2
-                    dq = 0.5*self.sys.rho*self.type["CdAx"]*np.pi*self.type["d_vol"]*(self.L/(self.nNodes-1))*np.linalg.norm(np.dot(current,q)*q)*(np.dot(current,q)*q)
-                    dq0 = dq[0] + dq0
-                    dq1 = dq[1] + dq1
-                    dq2 = dq[2] + dq2
-                FxCurrent = dp0 + dq0
-                FyCurrent = dp1 + dq1
-                FzCurrent = dp2 + dq2
+                    q = unitVector([Xs[i+1] - Xs[i-1], Ys[i+1] - Ys[i-1], Zs[i+1] - Zs[i-1]])
+                    
+                # calculate transverse and axial current force at this node
+                dp = 0.5*self.sys.rho*self.type["Cd"]*self.type["d_vol"]*dl*np.linalg.norm(np.dot(-current,q)*q+current)*(np.dot(-current,q)*q+current)
+                dq = 0.5*self.sys.rho*self.type["CdAx"]*np.pi*self.type["d_vol"]*dl*np.linalg.norm(np.dot(current,q)*q)*(np.dot(current,q)*q)
+                
+                # add to total current force on line
+                FCurrent = FCurrent + dp + dq    
+                
         
             #Current per unit length of line
-            FC_1 = FxCurrent/(self.L)
-            FC_2 = FyCurrent/(self.L)
-            FC_3 = FzCurrent/(self.L)
+            FC_1 = FCurrent[0]/(self.L)
+            FC_2 = FCurrent[1]/(self.L)
+            FC_3 = FCurrent[2]/(self.L)
             
             # Function which finds the rotation matrix which transforms vector A into Vector B
             def RotFrm2Vect( A, B):
@@ -1073,7 +1051,7 @@ class Line():
                 alpha = np.sign(v_hat_rot[2])*(180/np.pi)*np.arccos(cosArg) 
             #Throw an error if the seabed slope is more than the arctan(Zf/Xf) then line would be fully on the slope and or would need to go through the slope which cannot be handled by our equations
             if alpha > (180/np.pi)*np.arctan(rot_dr[2]/total_xy_dist):    
-                raise LineError(22,"Fairlead/Anchor Position not compatible with Positive Seabed Slope")    
+                raise LineError(self.number,"Fairlead/Anchor Position not compatible with Positive Seabed Slope")    
                 
             #Reassign the values for LH and LV 
             LH = total_xy_dist
@@ -1113,9 +1091,7 @@ class Line():
             rot_FA = np.array([fAH*d_hat_rot[0],fAH*d_hat_rot[1],fAV])
             rot_FB = np.array([fBH*d_hat_rot[0],fBH*d_hat_rot[1],fBV])
             
-            
-       
-                    
+              
             #Unrotate the system (Anti-rotation ;p)
             #Inverse rotation matrix
             inv_r = np.linalg.inv(R_curr)
@@ -1125,12 +1101,8 @@ class Line():
             unrot_FB = inv_r@np.transpose(rot_FB)
             
             #Reassign our unrotated forces
-            self.fA[0] = unrot_FA[0]
-            self.fA[1] = unrot_FA[1]
-            self.fA[2] = unrot_FA[2]
-            self.fB[0] = unrot_FB[0]
-            self.fB[1] = unrot_FB[1]
-            self.fB[2] = unrot_FB[2]
+            self.fA = unrot_FA
+            self.fB = unrot_FB
             self.TA = np.linalg.norm(unrot_FA) # end tensions
             self.TB = np.linalg.norm(unrot_FB)
             
@@ -1277,7 +1249,7 @@ class Line():
             alpha = np.sign(v_hat[2])*(180/np.pi)*np.arccos(cosArg) 
         #Throw an error if the seabed slope is more than the arctan(Zf/Xf) then line would be fully on the slope and or would need to go through the slope which cannot be handled by our equations
         if alpha > (180/np.pi)*np.arctan((self.rB[2]-self.rA[2])/total_xy_dist):    
-            raise LineError(22,"Fairlead/Anchor Position not compatible with Positive Seabed Slope")    
+            raise LineError(self.number,"Fairlead/Anchor Position not compatible with Positive Seabed Slope")    
     
         #If EA is found in the line properties we will run the original catenary function 
         if 'EA' in self.type:

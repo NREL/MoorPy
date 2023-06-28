@@ -72,6 +72,14 @@ def printVec(vec):
     print( "\t".join(["{:+9.4e}"]*len(vec)).format( *vec ))
 
 
+def unitVector(r):
+    '''Returns the unit vector along the direction of input vector r.'''
+
+    L = np.linalg.norm(r)
+
+    return r/L
+
+
 def getH(r):
     '''function gets the alternator matrix, H, that when multiplied with a vector,
     returns the cross product of r and that vector
