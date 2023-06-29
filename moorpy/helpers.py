@@ -3,7 +3,7 @@ import numpy as np
 import time
 import yaml
 import os
-
+import re
 
  
 # base class for MoorPy exceptions
@@ -851,4 +851,82 @@ def read_mooring_file(dirName,fileName):
     data3 = data2.astype(float)
     
     return data3, ch, channels, units    
-   
+
+def read_output_file(dirName,fileName, skiplines=-1, hasunits=1, chanlim=999, dictionary=True):
+
+    # load data from FAST output file
+    # looks for channel names, then units (if hasunits==1), then data lines after first skipping [skiplines] lines.
+    # skiplines == -1 signals to search for first channel names line based on starting channel "Time".
+    
+#   print('attempting to load '+dirName+fileName)
+    f = open(dirName+fileName, 'r')
+    
+    channels = []
+    units = []
+    data = []
+    i=0
+    
+    for line in f:          # loop through lines in file
+    
+        if (skiplines == -1):               # special case signalling to search for "Time" at start of channel line
+            entries = line.split()          # split elements by whitespace
+            print(entries)
+            if entries[0].count('Time') > 0 or entries[0].count('time') > 0:  # if we find the time keyword
+                skiplines = i
+                print("got skiplines="+str(i))
+            else:
+                pass
+    
+        if (i < skiplines or skiplines < 0):        # if we haven't gotten to the first channel line or we're in search mode, skip
+            pass
+            
+        elif (i == skiplines):
+            for entry in line.split():      # loop over the elemets, split by whitespace
+                channels.append(entry)      # append to the last element of the list
+                
+        elif (i == skiplines+1 and hasunits == 1):
+            for entry in line.split():      # loop over the elemets, split by whitespace
+                if entry.count('kN') > 0 and entry.count('m') > 0:  # correct for a possible weird character
+                    entry = '(kN-m)'
+                    
+                units.append(entry)         # append to the last element of the list
+        
+        elif len(line.split()) > 0:
+            data.append([])  # add a new sublist to the data matrix
+            
+            r = re.compile(r"(?<=\d)\-(?=\d)")  # catch any instances where a large negative exponent has been written with the "E"
+            line2 = r.sub("E-",line)           # and add in the E
+            
+            j=0
+            for entry in line2.split():      # loop over the elements, split by whitespace
+                if j > chanlim:
+                    break
+                j+=1    
+                data[-1].append(entry)      # append to the last element of the list
+    
+        else:
+            break
+    
+        i+=1
+    
+    f.close()  # close data file
+    
+    
+    # use a dictionary for convenient access of channel columns (eg. data[t][ch['PtfmPitch'] )
+    ch = dict(zip(channels, range(len(channels))))
+    
+    #print ch['WindVxi']
+
+    data2 = np.array(data)
+    
+    data3 = data2.astype(float)
+    
+    if dictionary:
+        dataDict = {}
+        unitDict = {}
+        for i in range(len(channels)):
+            dataDict[channels[i]] = data3[:,i]
+            unitDict[channels[i]] = units[i]
+        return dataDict, unitDict
+    else:
+        return data3, ch, channels, units
