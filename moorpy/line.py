@@ -49,6 +49,7 @@ class Line():
         
         self.nNodes = int(nSegs) + 1
         self.cb = float(cb)    # friction coefficient (will automatically be set negative if line is fully suspended)
+        self.sbnorm = []    # Seabed Normal Vector (to be filled with a 3x1 normal vector describing seabed orientation)
         
         self.rA = np.zeros(3) # end coordinates
         self.rB = np.zeros(3)
@@ -323,47 +324,13 @@ class Line():
     
         # if a quasi-static analysis, just call the catenary function to return the line coordinates
         elif self.qs==1:
-        
-            depth = self.sys.depth
-        
-            dr =  self.rB - self.rA                 
-            LH = np.hypot(dr[0], dr[1])     # horizontal spacing of line ends
-            LV = dr[2]                      # vertical offset from end A to end B
-            if LH >0:
-                cosBeta = dr[0]/LH                 # cos of line heading
-                sinBeta = dr[1]/LH                 # sin of line heading
-                self.th = np.arctan2(dr[1],dr[0])  # line heading
-            else:   # special case of vertical line: line heading is undefined - use zero as default
-                cosBeta = 0.0
-                sinBeta = 0.0
-                self.th = 0.0
             
-            if np.min([self.rA[2],self.rB[2]]) > -depth:
-                self.cb = -depth - np.min([self.rA[2],self.rB[2]])   # if this line's lower end is off the seabed, set cb negative and to the distance off the seabed
-            elif self.cb < 0:   # if a line end is at the seabed, but the cb is still set negative to indicate off the seabed
-                self.cb = 0.0     # set to zero so that the line includes seabed interaction.
-        
-            # ----- check for linear vs nonlinear line elasticity -----
-        
-            #If EA is found in the line properties we will run the original catenary function 
-            if 'EA' in self.type:
+            self.staticSolve(profiles=1) # call with flag to tell Catenary to return node info
             
-                try:
-                    (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], 
-                                                      self.cb, HF0=self.HF, VF0=self.VF, nNodes=n, plots=1) 
-                except CatenaryError as error:
-                    raise LineError(self.number, error.message)
-
-                 #(fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], CB=self.cb, HF0=self.HF, VF0=self.VF, nNodes=n, plots=1)   # call line model
-
-            #If EA isnt found then we will use the ten-str relationship defined in the input file 
-            else:
-                 (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],self.type['w']) 
-            
-            Xs = self.rA[0] + info["X"]*cosBeta 
-            Ys = self.rA[1] + info["X"]*sinBeta 
-            Zs = self.rA[2] + info["Z"]
-            Ts = info["Te"]
+            Xs = self.rA[0] + self.info["X"]*self.cosBeta 
+            Ys = self.rA[1] + self.info["X"]*self.sinBeta 
+            Zs = self.rA[2] + self.info["Z"]
+            Ts = self.info["Te"]
             return Xs, Ys, Zs, Ts
             
         # otherwise, count on read-in time-series data
@@ -736,7 +703,11 @@ class Line():
 
         '''
 
-        depth = self.sys.depth
+        #depth = self.sys.depth
+        # get seabed depth and slope under each line end
+        depthA, nvecA = self.sys.getDepthFromBathymetry(self.rA[0], self.rA[1])
+        depthB, nvecB = self.sys.getDepthFromBathymetry(self.rB[0], self.rB[1])
+        depth = 0.5*(depthA + depthB)  # temporary approach <<<
         
         dr =  self.rB - self.rA
         LH = np.hypot(dr[0], dr[1])     # horizontal spacing of line ends
@@ -750,9 +721,11 @@ class Line():
             sinBeta = 0.0
             self.th = 0.0
 
-        if self.rA[2] < -depth:
-            raise LineError("Line {} end A is lower than the seabed.".format(self.number))
-        elif self.rB[2] < -depth:
+        if self.rA[2] < -depthA:
+            self.rA[2] = -depthA
+            self.cb = 0
+            #raise LineError("Line {} end A is lower than the seabed.".format(self.number)) <<< temporarily adjust to seabed depth
+        elif self.rB[2] < -depthB:
             raise LineError("Line {} end B is lower than the seabed.".format(self.number))
         elif np.min([self.rA[2],self.rB[2]]) > -depth:
             self.cb = -depth - np.min([self.rA[2],self.rB[2]])   # if this line's lower end is off the seabed, set cb negative and to the distance off the seabed
@@ -765,19 +738,56 @@ class Line():
             
         if reset==True:   # Indicates not to use previous fairlead force values to start catenary 
             self.HF = 0   # iteration with, and insteady use the default values.
+        
+        
+        # ----- Do some preprocessing to determine the seabed slope -----
+
+        # check if there's seabed contact AND seabed slope at end A
+        if self.rA[2] + depthA < 1 and nvecA[2] < 1.0:
             
+            self.cb = 0 # hasty override for safety
+            
+            #Determine the heading of the line and construct the d_hat unit vector
+            d_hat = [cosBeta, sinBeta,0]   
+            
+            #Determine the v vector which is the d vector projectd onto the seabed
+            v_hat = [np.sqrt(1-((d_hat[0]*nvecA[0]+d_hat[1]*nvecA[1])/nvecA[2])**2)*d_hat[0], 
+                     np.sqrt(1-((d_hat[0]*nvecA[0]+d_hat[1]*nvecA[1])/nvecA[2])**2)*d_hat[1], 
+                     -(d_hat[0]*nvecA[0]+d_hat[1]*nvecA[1])/nvecA[2]]  
+                     
+            #Determine the seabed slope
+            if v_hat[2] == 0:
+                alpha = 0 
+            else: 
+                cosArg = np.dot(d_hat, v_hat)/(np.linalg.norm(d_hat)*np.linalg.norm(v_hat))
+                if cosArg > 1:
+                    cosArg = 1
+                if cosArg < -1:
+                    cosArg = -1
+                alpha = np.sign(v_hat[2])*(180/np.pi)*np.arccos(cosArg) 
+            #Throw an error if the seabed slope is more than the arctan(Zf/Xf) then line would be fully on the slope and or would need to go through the slope which cannot be handled by our equations
+            if alpha > (180/np.pi)*np.arctan((self.rB[2]-self.rA[2])/LH):    
+                raise LineError(self.number, "Fairlead/Anchor Position not compatible with Positive Seabed Slope")    
+        else:
+            alpha = 0
+            
+        #breakpoint()
+       
         # ----- get line results for linear or nonlinear elasticity -----
         
         #If EA is found in the line properties we will run the original catenary function 
         if 'EA' in self.type:
             try:
-                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], self.type['w'], CB=self.cb, Tol=tol, HF0=self.HF, VF0=self.VF, plots=profiles)   # call line model
+                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], 
+                                              self.type['w'], CB=self.cb, alpha=alpha, Tol=tol, 
+                                              HF0=self.HF, VF0=self.VF, plots=profiles)   
                                                                                                                                     
             except CatenaryError as error:
                 raise LineError(self.number, error.message)       
        #If EA isnt found then we will use the ten-str relationship defined in the input file 
         else:
              (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],self.type['w']) 
+            # should have a profiles=1 option for this too (could be linear, or use rod style)
             
         self.HF = info["HF"]
         self.VF = info["VF"]
@@ -795,11 +805,14 @@ class Line():
         self.TA = np.sqrt(fAH*fAH + fAV*fAV) # end tensions
         self.TB = np.sqrt(fBH*fBH + fBV*fBV)
         
+        # a lazy save for now
+        self.sinBeta = sinBeta
+        self.cosBeta = cosBeta
+        
+        
         # ----- compute 3d stiffness matrix for both line ends (3 DOF + 3 DOF) -----
         
-        # solve for required variables to set up the perpendicular stiffness. Keep it horizontal
-        #L_xy = np.linalg.norm(self.rB[:2] - self.rA[:2])
-        #T_xy = np.linalg.norm(self.fB[:2])
+        # may want to skip this next bit when just getting profiles for plotting...
         
         # create the rotation matrix based on the heading angle that the line is from the horizontal
         R = rotationMatrix(0,0,self.th)
@@ -816,19 +829,15 @@ class Line():
                            [K2D[1,0], 0 , K2D[1,1]]])
             return np.matmul(np.matmul(R, K2), R.T)
             
-        
-        self.KA  = from2Dto3Drotated(info['stiffnessA'], -fBH, LH)   # stiffness matrix describing reaction force on end A due to motion of end A
-        self.KB  = from2Dto3Drotated(info['stiffnessB'], -fBH, LH)   # stiffness matrix describing reaction force on end B due to motion of end B
-        self.KAB = from2Dto3Drotated(info['stiffnessAB'], fBH, LH)  # stiffness matrix describing reaction force on end B due to motion of end A
-                
-        #self.K6 = np.block([[ from2Dto3Drotated(self.KA),  from2Dto3Drotated(self.KAB.T)],
-        #                    [ from2Dto3Drotated(self.KAB), from2Dto3Drotated(self.KB)  ]])
-        
+        # line end stiffness matrices
+        self.KA  = from2Dto3Drotated(self.info['stiffnessA'], -fBH, LH)  # reaction at A due to motion of A
+        self.KB  = from2Dto3Drotated(self.info['stiffnessB'], -fBH, LH)  # reaction at B due to motion of B
+        self.KAB = from2Dto3Drotated(self.info['stiffnessAB'], fBH, LH)  # reaction at B due to motion of A
         
         
         if profiles > 1:
             import matplotlib.pyplot as plt
-            plt.plot(info['X'], info['Z'])
+            plt.plot(self.info['X'], self.info['Z'])
             plt.show()
         
     
@@ -916,7 +925,7 @@ class Line():
         '''Calls the catenary function to return the tensions of the Line for a quasi-static analysis'''
 
         # >>> this can probably be done using data already generated by static Solve <<<
-
+        '''
         depth = self.sys.depth
     
         dr =  self.rB - self.rA                 
@@ -929,6 +938,29 @@ class Line():
             self.cb = 0.0     # set to zero so that the line includes seabed interaction.
     
         tol = 0.0001
+        # --------------------
+        
+        #Determine the heading of the line and construct the d_hat unit vector
+        x_excursion = self.rB[0]-self.rA[0]
+        y_excursion = self.rB[1]-self.rA[1]
+        total_xy_dist = np.sqrt( x_excursion* x_excursion + y_excursion*y_excursion)
+        d_hat = [x_excursion/total_xy_dist,y_excursion/total_xy_dist,0]   
+        #Determine the v vector which is the d vector projectd onto the seabed
+        v_hat = [np.sqrt(1-((d_hat[0]*self.sbnorm[0]+d_hat[1]*self.sbnorm[1])/self.sbnorm[2])**2)*d_hat[0], np.sqrt(1-((d_hat[0]*self.sbnorm[0]+d_hat[1]*self.sbnorm[1])/self.sbnorm[2])**2)*d_hat[1], -(d_hat[0]*self.sbnorm[0]+d_hat[1]*self.sbnorm[1])/self.sbnorm[2]]    
+        #Determine the seabed slope
+        if v_hat[2] == 0:
+            alpha = 0 
+        else: 
+            cosArg = np.dot(d_hat, v_hat)/(np.linalg.norm(d_hat)*np.linalg.norm(v_hat))
+            if cosArg > 1:
+                cosArg = 1
+            if cosArg < -1:
+                cosArg = -1
+            alpha = np.sign(v_hat[2])*(180/np.pi)*np.arccos(cosArg) 
+        #Throw an error if the seabed slope is more than the arctan(Zf/Xf) then line would be fully on the slope and or would need to go through the slope which cannot be handled by our equations
+        if alpha > (180/np.pi)*np.arctan((self.rB[2]-self.rA[2])/total_xy_dist):    
+            raise LineError(22,"Fairlead/Anchor Position not compatible with Positive Seabed Slope")    
+        # --------------------                                                                                                  
     
         #If EA is found in the line properties we will run the original catenary function 
         if 'EA' in self.type:
@@ -942,8 +974,11 @@ class Line():
         #If EA isnt found then we will use the ten-str relationship defined in the input file 
         else:
              (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],self.type['w']) 
+        '''
 
-        Ts = info["Te"]
+        self.staticSolve(profiles=1) # call with flag to tell Catenary to return node info (may be unnecessary)
+
+        Ts = self.info["Te"]
         return Ts
     
 

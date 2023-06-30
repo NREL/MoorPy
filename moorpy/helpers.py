@@ -72,6 +72,63 @@ def printVec(vec):
     print( "\t".join(["{:+9.4e}"]*len(vec)).format( *vec ))
 
 
+
+def unitVector(r):
+    '''Returns the unit vector along the direction of input vector r.'''
+
+    L = np.linalg.norm(r)
+
+    return r/L
+
+
+
+def getInterpNums(xlist, xin, istart=0):  # should turn into function in helpers
+    '''
+    Paramaters
+    ----------
+    xlist : array
+        list of x values
+    xin : float
+        x value to be interpolated
+    istart : int
+        first lower index to try
+    
+    Returns
+    -------
+    i : int
+        lower index to interpolate from
+    fout : float
+        fraction to return   such that y* = y[i] + fout*(y[i+1]-y[i])
+    '''
+    
+    nx = len(xlist)
+  
+    if xin <= xlist[0]:  #  below lowest data point
+        i = 0
+        fout = 0.0
+  
+    elif xlist[-1] <= xin:  # above highest data point
+        i = nx-1
+        fout = 0.0
+  
+    else:  # within the data range
+ 
+        # if istart is below the actual value, start with it instead of 
+        # starting at 0 to save time, but make sure it doesn't overstep the array
+        if xlist[min(istart,nx)] < xin:
+            i1 = istart
+        else:
+            i1 = 0
+
+        for i in range(i1, nx-1):
+            if xlist[i+1] > xin:
+                fout = (xin - xlist[i] )/( xlist[i+1] - xlist[i] )
+                break
+    
+    return i, fout
+    
+        
+
 def getH(r):
     '''function gets the alternator matrix, H, that when multiplied with a vector,
     returns the cross product of r and that vector
