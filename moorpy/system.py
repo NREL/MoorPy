@@ -72,6 +72,7 @@ class System():
         self.depth = depth  # water depth [m]
         self.rho   = rho    # water density [kg/m^3]
         self.g     = g      # gravitational acceleration [m/s^2]
+        self.current = []   # Empty vector to hold the current [m/s] (if applicable)
         
         # additional keyword arguments
         bathymetry = kwargs.get("bathymetry", None)  # a filename or dict to include a bathymetry grid
