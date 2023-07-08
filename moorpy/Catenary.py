@@ -508,7 +508,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                 
                     #breakpoint()
                     '''
-                    raise CatenaryError("catenary solver failed.")
+                    raise CatenaryError("catenary solver failed. "+info4['oths']['message'])
                 
                 else:                            # if the solve was successful,
                     info.update(info4['oths'])   # copy info from last solve into existing info dictionary
@@ -1050,12 +1050,16 @@ def eval_func_cat(X, args):
             
             dZFdVF = ( VF_HF /SQRT1VF_HF2 )/ W + VF_WEA
     ## Line Profile Type 7: Line partially on a sloped seabed        
-    if ProfileType==7: 
+    elif ProfileType==7: 
         
         if (VF_HF + SQRT1VF_HF2 <= 0):
             info['error'] = True
             info['message'] = "ProfileType 7: VF_HF + SQRT1VF_HF2 <= 0"
             
+        elif HF*1000 < VF:
+            info['error'] = True
+            info['message'] = "ProfileType 7: HF << VF, line is slack, not supported yet"
+        
         else:
         
         
@@ -1107,6 +1111,13 @@ def eval_func_cat(X, args):
             #Ensure LBot is not less than zero 
             LBot = max(LBot, 0)
 
+
+    # if there was an error, send the stop signal
+    if info['error']==True:
+        #breakpoint()
+        return np.zeros(2), info, True
+    
+
     # Now compute the tensions at the anchor    
     if ProfileType==1:          # No portion of the line rests on the seabed
         HA = HF;
@@ -1124,11 +1135,6 @@ def eval_func_cat(X, args):
         HA = TA*np.cos(np.pi*alpha/180)
         VA = TA*np.sin(np.pi*alpha/180)                                     
 
-    # if there was an error, send the stop signal
-    if info['error']==True:
-        #breakpoint()
-        return np.zeros(2), info, True
-        
 
     ## Step 3. group the outputs into objective function value and others
     Y = np.array([EXF, EZF])               # objective function

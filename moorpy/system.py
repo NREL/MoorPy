@@ -23,7 +23,8 @@ import matplotlib as mpl
 from moorpy.helpers import (rotationMatrix, rotatePosition, getH, printVec, 
                             set_axes_equal, dsolve2, SolveError, MoorPyError, 
                             loadLineProps, getLineProps, read_mooring_file, 
-                            printMat, printVec, getInterpNums, unitVector)
+                            printMat, printVec, getInterpNums, unitVector,
+                            getFromDict)
 
 
 
@@ -72,10 +73,26 @@ class System():
         self.depth = depth  # water depth [m]
         self.rho   = rho    # water density [kg/m^3]
         self.g     = g      # gravitational acceleration [m/s^2]
-        self.current = []   # Empty vector to hold the current [m/s] (if applicable)
         
-        # additional keyword arguments
-        bathymetry = kwargs.get("bathymetry", None)  # a filename or dict to include a bathymetry grid
+        # water current - currentMod 0 = no current; 1 = steady uniform current
+        self.currentMod = 0         # flag for current model to use
+        self.current = np.zeros(3)  # current velocity vector [m/s]
+        if 'current' in kwargs:
+            self.currentMod = 1
+            self.current = getFromDict(kwargs, 'current', shape=3)
+            
+        # seabed bathymetry - seabedMod 0 = flat; 1 = uniform slope, 2 = grid
+        self.seabedMod = 0
+        
+        if 'xSlope' in kwargs or 'ySlope' in kwargs:
+            self.seabedMod = 1
+            self.xSlope = getFromDict(kwargs, 'xSlope', default=0)
+            self.ySlope = getFromDict(kwargs, 'ySlope', default=0)
+        
+        if 'bathymetry' in kwargs:
+            seabedMod = 2
+            self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = self.readBathymetryFile(kwargs['bathymetry'])
+        
         
         # initializing variables and lists        
         self.nDOF = 0       # number of (free) degrees of freedom of the mooring system (needs to be set elsewhere)        
@@ -87,12 +104,7 @@ class System():
         self.display = 0    # a flag that controls how much printing occurs in methods within the System (Set manually. Values > 0 cause increasing output.)
         
         self.MDoptions = {} # dictionary that can hold any MoorDyn options read in from an input file, so they can be saved in a new MD file if need be
-        
-        # set up bathymetry grid
-        if type(bathymetry) == str:
-            self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = self.readBathymetryFile(bathymetry)
-        else:
-            self.bathGrid = None  # otherwise, use this as a flag to avoid looking for bathymetry
+
         
         # read in data from an input file if a filename was provided
         if len(file) > 0:
@@ -2906,9 +2918,13 @@ class System():
         '''
         
         # if no bathymetry info stored, just return uniform depth
-        if not type(self.bathGrid) == np.ndarray:
+        if self.seabedMod == 0:
             return self.depth, np.array([0,0,1])
         
+        if self.seabedMod == 1:
+            depth = self.depth - self.xSlope*x - self.ySlope*y
+            nvec  = unitVector([-self.xSlope, -self.ySlope, 1])            
+            return depth, nvec
 
         # get interpolation indices and fractions for the relevant grid panel
         ix0, fx = getInterpNums(self.bathGrid_Xs, x)

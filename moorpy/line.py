@@ -4,7 +4,9 @@ import numpy as np
 from matplotlib import cm
 from moorpy.Catenary import catenary
 from moorpy.nonlinear import nonlinear                                      
-from moorpy.helpers import unitVector, LineError, CatenaryError, rotationMatrix, makeTower, read_mooring_file, quiver_data_to_segments
+from moorpy.helpers import (unitVector, LineError, CatenaryError, 
+                     rotationMatrix, makeTower, read_mooring_file, 
+                     quiver_data_to_segments, printVec, printMat)
 from os import path
 
  
@@ -778,7 +780,6 @@ class Line():
         else:
             alpha = 0
             
-        #breakpoint()
        
         # ----- get line results for linear or nonlinear elasticity -----
         
@@ -797,10 +798,11 @@ class Line():
             # should have a profiles=1 option for this too (could be linear, or use rod style)
             
         #Postion of the line
-        Xs = self.rA[0]+d_hat[0]*info["X"]
-        Ys = self.rA[1]+d_hat[1]*info["X"]
-        Zs = self.rA[2]+info["Z"]
-        Ts = info["Te"]
+        if profiles > 0:
+            Xs = self.rA[0]+cosBeta*info["X"]
+            Ys = self.rA[1]+sinBeta*info["X"]
+            Zs = self.rA[2]+info["Z"]
+            Ts = info["Te"]
         
             
         self.HF = info["HF"]
@@ -830,36 +832,22 @@ class Line():
         
         # create the rotation matrix based on the heading angle that the line is from the horizontal
         R = rotationMatrix(0,0,self.th)
-        
-        # initialize the line's analytic stiffness matrix in the "in-line" plane then rotate the matrix to be about the global frame [K'] = [R][K][R]^T
-        def from2Dto3Drotated(K2D, F, L):
-            if L > 0:
-                Kt = F/L         # transverse stiffness term
-            else:
-                Kt = 0.0
-            
-            K2 = np.array([[K2D[0,0], 0 , K2D[0,1]],
-                           [  0     , Kt,   0     ],
-                           [K2D[1,0], 0 , K2D[1,1]]])
-            return np.matmul(np.matmul(R, K2), R.T)
-            
+
         # line end stiffness matrices
-        self.KA  = from2Dto3Drotated(self.info['stiffnessA'], -fBH, LH)  # reaction at A due to motion of A
-        self.KB  = from2Dto3Drotated(self.info['stiffnessB'], -fBH, LH)  # reaction at B due to motion of B
-        self.KAB = from2Dto3Drotated(self.info['stiffnessAB'], fBH, LH)  # reaction at B due to motion of A
+        self.KA  = from2Dto3Drotated(self.info['stiffnessA'], -fBH, LH, R)  # reaction at A due to motion of A
+        self.KB  = from2Dto3Drotated(self.info['stiffnessB'], -fBH, LH, R)  # reaction at B due to motion of B
+        self.KAB = from2Dto3Drotated(self.info['stiffnessAB'], fBH, LH, R)  # reaction at B due to motion of A
+        # <<< move the above into an else block for currentMod below
         
         
-        if bool(self.sys.current) == True:  #Lets check and see if there is a seabed slope here
-            currentflag = 1
-            current = np.array(self.sys.current)
-            
-        else:
-            currentflag = 0
-         
-            
-            
-        if currentflag == 1: #If there is a current applied to the model
+        # ----- apply current loads if applicable -----
+        
+        if self.sys.currentMod == 1: 
             #Calculate the current loading on the line
+            
+            # -------------- calculate new current drag and resultant W ----------
+
+            current = self.sys.current
             
             dl = self.L/(self.nNodes-1)  # segment length
             
@@ -903,52 +891,50 @@ class Line():
             #Define Equivalent Weight Vector
             w_eqv = np.array([FC_1, FC_2, FC_3-self.type["w"]])
             w_eqv_norm = w_eqv/np.linalg.norm(w_eqv)
-                           
-        
+            
+            
+            # ------------ Perform rotation/transformation -------------
+            
             #Be careful if vectors are the same.  Bad things will happen
             if np.array_equal(w_eqv_norm,np.array([0, 0, -1])):
                 R_curr = np.eye(3,3)
             else:
-                R_curr = RotFrm2Vect(w_eqv_norm, np.array([0, 0, -1]))
-                     
+                R_curr = RotFrm2Vect(w_eqv_norm, np.array([0, 0, -1]))  # rotation vector to make w_eqv vertical
             
             #rotate the seabed normal and the line headings
-            rot_sbnorm = np.matmul(R_curr,np.transpose(nvecA))
-        
-            rot_dr = np.matmul(R_curr,np.transpose(dr))
-        
-            #Recalculate the heading of the line and construct the d_hat unit vector
-            x_excursion = rot_dr[0]
-            y_excursion = rot_dr[1]
-            total_xy_dist = np.sqrt( x_excursion* x_excursion + y_excursion*y_excursion)
-            d_hat_rot = [x_excursion/total_xy_dist,y_excursion/total_xy_dist,0]   
-            #Recalculate the v vector which is the d vector projectd onto the seabed
-            v_hat_rot = [np.sqrt(1-((d_hat_rot[0]*rot_sbnorm[0]+d_hat_rot[1]*rot_sbnorm[1])/rot_sbnorm[2])**2)*d_hat_rot[0], np.sqrt(1-((d_hat_rot[0]*rot_sbnorm[0]+d_hat_rot[1]*rot_sbnorm[1])/rot_sbnorm[2])**2)*d_hat_rot[1], -(d_hat_rot[0]*rot_sbnorm[0]+d_hat_rot[1]*rot_sbnorm[1])/rot_sbnorm[2]]  
-            #Recalculate the seabed slope
-            if v_hat_rot[2] == 0:
-                alpha = 0 
-            else: 
-                cosArg = np.dot(d_hat_rot, v_hat_rot)/(np.linalg.norm(d_hat_rot)*np.linalg.norm(v_hat_rot))
-                if cosArg > 1:
-                    cosArg = 1
-                if cosArg < -1:
-                    cosArg = -1
-                alpha = np.sign(v_hat_rot[2])*(180/np.pi)*np.arccos(cosArg) 
-            #Throw an error if the seabed slope is more than the arctan(Zf/Xf) then line would be fully on the slope and or would need to go through the slope which cannot be handled by our equations
-            if alpha > (180/np.pi)*np.arctan(rot_dr[2]/total_xy_dist):    
-                raise LineError(self.number,"Fairlead/Anchor Position not compatible with Positive Seabed Slope")    
-                
+            rot_sbnorm = np.matmul(R_curr, nvecA)
+            rot_dr = np.matmul(R_curr, dr)  # vector from A to B in rotated frame
+            
+            # figure out what rotation about Z' is needed to align end A onto the X'-Z' plane
+            theta_z = -np.arctan2(rot_dr[1], rot_dr[0])
+            
+            # add this rotation to the previous one to get the complete rotation needed
+            R_z = rotationMatrix(0, 0, theta_z)
+            R_current = np.matmul(R_z, R_curr)
+            
+            # figure out slope in plane
+            rot_sbnorm2 = np.matmul(R_current, nvecA)
+            
+            dz_dx = -rot_sbnorm2[0]*(1.0/rot_sbnorm2[2])  # seabed slope components
+            dz_dy = -rot_sbnorm2[1]*(1.0/rot_sbnorm2[2])  # seabed slope components
+            # we only care about dz_dx since the line is in the X-Z plane in this rotated situation
+            alpha = np.degrees(np.arctan(dz_dx))
+            
             #Reassign the values for LH and LV 
-            LH = total_xy_dist
+            LH = np.linalg.norm(rot_dr[:2])
             LV = rot_dr[2]
-        
+            
+            
             # ----- get line results for linear or nonlinear elasticity -----
+            
             #NOTE FOR  CAT SOLVE THAT WE ARE GOING TO USE W_EQV INSTEAD OF W
             #If EA is found in the line properties we will run the original catenary function 
             if 'EA' in self.type:
                 try:
-                    (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], np.linalg.norm(w_eqv), alpha, 
-                                                  self.cb, HF0=self.HF, VF0=self.VF, nNodes=self.nNodes, plots=1)    # call line model                                                                       
+                    (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], 
+                                                          np.linalg.norm(w_eqv),
+                                                          CB=self.cb, alpha=alpha, HF0=self.HF, VF0=self.VF, 
+                                                          nNodes=self.nNodes, plots=profiles)                                                                      
                 except CatenaryError as error:
                     raise LineError(self.number, error.message)       
             #If EA isnt found then we will use the ten-str relationship defined in the input file 
@@ -957,100 +943,40 @@ class Line():
         
 
         
-            #Also need the mooring line excursion (in rotated ref frame) (Line Coord system)
-            rot_Xs_line_cord = info["X"]
-            rot_Zs_line_cord = info["Z"]
-        
-            #Transform to global rotated coordinate system (Zs stays the same)
-            rot_Xs_glob = rot_Xs_line_cord*d_hat_rot[0]
-            rot_Ys_glob = rot_Xs_line_cord*d_hat_rot[1]
-            rot_Zs_glob = rot_Zs_line_cord
-        
-        
             #Unrotate the system (Anti-rotation ;p)
-            #Inverse rotation matrix
-            inv_r = np.linalg.inv(R_curr)
             
-            #Setup empty array to hold line positions
-            #Xs_temp = np.empty(in rot_Xs_glob)
-            #Ys_temp = np.empty(in rot_Xs_glob)
-            #Zs_temp = np.empty(in rot_Xs_glob)
-            
-            
-            for i in range(0,self.nNodes):
-                temp_array = np.array([rot_Xs_glob[i], rot_Ys_glob[i], rot_Zs_glob[i]])
-                unrot_pos = temp_array@np.transpose(inv_r)
-                #overwrite line positions
-                Xs[i] = unrot_pos[0]
-                Ys[i] = unrot_pos[1]
-                Zs[i] = unrot_pos[2]
-            
-        
-
-            #Now we will unrotate our line excursions
-            Xs = self.rA[0] + Xs 
-            Ys = self.rA[1] + Ys
-            Zs = self.rA[2] + Zs
-            Ts = info["Te"]
-            #breakpoint()
-            print(np.max(Ys)) 
-    
-            #Things we care about in the rotated reference frame
-            rot_HF = info["HF"]
-            rot_VF = info["VF"]
-            rot_KA2 = info["stiffnessA"]
-            rot_KB2 = info["stiffnessB"]
-            rot_LBot = info["LBot"]
-            rot_info = info
-            
-            #Reassign R for transforming line stiffness from 2d to 3d
-            R = R_curr
+            if profiles > 0:
+                for i in range(0,self.nNodes):
+                    temp_array = np.array([info['X'][i], 0 ,info['Z'][i]])
+                    unrot_pos = np.matmul(temp_array, R_current)
+                    #overwrite line positions
+                    Xs[i] = unrot_pos[0]
+                    Ys[i] = unrot_pos[1]
+                    Zs[i] = unrot_pos[2]
+                
+                # global line coordinates
+                Xs = self.rA[0] + Xs 
+                Ys = self.rA[1] + Ys
+                Zs = self.rA[2] + Zs
+                Ts = info["Te"]
             
             #Calc 3D Transformed LineStiffness terms 
-            rot_KA  = from2Dto3Drotated(info['stiffnessA'], -fBH, LH)   # stiffness matrix describing reaction force on end A due to motion of end A
-            rot_KB  = from2Dto3Drotated(info['stiffnessB'], -fBH, LH)   # stiffness matrix describing reaction force on end B due to motion of end B
-            rot_KAB = from2Dto3Drotated(info['stiffnessAB'], fBH, LH)  # stiffness matrix describing reaction force on end B due to motion of end A
-            #print(rot_KA)
-            #breakpoint()
-            
-            
-            rot_FA = np.array([fAH*d_hat_rot[0],fAH*d_hat_rot[1],fAV])
-            rot_FB = np.array([fBH*d_hat_rot[0],fBH*d_hat_rot[1],fBV])
-            
-              
-            #Unrotate the system (Anti-rotation ;p)
-            #Inverse rotation matrix
-            inv_r = np.linalg.inv(R_curr)
-            
-            #Unrotated forces
-            unrot_FA = inv_r@np.transpose(rot_FA)
-            unrot_FB = inv_r@np.transpose(rot_FB)
-            
+            self.KA  = from2Dto3Drotated(info['stiffnessA'], -fBH, LH, R_current)  # stiffness matrix describing reaction force on end A due to motion of end A
+            self.KB  = from2Dto3Drotated(info['stiffnessB'], -fBH, LH, R_current)  # stiffness matrix describing reaction force on end B due to motion of end B
+            self.KAB = from2Dto3Drotated(info['stiffnessAB'], fBH, LH, R_current)  # stiffness matrix describing reaction force on end B due to motion of end A
+
             #Reassign our unrotated forces
-            self.fA = unrot_FA
-            self.fB = unrot_FB
-            self.TA = np.linalg.norm(unrot_FA) # end tensions
-            self.TB = np.linalg.norm(unrot_FB)
-            
-            #Unrotate and assign rotated line tensions 
-            #self.KA  = R_curr@rot_KA@np.transpose(R_curr)
-            #self.KB  = R_curr@rot_KB@np.transpose(R_curr)
-            #self.KAB = R_curr@rot_KAB@np.transpose(R_curr)
-            self.KA  = inv_r@rot_KA@np.transpose(inv_r)
-            self.KB  = inv_r@rot_KB@np.transpose(inv_r)
-            self.KAB = inv_r@rot_KAB@np.transpose(inv_r)    
-    
-            
-            #breakpoint()
+            self.fA = np.matmul(np.array([fAH, 0, fAV]), R_current)
+            self.fB = np.matmul(np.array([fBH, 0, fBV]), R_current)
+            self.TA = np.linalg.norm(self.fA) # end tensions
+            self.TB = np.linalg.norm(self.fB)
         
         
-        self.Xs = Xs
-        self.Ys = Ys
-        self.Zs = Zs
-        self.Ts = Ts
-            
-        return Xs, Ys, Zs, Ts                    
-        
+        if profiles > 0:
+            self.Xs = Xs
+            self.Ys = Ys
+            self.Zs = Zs
+            self.Ts = Ts
         
         if profiles > 1:
             import matplotlib.pyplot as plt
@@ -1261,5 +1187,37 @@ class Line():
     def attachLine(self, lineID, endB):
         pass
 
+
+def from2Dto3Drotated(K2D, F, L, R): 
+    '''Initialize a line end's analytic stiffness matrix in the 
+    plane of the catenary then rotate the matrix to be about the 
+    global frame using [K'] = [R][K][R]^T
     
+    Parameters
+    ----------
+    K2D : 2x2 matrix
+        Planar stiffness matrix of line end [N/m]
+    F : float
+        Line horizontal tension component [N]
+    L : float
+        Line horizontal distance end-to-end [m]
+    R : 3x3 matrix
+        Rotation matrix from global frame to plane to the local
+        X-Z plane of the line
+        
+    Returns
+    -------
+    3x3 stiffness matrix in global orientation [N/m].
+    '''
+
+    if L > 0:
+        Kt = F/L         # transverse stiffness term
+    else:
+        Kt = 0.0
+    
+    K2 = np.array([[K2D[0,0], 0 , K2D[0,1]],
+                   [  0     , Kt,   0     ],
+                   [K2D[1,0], 0 , K2D[1,1]]])
+    
+    return np.matmul(np.matmul(R, K2), R.T)    
     
