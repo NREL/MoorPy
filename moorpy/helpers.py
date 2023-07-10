@@ -594,6 +594,11 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
            
         X = X + dX
          
+    # truncate empty parts of these arrays
+    Xs      = Xs     [:iter+1]
+    Es      = Es     [:iter+1]
+    dXlist  = dXlist [:iter+1]
+    dXlist2 = dXlist2[:iter+1]
 
     return X, Y, dict(iter=iter, err=err, dX=dX_last, oths=oths, Xs=Xs, Es=Es, success=success, dXlist=dXlist, dXlist2=dXlist2)
 
