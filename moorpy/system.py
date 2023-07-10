@@ -3172,8 +3172,8 @@ class System():
                     ax.text((line.rA[0]+line.rB[0])/2, (line.rA[1]+line.rB[1])/2, (line.rA[2]+line.rB[2])/2, j)
             
         if cbar_tension:
-            maxten = max([max(line.getLineTens()) for line in self.lineList])   # find the max tension in the System
-            minten = min([min(line.getLineTens()) for line in self.lineList])   # find the min tension in the System
+            maxten = max([max(line.Ts) for line in self.lineList])   # find the max tension in the System
+            minten = min([min(line.Ts) for line in self.lineList])   # find the min tension in the System
             bounds = range(int(minten),int(maxten), int((maxten-minten)/256)) 
             norm = mpl.colors.BoundaryNorm(bounds, 256)     # set the bounds in a norm object, with 256 being the length of all colorbar strings
             fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap_tension), label='Tension (N)')  # add the colorbar
@@ -3369,8 +3369,8 @@ class System():
                 ax.text(xloc,yloc,j)
         
         if cbar_tension:
-            maxten = max([max(line.getLineTens()) for line in self.lineList])   # find the max tension in the System
-            minten = min([min(line.getLineTens()) for line in self.lineList])   # find the min tension in the System
+            maxten = max([max(line.Ts) for line in self.lineList])   # find the max tension in the System
+            minten = min([min(line.Ts) for line in self.lineList])   # find the min tension in the System
             bounds = range(int(minten),int(maxten), int((maxten-minten)/256)) 
             norm = mpl.colors.BoundaryNorm(bounds, 256)     # set the bounds in a norm object, with 256 being the length of all colorbar strings
             fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap_tension), label='Tension (N)')  # add the colorbar
