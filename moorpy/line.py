@@ -416,7 +416,7 @@ class Line():
             toggle to plot the lines in a colormap based on node tensions. The default is False
         cmap : string, optional
             colormap string type to plot tensions when colortension=True. The default is 'rainbow'
-        linewidth: float, otional
+        linewidth: float, optional
             sets the mooring lines linewidth in matplotlib. default is 1
 
         Returns
