@@ -90,7 +90,7 @@ class System():
             self.ySlope = getFromDict(kwargs, 'ySlope', default=0)
         
         if 'bathymetry' in kwargs:
-            seabedMod = 2
+            self.seabedMod = 2
             self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = self.readBathymetryFile(kwargs['bathymetry'])
         
         
@@ -2926,53 +2926,54 @@ class System():
             nvec  = unitVector([-self.xSlope, -self.ySlope, 1])            
             return depth, nvec
 
-        # get interpolation indices and fractions for the relevant grid panel
-        ix0, fx = getInterpNums(self.bathGrid_Xs, x)
-        iy0, fy = getInterpNums(self.bathGrid_Ys, y)
+        if self.seabedMod == 2:
+            # get interpolation indices and fractions for the relevant grid panel
+            ix0, fx = getInterpNums(self.bathGrid_Xs, x)
+            iy0, fy = getInterpNums(self.bathGrid_Ys, y)
 
 
-        # handle end case conditions
-        if fx == 0:
-            ix1 = ix0
-        else:
-            ix1 = min(ix0+1, self.bathGrid.shape[1])  # don't overstep bounds
-        
-        if fy == 0:
-            iy1 = iy0
-        else:
-            iy1 = min(iy0+1, self.bathGrid.shape[0])  # don't overstep bounds
-        
+            # handle end case conditions
+            if fx == 0:
+                ix1 = ix0
+            else:
+                ix1 = min(ix0+1, self.bathGrid.shape[1])  # don't overstep bounds
+            
+            if fy == 0:
+                iy1 = iy0
+            else:
+                iy1 = min(iy0+1, self.bathGrid.shape[0])  # don't overstep bounds
+            
 
-        # get corner points of the panel
-        c00 = self.bathGrid[iy0, ix0]
-        c01 = self.bathGrid[iy1, ix0]
-        c10 = self.bathGrid[iy0, ix1]
-        c11 = self.bathGrid[iy1, ix1]
+            # get corner points of the panel
+            c00 = self.bathGrid[iy0, ix0]
+            c01 = self.bathGrid[iy1, ix0]
+            c10 = self.bathGrid[iy0, ix1]
+            c11 = self.bathGrid[iy1, ix1]
 
-        # get interpolated points and local value
-        cx0    = c00 *(1.0-fx) + c10 *fx
-        cx1    = c01 *(1.0-fx) + c11 *fx
-        c0y    = c00 *(1.0-fy) + c01 *fy
-        c1y    = c10 *(1.0-fy) + c11 *fy
-        depth  = cx0 *(1.0-fy) + cx1 *fy
+            # get interpolated points and local value
+            cx0    = c00 *(1.0-fx) + c10 *fx
+            cx1    = c01 *(1.0-fx) + c11 *fx
+            c0y    = c00 *(1.0-fy) + c01 *fy
+            c1y    = c10 *(1.0-fy) + c11 *fy
+            depth  = cx0 *(1.0-fy) + cx1 *fy
 
-        # get local slope
-        dx = self.bathGrid_Xs[ix1] - self.bathGrid_Xs[ix0]
-        dy = self.bathGrid_Ys[iy1] - self.bathGrid_Ys[iy0]
-        
-        if dx > 0.0:
-            dc_dx = (c1y-c0y)/dx
-        else:
-            dc_dx = 0.0  # maybe this should raise an error
-        
-        if dx > 0.0:
-            dc_dy = (cx1-cx0)/dy
-        else:
-            dc_dy = 0.0  # maybe this should raise an error
-        
-        nvec = unitVector([dc_dx, dc_dy, 1.0])  # compute unit vector      
+            # get local slope
+            dx = self.bathGrid_Xs[ix1] - self.bathGrid_Xs[ix0]
+            dy = self.bathGrid_Ys[iy1] - self.bathGrid_Ys[iy0]
+            
+            if dx > 0.0:
+                dc_dx = (c1y-c0y)/dx
+            else:
+                dc_dx = 0.0  # maybe this should raise an error
+            
+            if dx > 0.0:
+                dc_dy = (cx1-cx0)/dy
+            else:
+                dc_dy = 0.0  # maybe this should raise an error
+            
+            nvec = unitVector([dc_dx, dc_dy, 1.0])  # compute unit vector      
 
-        return depth, nvec
+            return depth, nvec
     
     
     def loadData(self, dirname, rootname, sep='.MD.'):
