@@ -2543,7 +2543,7 @@ class System():
         
         
     
-    def getCoupledStiffnessA(self, dx=0.1, dth=0.1, solveOption=1, lines_only=False, tensions=False, nTries=3, plots=0):
+    def getCoupledStiffnessA(self, lines_only=False, tensions=False, nTries=3, plots=0):
         '''Calculates the stiffness matrix for coupled degrees of freedom of a mooring system
         with free uncoupled degrees of freedom equilibrated - analytical appraoch. 
         
@@ -2905,6 +2905,29 @@ class System():
                     return 
             return(ratios)
     
+    
+    def activateDynamicStiffness(self):
+        '''Switch mooring system model to dynamic line stiffness
+        values, including potential unstretched line length
+        adjustment. This only works when dynamic line properties
+        are used.'''
+        
+        for line in self.lineList:
+            line.activateDynamicStiffness()
+        
+        #initialize?
+    
+    
+    def revertToStaticStiffness(self):
+        '''Switch mooring system model to dynamic line stiffness
+        values, including potential unstretched line length
+        adjustment. This only works when dynamic line properties
+        are used.'''
+        
+        for line in self.lineList:
+            line.revertToStaticStiffness()
+        
+        #initialize?
 
     def getDepthFromBathymetry(self, x, y):   #BathymetryGrid, BathGrid_Xs, BathGrid_Ys, LineX, LineY, depth, nvec)
         ''' interpolates local seabed depth and normal vector

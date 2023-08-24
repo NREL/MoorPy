@@ -8,11 +8,21 @@
 #    mass_d2   :     # linear mass density per diameter^2 [kg/m^3]
 #    mass_d3   :     # linear mass density per diameter^3 [kg/m^4]
 #    
+#    MBL_0     :     # minimum breaking load offset [N]
+#    MBL_d     :     # minimum breaking load per diameter [N/m]
+#    MBL_d2    :     # minimum breaking load per diameter^2 [N/m^2]
+#    MBL_d3    :     # minimum breaking load per diameter^3 [N/m^3]
+#    
 #    EA_0      :     # stiffness offset [N]
 #    EA_d      :     # stiffness per diameter [N/m]
 #    EA_d2     :     # stiffness per diameter^2 [N/m^2]
 #    EA_d3     :     # stiffness per diameter^3 [N/m^3]
-#    EA_MBL    :     # stiffness per MBL [N/N]
+#    EA_MBL or Kr    # stiffness per MBL [N/N]
+#    EAs_MBL or Krs  # quasi-static stiffness per MBL [N/N]
+#    EAd_MBL or Krd_alpha    # dynamic stiffness per MBL [N/N]
+#    EAd_MBL_Lm or Krd_beta  # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
+
+
 
 NEW:
 #    Krs       or EAs_MBL      :     # quasi-static stiffness per MBL [N/N]
@@ -21,11 +31,7 @@ NEW:
 # (% mean load will be input later in the modeling code)
 
 
-#    
-#    MBL_0     :     # minimum breaking load offset [N]
-#    MBL_d     :     # minimum breaking load per diameter [N/m]
-#    MBL_d2    :     # minimum breaking load per diameter^2 [N/m^2]
-#    MBL_d3    :     # minimum breaking load per diameter^3 [N/m^3]
+
 #    
 #    dvol_dnom :     # volume-equivalent diameter per nominal diameter [-]
 #    
@@ -60,11 +66,14 @@ lineProps:
   
   polyester   :            # polyester synthetic rope
     mass_d2   :  797.8     # linear mass density per diameter^2 [kg/m^3]    
-    EA_d2     :  1.09e9    # stiffness per diameter^2 [N/m^2]    
+    #EA_d2     :  1.09e9    # stiffness per diameter^2 [N/m^2]    
     MBL_d2    :  170.5e6   # minimum breaking load per diameter^2 [N/m^2]   
     dvol_dnom :  0.86      # volume-equivalent diameter per nominal diameter [-]    
     cost_MBL  :  1.65e-05  # cost per MBL [$/m/N]
-    
+    EAs_MBL   :   14       # quasi-static stiffness per MBL [N/N]
+    EAd_MBL   :   14       # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm :  0.34     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
+
   nylon       :            # nylon synthetic rope
     mass_d2   :  647.6     # linear mass density per diameter^2 [kg/m^3]
     EA_d2     :  1.18e8    # stiffness per diameter^2 [N/m^2] 

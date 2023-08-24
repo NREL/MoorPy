@@ -46,8 +46,11 @@ class Line():
         self.number = num
         self.isRod = isRod
             
-        self.L = L  # line unstretched length
+        self.L = L              # line unstretched length (may be modified if using nonlinear elasticity) [m]
+        self.L0 = L             # line reference unstretched length [m]
         self.type = lineType    # dictionary of a System.lineTypes entry
+        
+        self.EA = self.type['EA']  # use the default stiffness value for now (may be modified if using nonlinear elasticity) [N]
         
         self.nNodes = int(nSegs) + 1
         self.cb = float(cb)    # friction coefficient (will automatically be set negative if line is fully suspended)
@@ -799,7 +802,7 @@ class Line():
         #If EA is found in the line properties we will run the original catenary function 
         if 'EA' in self.type:
             try:
-                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.type['EA'], w,
+                (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.EA, w,
                                                       CB=cb, alpha=alpha, HF0=self.HF, VF0=self.VF, 
                                                       Tol=tol, nNodes=self.nNodes, plots=profiles)                                                    
             except CatenaryError as error:
@@ -1039,9 +1042,39 @@ class Line():
         Zs = self.rA[2] + z
         
         return np.vstack([ Xs, Ys, Zs])
+
     
     def attachLine(self, lineID, endB):
         pass
+
+
+    def activateDynamicStiffness(self):
+        '''Switch mooring line model to dynamic line stiffness
+        value, including potential unstretched line length
+        adjustment. This only works when dynamic line properties
+        are used.'''
+    
+        # switch to dynamic stiffness value
+        EA_old = self.type['EAs']
+        EA_new = self.type['EAd'] + self.type['EAd_Lm']*self.TA  # this implements the sloped Krd = alpha + beta*Lm
+        self.EA = EA_new
+        
+        # adjust line length to maintain current tension (approximate)
+        self.L = self.L0 * (1 + self.TB/EA_old)/(1+self.TB/EA_new)
+        
+    
+    
+    def revertToStaticStiffness(self):
+        '''Switch mooring line model to dynamic line stiffness
+        values, including potential unstretched line length
+        adjustment. This only works when dynamic line properties
+        are used.'''
+        
+        # switch to static/default stiffness value
+        self.EA = self.type['EA']
+        
+        # revert to original line length
+        self.L = self.L0
 
 
 def from2Dto3Drotated(K2D, F, L, R): 

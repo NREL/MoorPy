@@ -688,6 +688,11 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
     w = (mass - np.pi/4*d_vol**2 *rho)*g
     
+    # >>> expected inputs for viscoelastic approach <<<   need to add some kind of mode switch to handle this throughout MoorPy <<<<
+    EAs = mat['EAs_MBL']*MBL      # quasi-static stiffness: Krs x MBL [N]
+    EAd = mat['EAd_MBL']*MBL     # dynamic stiffness constant: Krd alpha term x MBL [N]
+    EAd_Lm = mat['EAd_MBL_Lm']   # dynamic stiffness Lm slope: Krd beta term (to be multiplied by mean load) [-]
+    
     # Set up a main identifier for the linetype unless one is provided
     if name=="":
         typestring = f"{type}{dnommm:.0f}"
@@ -697,7 +702,8 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     notes = f"made with getLineProps"
 
     lineType = dict(name=typestring, d_vol=d_vol, m=mass, EA=EA, w=w,
-                    MBL=MBL, cost=cost, notes=notes, input_type=type, input_d=d, material=material)
+                    MBL=MBL, EAs=EAs, EAd=EAd, EAd_Lm=EAd_Lm, input_d=d,
+                    cost=cost, notes=notes, input_type=type, material=material)
 
     lineType.update(kwargs)   # add any custom arguments provided in the call to the lineType's dictionary
           
@@ -755,6 +761,10 @@ def loadLineProps(source):
         output[mat]['EA_d2'    ] = getFromDict(props, 'EA_d2'    , default=0.0)
         output[mat]['EA_d3'    ] = getFromDict(props, 'EA_d3'    , default=0.0)
         output[mat]['EA_MBL'   ] = getFromDict(props, 'EA_MBL'   , default=0.0)
+        output[mat]['EAs_MBL'  ] = getFromDict(props, 'EAs_MBL'  , default=0.0)
+        output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
+        output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
+        
         output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
         output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
         output[mat]['MBL_d2'   ] = getFromDict(props, 'MBL_d2'   , default=0.0)
