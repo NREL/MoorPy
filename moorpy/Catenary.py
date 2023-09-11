@@ -92,7 +92,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         flipFlag = False
     
     # reverse line in the solver if end A is above end B
-    if ZF < 0: 
+    if ZF < 0 and hA > Tol:  # and if end A isn't on the seabed 
         #CB = -max(0, -CB) - ZF + XF*np.tan(np.radians(alpha))
         hA, hB = hB, hA
         ZF = -ZF
@@ -149,7 +149,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         #return W*(z0*W/H + 1)/np.sqrt( (z0*W/H + 1)**2 - 1)   # inelastic apprxoimation
         return W # returning a fully slack line approximation, 
         #   because a large value here risks adding a bad cross coupling term in the system stiffness matrix
-
+    
     # ProfileType 0 case - entirely along seabed
     if ZF==0.0 and hA == 0.0 and W > 0:
     
@@ -418,7 +418,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         # make sure required values are non-zero
         HF = np.max([ HF, Tol ])
         XF = np.max([ XF, Tol ])
-        ZF = np.max([ ZF, Tol ])
+        if ZF > -Tol: # allow negative values
+            ZF = np.max([ ZF, Tol ])
 
         # some initial values just for printing before they're filled in
         EXF=0
@@ -848,7 +849,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                             xB = 0.0
 
                         xBlim = max(xB, 0.0) 
-                            
+                          
                         if  s[I] <= xB and CB > 0:  # (aka Lbot - s > HF/(CB*W) ) if this node rests on the seabed and the tension is zero
                         
                             Xs[I] = cos_alpha*s[I];
@@ -1284,7 +1285,7 @@ if __name__ == "__main__":
     
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(2.203138228651369e-05, 378.2807133834522, 383.34011790636976, 260525391.7172965, 474.5672065262173, CB=-7.719286616547777, 
     #         HF0=0.012438428537800724, VF0=179721.2163869108, Tol=4.000000000000001e-06, MaxIter=100, plots=1)
-    
+    """
     (fAH1, fAV1, fBH1, fBV1, info1) = catenary(406.77, -21.22, 410, 854000000.00, 1820.205, CB=0, alpha=-26.7, 
     HF0=1300157.2, VF0=931582.2, Tol=1e-06, MaxIter=100, plots=1)
     
@@ -1312,5 +1313,12 @@ if __name__ == "__main__":
     printMat(info1['stiffnessA'])
     print('')
     printMat(info1['stiffnessB'])
+    """
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(147.0, -25.8, 160.0, 8540000000.0, 6523.0, 
+            CB=0.0, alpha=-27.73, HF0=725968.57, VF0=667765.24, 
+            Tol=0.0001, MaxIter=100, plots=1)
+    plt.plot(info1['X'], info1['Z'] )
+    plt.axis('equal')
+    
     
     plt.show()
