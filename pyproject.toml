@@ -9,14 +9,13 @@ description = "A design-oriented mooring system library for Python"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "BSD-3-Clause"}
-keywords = ["wind", "floating", "mooring", "design", "optimization"]
+keywords = ["wind", "floating", "mooring", "design", "water"]
 authors = [
   {name = "National Renewable Energy Laboratory", email = "matthew.hall@nrel.gov" }
 ]
 maintainers = [
   {name = "Matthew Hall", email = "matthew.hall@nrel.gov"},
   {name = "Stein Housner", email = "stein.housner@nrel.gov"},
-  {name = "Stefan Dalecki", email = "sjdalecki@gmail.com"},
 ]
 classifiers = [  # Optional
   # How mature is this project? Common values are
