@@ -92,7 +92,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         flipFlag = False
     
     # reverse line in the solver if end A is above end B
-    if ZF < 0 and hA > Tol:  # and if end A isn't on the seabed 
+    if ZF < 0 and hA > 0:  # and if end A isn't on the seabed 
         #CB = -max(0, -CB) - ZF + XF*np.tan(np.radians(alpha))
         hA, hB = hB, hA
         ZF = -ZF
@@ -648,18 +648,19 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
             X, Y, infoU = dsolve2(eval_func_U, [X1_0], step_func=step_func_U, ytol=0.25*Tol, stepfac=1, maxIter=20, a_max=1.2, display=0)
             X1 = X[0]
             X2 = XF-X1
-            nNodes1 = int(L1/L*nNodes + 0.5)  # set number of nodes in the first line proportionally to its length, rounded.
+            nNodes1 = int(L1/L*(nNodes-1) + 0.5) + 1  # set number of nodes in the first line by trying to keep original segment length
             
             # call one more time to get final values
             (fAH1, fAV1, fBH1, fBV1, info1) = catenary(X1, Z1, L1, EA, W, CB=Z1, alpha=0, Tol=0.5*Tol, MaxIter=MaxIter, plots=plots, nNodes=nNodes1)
-            (fAH2, fAV2, fBH2, fBV2, info2) = catenary(X2, Z2, L2, EA, W, CB=0, alpha=0, Tol=0.5*Tol, MaxIter=MaxIter, plots=plots, nNodes=nNodes-nNodes1)
+            (fAH2, fAV2, fBH2, fBV2, info2) = catenary(X2, Z2, L2, EA, W, CB=0, alpha=0, Tol=0.5*Tol, MaxIter=MaxIter, plots=plots, nNodes=nNodes-nNodes1+1)
             
             if plots > 0 or (info1['error'] and info2['error']):
             
-                s  = np.hstack([ info1["s" ] , info2["s" ]+L1 ])
-                Xs = np.hstack([ info1["X" ] , info2["X" ]+X1 ])
-                Zs = np.hstack([ info1["Z" ] , info2["Z" ]+Z1 ])
-                Te = np.hstack([ info1["Te"] , info2["Te"]    ])
+                # concatenate nodal values (removing duplicate at the end nodes where they connect)
+                s  = np.hstack([ info1["s" ] , info2["s" ][1:]+L1 ])
+                Xs = np.hstack([ info1["X" ] , info2["X" ][1:]+X1 ])
+                Zs = np.hstack([ info1["Z" ] , info2["Z" ][1:]+Z1 ])
+                Te = np.hstack([ info1["Te"] , info2["Te"][1:]    ])
                 
                 # re-reverse line distributed data back to normal if applicable
                 '''
@@ -1314,10 +1315,15 @@ if __name__ == "__main__":
     print('')
     printMat(info1['stiffnessB'])
     """
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(147.0, -25.8, 160.0, 8540000000.0, 6523.0, 
+    '''
+    # sloped case
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(147.0, -25.8, 160.0, 854e7, 6523.0, 
             CB=0.0, alpha=-27.73, HF0=725968.57, VF0=667765.24, 
             Tol=0.0001, MaxIter=100, plots=1)
+    '''
+    # simple U case  (fAH1, fAV1, fBH1, fBV1, info1) = catenary(200, 30, 260.0, 8e9, 6500, CB=-50, nNodes=21, plots=1)
     plt.plot(info1['X'], info1['Z'] )
+    plt.plot(info1['s'], info1['X'] )
     plt.axis('equal')
     
     

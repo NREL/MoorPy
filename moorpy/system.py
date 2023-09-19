@@ -3065,8 +3065,11 @@ class System():
         draw_clumps     = kwargs.get('draw_clumps'    , False     )     # toggle to draw clump weights and float of the mooring system
         draw_anchors    = kwargs.get('draw_anchors'   , False     )     # toggle to draw the anchors of the mooring system or not  
         bathymetry      = kwargs.get("bathymetry"     , False     )     # toggle (and string) to include bathymetry or not. Can do full map based on text file, or simple squares
+        args_bath       = kwargs.get("args_bath"      , {}        )     # dictionary of optional plot_surface arguments
+        '''
         cmap_bath       = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
         alpha           = kwargs.get("opacity"        , 1.0       )     # the transparency of the bathymetry plot_surface
+        '''
         rang            = kwargs.get('rang'           , 'hold'    )     # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
         cbar_bath       = kwargs.get('cbar_bath'      , False     )     # toggle to include a colorbar for a plot or not
         colortension    = kwargs.get("colortension"   , False     )     # toggle to draw the mooring lines in colors based on node tensions
@@ -3249,7 +3252,7 @@ class System():
             # Second method: plot a 3D surface, plot_surface
             X, Y = np.meshgrid(bathGrid_Xs, bathGrid_Ys)
             
-            bath = ax.plot_surface(X,Y,-bathGrid, cmap=cmap_bath, vmin=rang[0], vmax=rang[1], alpha=alpha)
+            bath = ax.plot_surface(X,Y,-bathGrid, vmin=rang[0], vmax=rang[1], **args_bath)
             
             if cbar_bath_size!=1.0:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
                 cbar_bath=True

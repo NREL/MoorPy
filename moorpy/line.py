@@ -303,7 +303,7 @@ class Line():
         
         
 
-    def getLineCoords(self, Time, n=0):    # formerly UpdateLine
+    def getLineCoords(self, Time, n=0, segmentTensions=False):
         '''Gets the updated line coordinates for drawing and plotting purposes.'''
         
         if n==0: n = self.nNodes
@@ -377,7 +377,10 @@ class Line():
                 
                 # handle whether or not there is tension data
                 try:  # use average to go from segment tension to node tensions <<< can skip this once MD is updated to output node tensions
-                    Te = 0.5*(np.append(self.Te[ts,0], self.Te[ts,:]) +np.append(self.Te[ts,:], self.Te[ts,-1]))
+                    if segmentTensions:
+                        Te = self.Te[ts,:]  # return tensions of segments rather than averaging to get tensions of nodes
+                    else:
+                        Te = 0.5*(np.append(self.Te[ts,0], self.Te[ts,:]) +np.append(self.Te[ts,:], self.Te[ts,-1]))
                 except: # otherwise return zeros to avoid an error (might want a warning in some cases?)
                     Te = np.zeros(self.nNodes)
                 
