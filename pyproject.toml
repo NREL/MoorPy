@@ -7,7 +7,7 @@ name = "MoorPy"
 version = "1.1.0"
 description = "A design-oriented mooring system library for Python"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 license = {text = "BSD-3-Clause"}
 keywords = ["wind", "floating", "mooring", "design", "water"]
 authors = [
@@ -34,6 +34,7 @@ classifiers = [  # Optional
   # that you indicate you support Python 3. These classifiers are *not*
   # checked by "pip install". See instead "python_requires" below.
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
