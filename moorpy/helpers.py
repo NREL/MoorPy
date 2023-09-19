@@ -688,8 +688,8 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
     w = (mass - np.pi/4*d_vol**2 *rho)*g
     
-    # >>> expected inputs for viscoelastic approach <<<   need to add some kind of mode switch to handle this throughout MoorPy <<<<
-    EAs = mat['EAs_MBL']*MBL      # quasi-static stiffness: Krs x MBL [N]
+    # stiffness values for viscoelastic approach 
+    EAs = mat['EA_MBL']*MBL      # quasi-static stiffness: Krs x MBL [N]
     EAd = mat['EAd_MBL']*MBL     # dynamic stiffness constant: Krd alpha term x MBL [N]
     EAd_Lm = mat['EAd_MBL_Lm']   # dynamic stiffness Lm slope: Krd beta term (to be multiplied by mean load) [-]
     
@@ -761,7 +761,6 @@ def loadLineProps(source):
         output[mat]['EA_d2'    ] = getFromDict(props, 'EA_d2'    , default=0.0)
         output[mat]['EA_d3'    ] = getFromDict(props, 'EA_d3'    , default=0.0)
         output[mat]['EA_MBL'   ] = getFromDict(props, 'EA_MBL'   , default=0.0)
-        output[mat]['EAs_MBL'  ] = getFromDict(props, 'EAs_MBL'  , default=0.0)
         output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
         output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
         

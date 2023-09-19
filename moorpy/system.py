@@ -2906,29 +2906,24 @@ class System():
             return(ratios)
     
     
-    def activateDynamicStiffness(self):
+    def activateDynamicStiffness(self, display=0):
         '''Switch mooring system model to dynamic line stiffness
-        values, including potential unstretched line length
-        adjustment. This only works when dynamic line properties
+        values and adjust the unstretched line lengths to maintain the
+        same tensions. This only has an effect when dynamic line properties
         are used.'''
         
         for line in self.lineList:
-            line.activateDynamicStiffness()
-        
-        #initialize?
+            line.activateDynamicStiffness(display=display)
     
     
     def revertToStaticStiffness(self):
-        '''Switch mooring system model to dynamic line stiffness
-        values, including potential unstretched line length
-        adjustment. This only works when dynamic line properties
-        are used.'''
+        '''Revert mooring system model back to the static stiffness
+        values and the original unstretched lenths.'''
         
         for line in self.lineList:
             line.revertToStaticStiffness()
-        
-        #initialize?
-
+    
+    
     def getDepthFromBathymetry(self, x, y):   #BathymetryGrid, BathGrid_Xs, BathGrid_Ys, LineX, LineY, depth, nvec)
         ''' interpolates local seabed depth and normal vector
         

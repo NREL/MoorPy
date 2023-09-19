@@ -14,9 +14,39 @@ MoorPy Usage
 .. role:: stnd
 
 
+Advanced Features
+^^^^^^^^^^^^^^^^^
   
 
 (A list of key functions to be added here)
+
+Variable Rope Stiffness Behavior
+--------------------------------
+
+MoorPy supports separate static and dynamic stiffness coefficients, 
+to approximate the variable stiffness characterisics of synthetic
+fiber ropes. For using this capability, the mooring line type 
+information must include a static stiffness value (EAs), and a 
+dynamic stiffness value (EAd). An additional factor on EAd that
+scales with mean tension (EAd_Lm) can also be included. When using
+a mooring line properties library (i.e., a yaml file), these values
+should be specified by the EA_MBL, EAd_MBL, and EAd_MBL_Lm keywords,
+respectively. See the (moorprops library section to be added) for 
+more information.
+
+Two System methods control switching between static and
+dynamic stiffness properties:
+
+activateDynamicStiffness switches the mooring system model to dynamic 
+line stiffness values. It also adjusts the unstretched line lengths
+to maintain the same tension at the current system state. If EAd has 
+not been set, it will not change anything (call it with display > 0 
+to display a warning when this occurs).
+
+:func:`.system.activateDynamicStiffness`
+
+revertToStaticStiffness resets the mooring lines to use the static
+stiffness values and return to their original unstretched lenths.
 
 
 Additional Parameters in MoorPy

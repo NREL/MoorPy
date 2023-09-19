@@ -17,22 +17,10 @@
 #    EA_d      :     # stiffness per diameter [N/m]
 #    EA_d2     :     # stiffness per diameter^2 [N/m^2]
 #    EA_d3     :     # stiffness per diameter^3 [N/m^3]
-#    EA_MBL or Kr    # stiffness per MBL [N/N]
-#    EAs_MBL or Krs  # quasi-static stiffness per MBL [N/N]
-#    EAd_MBL or Krd_alpha    # dynamic stiffness per MBL [N/N]
-#    EAd_MBL_Lm or Krd_beta  # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
-
-
-
-NEW:
-#    Krs       or EAs_MBL      :     # quasi-static stiffness per MBL [N/N]
-#    Krd_alpha or EAd_MBL      :     # dynamic stiffness per MBL [N/N]
-#    Krd_beta  or EAd_MBL_PML  :     # dynamic stiffness per MBL per % mean load [N/N]
-# (% mean load will be input later in the modeling code)
-
-
-
-#    
+#    EA_MBL    :     # (quasi-static) stiffness per MBL [N/N] (aka Kr, Krs) 
+#    EAd_MBL   :     # dynamic stiffness per MBL [N/N] (aka Krd or Krd_alpha)
+#    EAd_MBL_Lm:     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (aka or Krd_beta)
+#
 #    dvol_dnom :     # volume-equivalent diameter per nominal diameter [-]
 #    
 #    cost_0    :     # cost offset [$/m]
@@ -70,7 +58,7 @@ lineProps:
     MBL_d2    :  170.5e6   # minimum breaking load per diameter^2 [N/m^2]   
     dvol_dnom :  0.86      # volume-equivalent diameter per nominal diameter [-]    
     cost_MBL  :  1.65e-05  # cost per MBL [$/m/N]
-    EAs_MBL   :   14       # quasi-static stiffness per MBL [N/N]
+    EA_MBL    :   14       # quasi-static stiffness per MBL [N/N]
     EAd_MBL   :   14       # dynamic stiffness per MBL [N/N]
     EAd_MBL_Lm :  0.34     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
 

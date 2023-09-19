@@ -1051,20 +1051,23 @@ class Line():
         pass
 
 
-    def activateDynamicStiffness(self):
+    def activateDynamicStiffness(self, display=0):
         '''Switch mooring line model to dynamic line stiffness
         value, including potential unstretched line length
         adjustment. This only works when dynamic line properties
         are used.'''
     
-        # switch to dynamic stiffness value
-        EA_old = self.type['EAs']
-        EA_new = self.type['EAd'] + self.type['EAd_Lm']*self.TA  # this implements the sloped Krd = alpha + beta*Lm
-        self.EA = EA_new
-        
-        # adjust line length to maintain current tension (approximate)
-        self.L = self.L0 * (1 + self.TB/EA_old)/(1+self.TB/EA_new)
-        
+        if self.type['EAd'] > 0:
+            # switch to dynamic stiffness value
+            EA_old = self.type['EAs']
+            EA_new = self.type['EAd'] + self.type['EAd_Lm']*self.TA  # this implements the sloped Krd = alpha + beta*Lm
+            self.EA = EA_new
+            
+            # adjust line length to maintain current tension (approximate)
+            self.L = self.L0 * (1 + self.TB/EA_old)/(1+self.TB/EA_new)
+        else:
+            if display > 0:
+                print(f'Line {self.number} has zero dynamic stiffness coefficient so activateDynamicStiffness does nothing.')
     
     
     def revertToStaticStiffness(self):
