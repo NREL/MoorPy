@@ -4,19 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "MoorPy"
-version = "1.0.1"
+version = "1.0.2"
 description = "A design-oriented mooring system library for Python"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 license = {text = "BSD-3-Clause"}
-keywords = ["wind", "floating", "mooring", "design", "optimization"]
+keywords = ["wind", "floating", "mooring", "design", "water"]
 authors = [
   {name = "National Renewable Energy Laboratory", email = "matthew.hall@nrel.gov" }
 ]
 maintainers = [
   {name = "Matthew Hall", email = "matthew.hall@nrel.gov"},
   {name = "Stein Housner", email = "stein.housner@nrel.gov"},
-  {name = "Stefan Dalecki", email = "sjdalecki@gmail.com"},
 ]
 classifiers = [  # Optional
   # How mature is this project? Common values are
@@ -35,6 +34,7 @@ classifiers = [  # Optional
   # that you indicate you support Python 3. These classifiers are *not*
   # checked by "pip install". See instead "python_requires" below.
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -100,7 +100,7 @@ namespaces = true
 [tool.setuptools.package-data]
 # If there are data files included in your packages that need to be
 # installed, specify them here.
-"*" = ["*.txt", "*.md"]
+"*" = ["*.txt", "*.md", "*.yaml"]
 
 #[tool.black]
 #line-length = 120
