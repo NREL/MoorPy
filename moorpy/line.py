@@ -280,7 +280,16 @@ class Line():
         #    print(e)
         #    self.show = False
         
-        
+    
+    def setL(self, L):
+        '''Sets the line unstretched length [m], and saves it for use with
+        static-dynamic stiffness adjustments. Also reverts to static 
+        stiffness to avoid an undefined state of having changing the line
+        length in a state with adjusted dynamic EA and L values.'''
+        self.L = L
+        self.L0 = L
+        self.revertToStaticStiffness()
+
 
     def getTimestep(self, Time):
         '''Get the time step to use for showing time series data'''
@@ -1056,19 +1065,21 @@ class Line():
         value, including potential unstretched line length
         adjustment. This only works when dynamic line properties
         are used.'''
-    
+        
         if self.type['EAd'] > 0:
             # switch to dynamic stiffness value
-            EA_old = self.type['EAs']
+            EA_old = self.type['EA']
             EA_new = self.type['EAd'] + self.type['EAd_Lm']*self.TA  # this implements the sloped Krd = alpha + beta*Lm
             self.EA = EA_new
             
             # adjust line length to maintain current tension (approximate)
-            self.L = self.L0 * (1 + self.TB/EA_old)/(1+self.TB/EA_new)
+            self.L = self.L0 * (1 + self.TB/EA_old)/(1 + self.TB/EA_new)
+            print(f"Adjusted L from {self.L0:.0f} to {self.L:.0f} and EA from {EA_old:.0f} to {EA_new:.0f}.")
+            
         else:
             if display > 0:
                 print(f'Line {self.number} has zero dynamic stiffness coefficient so activateDynamicStiffness does nothing.')
-    
+        
     
     def revertToStaticStiffness(self):
         '''Switch mooring line model to dynamic line stiffness
@@ -1081,7 +1092,9 @@ class Line():
         
         # revert to original line length
         self.L = self.L0
-
+        
+        print(f"Reset L to {self.L0:.0f} and EA to {self.EA:.0f}.")
+        
 
 def from2Dto3Drotated(K2D, F, L, R): 
     '''Initialize a line end's analytic stiffness matrix in the 

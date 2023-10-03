@@ -689,7 +689,7 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     w = (mass - np.pi/4*d_vol**2 *rho)*g
     
     # stiffness values for viscoelastic approach 
-    EAs = mat['EA_MBL']*MBL      # quasi-static stiffness: Krs x MBL [N]
+    #EAs = mat['EA_MBL']*MBL      # quasi-static stiffness: Krs x MBL [N]
     EAd = mat['EAd_MBL']*MBL     # dynamic stiffness constant: Krd alpha term x MBL [N]
     EAd_Lm = mat['EAd_MBL_Lm']   # dynamic stiffness Lm slope: Krd beta term (to be multiplied by mean load) [-]
     
@@ -702,9 +702,9 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     notes = f"made with getLineProps"
 
     lineType = dict(name=typestring, d_vol=d_vol, m=mass, EA=EA, w=w,
-                    MBL=MBL, EAs=EAs, EAd=EAd, EAd_Lm=EAd_Lm, input_d=d,
+                    MBL=MBL, EAd=EAd, EAd_Lm=EAd_Lm, input_d=d,
                     cost=cost, notes=notes, input_type=type, material=material)
-
+    
     lineType.update(kwargs)   # add any custom arguments provided in the call to the lineType's dictionary
           
     return lineType
