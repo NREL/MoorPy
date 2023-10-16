@@ -679,13 +679,28 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     
     # calculate the relevant properties for this specific line type
     mat = lineProps[material]       # shorthand for the sub-dictionary of properties for the material in question    
-    d = dnommm*0.001                # convert nominal diameter from mm to m    
-    d_vol = mat['dvol_dnom']*d    
+    d = dnommm*0.001                # convert nominal diameter from mm to m      
     mass = mat['mass_0'] + mat['mass_d']*d + mat['mass_d2']*d**2 + mat['mass_d3']*d**3 
     MBL  = mat[ 'MBL_0'] + mat[ 'MBL_d']*d + mat[ 'MBL_d2']*d**2 + mat[ 'MBL_d3']*d**3 
     EA   = mat[  'EA_0'] + mat[  'EA_d']*d + mat[  'EA_d2']*d**2 + mat[  'EA_d3']*d**3 + mat['EA_MBL']*MBL 
     cost =(mat['cost_0'] + mat['cost_d']*d + mat['cost_d2']*d**2 + mat['cost_d3']*d**3 
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
+    
+    # internally calculate the volumetric diameter using one of three options
+    if 'dvol_dnom' in mat and 'density' not in mat and 'spec_grav' not in mat:      # if only 'dvol_dnom' is specified in the source
+        d_vol = mat['dvol_dnom']*d                                          # [m]
+    elif 'density' in mat and 'dvol_dnom' not in mat and 'spec_grav' not in mat:    # if only 'density' is specified in the source
+        material_density = mat['density']                                   # [kg/m^3]
+        d_vol = np.sqrt((mass/material_density)*(4/np.pi))                  # [m]
+    elif 'spec_grav' in mat and 'dvol_dnom' not in mat and 'density' not in mat:    # if only 'spec_grav' is specified in the source
+        water_density = lineProps['water_density']                          # [kg/m^3]
+        print('Warning: Is this water density the same that is specified in MoorPy?')
+        material_density = (mat['spec_grav']/(water_density/1000))*1000     # [kg/m^3]
+        d_vol = np.sqrt((mass/material_density)*(4/np.pi))                  # [m]
+    else:
+        raise ValueError("Only one parameter can be specified to calculate the volumetric diameter. Choose either 'dvol_dnom', 'density', or 'spec_grav'")
+    
+    # use the volumetric diameter to calculate the weight per unit length (could have also used mass, water density, and material density)
     w = (mass - np.pi/4*d_vol**2 *rho)*g
     
     # stiffness values for viscoelastic approach 
