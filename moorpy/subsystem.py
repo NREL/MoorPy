@@ -33,9 +33,6 @@ class Subsystem(System, Line):
     '''
     
     
-    
-    
-    
     def __init__(self, depth=0, rho=1025, g=9.81, qs=1, Fortran=True, lineProps=None, **kwargs):
         '''Shortened initializer for just the SubSystem aspects.'''
         

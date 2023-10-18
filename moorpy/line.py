@@ -62,7 +62,7 @@ class Line():
         self.fB = np.zeros(3)
         
         #Perhaps this could be made less intrusive by defining it using a line.addpoint() method instead, similar to point.attachline().
-        self.attached = attachments  # ID numbers of the Points at the Line ends [a,b] >>> NOTE: not fully supported <<<<
+        #self.attached = attachments  # ID numbers of the Points at the Line ends [a,b] >>> NOTE: not fully supported <<<<
         self.th = 0           # heading of line from end A to B
         self.HF = 0           # fairlead horizontal force saved for next solve
         self.VF = 0           # fairlead vertical force saved for next solve
@@ -1074,7 +1074,6 @@ class Line():
             
             # adjust line length to maintain current tension (approximate)
             self.L = self.L0 * (1 + self.TB/EA_old)/(1 + self.TB/EA_new)
-            print(f"Adjusted L from {self.L0:.0f} to {self.L:.0f} and EA from {EA_old:.0f} to {EA_new:.0f}.")
             
         else:
             if display > 0:
@@ -1092,9 +1091,7 @@ class Line():
         
         # revert to original line length
         self.L = self.L0
-        
-        print(f"Reset L to {self.L0:.0f} and EA to {self.EA:.0f}.")
-        
+    
 
 def from2Dto3Drotated(K2D, F, L, R): 
     '''Initialize a line end's analytic stiffness matrix in the 

@@ -92,7 +92,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         flipFlag = False
     
     # reverse line in the solver if end A is above end B
-    if ZF < 0 and hA > 0:  # and if end A isn't on the seabed 
+    if ZF < 0 and (hA > 0 or flipFlag):  # and if end A isn't on the seabed (unless it's a buoyant line)
         #CB = -max(0, -CB) - ZF + XF*np.tan(np.radians(alpha))
         hA, hB = hB, hA
         ZF = -ZF
@@ -100,6 +100,10 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         reverseFlag = True   
     else:
         reverseFlag = False
+    
+    # avoid issue with tolerance on the margin of full seabed contact
+    if ZF <= Tol:
+        ZF = 0
     
     # ensure the input variables are realistic
     if XF < 0.0:
@@ -110,7 +114,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
     if EA <= 0.0:
         raise CatenaryError("EA is zero or negative!")
 
-    
     # Solve for the horizontal and vertical forces at the fairlead (HF, VF) and at the anchor (HA, VA)
     
     # There are many "ProfileTypes" of a mooring line and each must be analyzed separately (1-3 are consistent with FAST v7)
@@ -129,7 +132,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
     # ProfileType = 7: Portion of the line is resting on the seabed, and the seabed has a slope
     
     EA_W = EA/W
-
     
     # calculate the unstretched length that would be hanging if the line was fully slack (vertical down to flat on the seabed)
     '''
@@ -297,7 +299,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                         Xs[I] = XF
                         Zs[I] = ZF - Lms - W/EA*(LHanging2*Lms - 0.5*Lms**2 )
                         Te[I] = W*Lms
-        
     
 
     # ProfileType 6 case - vertical line without seabed contact     
@@ -424,11 +425,11 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         # some initial values just for printing before they're filled in
         EXF=0
         EZF=0
-
+        
         # Solve the analytical, static equilibrium equations for a catenary (or taut) mooring line with seabed interaction:
         X0 = [HF, VF]
         Ytarget = [0,0]
-        args = dict(cat=[XF, ZF, L, EA, W, CB, hA, hB, alpha, WL, WEA, L_EA, CB_EA], step=[0.15,1.0,1.5])  
+        args = dict(cat=[XF, ZF, L, EA, W, CB, hA, hB, alpha, WL, WEA, L_EA, CB_EA]) #, step=[0.15,1.0,1.5])  
         # call the master solver function
         #X, Y, info2 = msolve.dsolve(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, tol=Tol, maxIter=MaxIter, a_max=1.2)
         X, Y, info2 = dsolve2(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, 
@@ -460,7 +461,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         
             X0 = [HF, VF]
             Ytarget = [0,0]
-            args = dict(cat=[XF, ZF, L, EA, W, CB, hA, hB, alpha, WL, WEA, L_EA, CB_EA], step=[0.1,0.8,1.5])   # step: alpha_min, alpha0, alphaR
+            args = dict(cat=[XF, ZF, L, EA, W, CB, hA, hB, alpha, WL, WEA, L_EA, CB_EA]) #, step=[0.1,0.8,1.5])   # step: alpha_min, alpha0, alphaR
             # call the master solver function
             #X, Y, info3 = msolve.dsolve(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, tol=Tol, maxIter=MaxIter, a_max=1.1) #, dX_last=info2['dX'])
             X, Y, info3 = dsolve2(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, 
@@ -468,18 +469,34 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                 
             # retry if it failed              
             if  info3['iter'] >= MaxIter-1  or  info3['oths']['error']==True:
-                        
+                
                 X0 = X
                 Ytarget = [0,0]
-                args = dict(cat=[XF, ZF, L, EA, W, CB, hA, hB, alpha, WL, WEA, L_EA, CB_EA], step=[0.1,1.0,2.0])  
+                args = dict(cat=[XF, ZF, L, EA, W, CB, hA, hB, alpha, WL, WEA, L_EA, CB_EA]) #, step=[0.05,1.0,1.0])  
                 # call the master solver function
                 #X, Y, info4 = msolve.dsolve(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, tol=Tol, maxIter=10*MaxIter, a_max=1.15) #, dX_last=info3['dX'])
                 X, Y, info4 = dsolve2(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, 
                                       ytol=Tol, stepfac=1, maxIter=MaxIter, a_max=1.2)
                     
                 # check if it failed                  
-                if  info4['iter'] >= 10*MaxIter-1  or  info4['oths']['error']==True:
-                                    
+                if  info4['iter'] >= MaxIter-1  or  info4['oths']['error']==True:
+                    
+                    
+                    # ----- last-ditch attempt for a straight line -----
+                    d = np.sqrt(XF*XF+ZF*ZF)
+                    sin_angle = XF/d
+                    F_lateral = sin_angle*np.abs(W)*L
+                    F_EA = (d/L-1)*EA
+
+                    
+
+                    print(f" F_lateral/F_EA is {F_lateral/F_EA:7.5f} !!!!   and strain is {d/L-1 : 7.5f}.")
+                    
+                    print(f" F_lateral / (strain+tol)EA is {F_lateral/((d+Tol)/L-1)*EA:7.5f} !!!!!!")
+                    
+                    #breakpoint()
+                    
+                    
                     print("catenary solve failed on all 3 attempts.")
                     print(f"catenary({XF}, {ZF}, {L}, {EA}, {W}, CB={CB}, HF0={HF0}, VF0={VF0}, Tol={Tol}, MaxIter={MaxIter}, plots=1)")
                     
@@ -959,7 +976,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
 def eval_func_cat(X, args):  
     '''returns target outputs and also secondary outputs for constraint checks etc.'''
     
-    info = dict(error=False)                                 # a dict of extra outputs to be returned
+    info = dict(error=False, message='')  # a dict of extra outputs to be returned
     
     ## Step 1. break out design variables and arguments into nice names
     HF = X[0]
@@ -998,7 +1015,6 @@ def eval_func_cat(X, args):
     else:   # must be 0.0 < HF <= -CB*VFMinWL, meaning a portion of the line must rest on the seabed and the anchor tension is zero
         ProfileType = 3
     
-   
     # Compute the error functions (to be zeroed) and the Jacobian matrix
     #   (these depend on the anticipated configuration of the mooring line):   
     
@@ -1211,11 +1227,12 @@ def step_func_cat(X, args, Y, info, Ytarget, err, tols, iter, maxIter):
     # correct solution (this happens, for example, if we jump to quickly between a taut and slack catenary)
 
     # options for adaptive step size: 
-    # [alpha_min, alpha0, alphaR] = args['step']  # get minimum alpha, initial alpha, and alpha reduction rate from passed arguments 
-    # alpha = np.max([alpha_min, alpha0*(1.0 - alphaR*iter/maxIter)])
-    # alpha = alpha0 * np.exp( iter/maxIter * np.log(alpha_min/alpha0 ) )
-    # dX[0] = dX[0]*alpha #dHF*( 1.0 - Tol*I )           
-    # dX[1] = dX[1]*alpha #dVF*( 1.0 - Tol*I )
+    if 'step' in args:
+        [alpha_min, alpha0, alphaR] = args['step']  # get minimum alpha, initial alpha, and alpha reduction rate from passed arguments 
+        alpha = np.max([alpha_min, alpha0*(1.0 - alphaR*iter/maxIter)])
+        alpha = alpha0 * np.exp( iter/maxIter * np.log(alpha_min/alpha0 ) )
+        dX[0] = dX[0]*alpha #dHF*( 1.0 - Tol*I )           
+        dX[1] = dX[1]*alpha #dVF*( 1.0 - Tol*I )
     
     # To avoid an ill-conditioned situation, make sure HF does not go less than or equal to zero by having a lower limit of Tol*HF 
     # [NOTE: the value of dHF = ( Tol - 1.0 )*HF comes from: HF = HF + dHF = Tol*HF when dHF = ( Tol - 1.0 )*HF]
@@ -1322,9 +1339,57 @@ if __name__ == "__main__":
             Tol=0.0001, MaxIter=100, plots=1)
     '''
     # simple U case  (fAH1, fAV1, fBH1, fBV1, info1) = catenary(200, 30, 260.0, 8e9, 6500, CB=-50, nNodes=21, plots=1)
+    
+    #tricky cable
+    '''
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(266.66666666666674, 195.33333333333337, 
+              400.0, 700000.0, -15.807095300087719, CB=0.0, alpha=-0.0, 
+              #HF0=3815675.5094567537, VF0=-1038671.8978986739, 
+              Tol=0.0001, MaxIter=100, plots=1)
+    '''          
+    #fAH1, fAV1, fBH1, fBV1, info1) = catenary(231.8516245613182, 248.3746210557402, 339.7721054751881, 70000000000.0, 34.91060469991227, 
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(231.8, 248.3, 339.7, 70000000000.0, 34.91060469991227, 
+    # CB=0.0, HF0=2663517010.1, VF0=2853338140.1, Tol=0.0001, MaxIter=100, plots=2)
+    
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(246.22420940032947, 263.55766330843164, 360.63566262396927, 700000000.0, 3.087350845602259, 
+    #          CB=0.0, HF0=9216801.959569097, VF0=9948940.060081193, Tol=2e-05, MaxIter=100, plots=1)
+    #catenary(400.0000111513176, 2e-05, 400.0, 70000000000.0, 34.91060469991227, 
+    #    CB=0.0, HF0=4224.074763303775, VF0=0.0, Tol=2e-05, MaxIter=100, plots=1)
+    
+    
+    Tol =2e-05
+    
+    XF=231.8516245613182
+    ZF=248.3746210557402
+    L = 339.7721054751881 #- Tol
+    EA=7e8
+    W=34.91
+    '''
+    XF=40.0
+    ZF=30.0
+    L = 50 - 0.001
+    EA=7e9
+    W=3
+    '''
+    d = np.sqrt(XF*XF+ZF*ZF)
+    sin_angle = XF/d
+    F_lateral = sin_angle*np.abs(W)*L
+    F_EA = (d/L-1)*EA
+    
+    #L = d
+
+    print(f" F_lateral/F_EA is {F_lateral/F_EA:6.2e} !!!!   and strain is {d/L-1 : 7.5f}.")
+    
+    print(f" F_lateral / ((strain+tol)EA) is {F_lateral/(((d+Tol)/L-1)*EA):6.2e} !!!!!!")
+    print(f" F_lateral / ((strain-tol)EA) is {F_lateral/(((d-Tol)/L-1)*EA):6.2e} !!!!!!")
+    
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(XF, ZF, L, EA, W, CB=-20, Tol=Tol, MaxIter=40, plots=2)
+    
+    print((fAH1, fAV1, fBH1, fBV1))
+    
     plt.plot(info1['X'], info1['Z'] )
-    plt.plot(info1['s'], info1['X'] )
-    plt.axis('equal')
+    #plt.plot(info1['s'], info1['X'] )
+    #plt.axis('equal')
     
     
     plt.show()
