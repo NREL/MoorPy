@@ -38,18 +38,21 @@
 # - The MBLs between studless and studlink chains are the same, for every grade
 # - The masses between different grades of chain are the same (for now...different grades might correspond to different material densities)
 # - If the user needs a different grade of chain, they will have to add another section and include those properties here. This default file only considers R4 chain
-
+# - This default yaml uses R4 studless chain as the default style of chain
+# - The chain MBL uses a cubic function, so be aware if you are researching theoretical chains with diameters greater than about 360mm, as the MBL will then decrease
 
 
 lineProps: 
 
-  water_density: 1025
+  water_reference: 
+    density   : 1025.0  # [kg/m^3]
 
-  chain       :     # R4 grade studless chain
+  chain       :     # R4 grade studless chain (the default chain that will be used when linetypename='chain')
     mass_d2   :  20.01e3    # linear mass density per diameter^2 [kg/m^3]    
     EA_d2     :  85.4e9     # stiffness per diameter^2 [N/m^2]    
-    MBL_d     :  37.34e6    # minimum breaking load per diameter [N/m]   
-    MBL_d2    : 602.47e6    # minimum breaking load per diameter^2 [N/m^2]   
+    MBL_d3    : -2.192e9    # minimum breaking load per diameter^3 [N/m^3]
+    MBL_d2    :  1.206e9    # minimum breaking load per diameter^2 [N/m^2] 
+    MBL_d     :  9.107e2    # minimum breaking load per diameter [N/m]   
     dvol_dnom :   1.801     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
     cost_mass :   2.585     # cost per mass [$/kg]
     
@@ -57,8 +60,9 @@ lineProps:
   chain_studlink :  # R4 grade studlink chain
     mass_d2   :  21.9e3     # linear mass density per diameter^2 [kg/m^3]    
     EA_d2     :  85.4e9     # stiffness per diameter^2 [N/m^2]    
-    MBL_d     :  37.34e6    # minimum breaking load per diameter [N/m]   
-    MBL_d2    : 602.47e6    # minimum breaking load per diameter^2 [N/m^2]   
+    MBL_d3    : -2.192e9    # minimum breaking load per diameter^3 [N/m^3]
+    MBL_d2    :  1.206e9    # minimum breaking load per diameter^2 [N/m^2] 
+    MBL_d     :  9.107e2    # minimum breaking load per diameter [N/m]   
     dvol_dnom :   1.885     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
     cost_mass :   2.585     # cost per mass [$/kg]           
             
