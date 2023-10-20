@@ -3222,7 +3222,7 @@ class System():
                     
                     Z = np.array(points)
                     verts = [[Z[0],Z[1],Z[2],Z[3]]]
-                    ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=alpha))
+                    ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=1.0))
             
         if isinstance(bathymetry, str):   # or, if it's a string, load in the bathymetry file
 

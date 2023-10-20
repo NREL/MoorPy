@@ -40,6 +40,8 @@
 # - If the user needs a different grade of chain, they will have to add another section and include those properties here. This default file only considers R4 chain
 # - This default yaml uses R4 studless chain as the default style of chain
 # - The chain MBL uses a cubic function, so be aware if you are researching theoretical chains with diameters greater than about 360mm, as the MBL will then decrease
+# - Chain EA values not provided in manufacturer catalogs, so the below coefficients are taken from DNV-OS-E301 2013
+
 
 
 lineProps: 
@@ -47,19 +49,20 @@ lineProps:
   water_reference: 
     density   : 1025.0  # [kg/m^3]
 
+  
   chain       :     # R4 grade studless chain (the default chain that will be used when linetypename='chain')
-    mass_d2   :  20.01e3    # linear mass density per diameter^2 [kg/m^3]    
-    EA_d2     :  85.4e9     # stiffness per diameter^2 [N/m^2]    
+    mass_d2   :  20.01e3    # linear mass density per diameter^2 [kg/m/m^2]    
+    EA_d3     : -3.927e7    # stiffness per diameter^3 [N/m^3]
+    EA_d2     :  85.61e9    # stiffness per diameter^2 [N/m^2]    
     MBL_d3    : -2.192e9    # minimum breaking load per diameter^3 [N/m^3]
     MBL_d2    :  1.206e9    # minimum breaking load per diameter^2 [N/m^2] 
     MBL_d     :  9.107e2    # minimum breaking load per diameter [N/m]   
     dvol_dnom :   1.801     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
     cost_mass :   2.585     # cost per mass [$/kg]
     
-
   chain_studlink :  # R4 grade studlink chain
-    mass_d2   :  21.9e3     # linear mass density per diameter^2 [kg/m^3]    
-    EA_d2     :  85.4e9     # stiffness per diameter^2 [N/m^2]    
+    mass_d2   :  21.9e3     # linear mass density per diameter^2 [kg/m/m^2]    
+    EA_d2     :  87.97e9    # stiffness per diameter^2 [N/m^2]    
     MBL_d3    : -2.192e9    # minimum breaking load per diameter^3 [N/m^3]
     MBL_d2    :  1.206e9    # minimum breaking load per diameter^2 [N/m^2] 
     MBL_d     :  9.107e2    # minimum breaking load per diameter [N/m]   
@@ -68,27 +71,33 @@ lineProps:
             
 
   polyester   :     # polyester synthetic rope
-    mass_d2   :  678.75     # linear mass density per diameter^2 [kg/m^3]       
+    mass_d2   :  678.75     # linear mass density per diameter^2 [kg/m/m^2]       
     MBL_d2    :  308.2e6    # minimum breaking load per diameter^2 [N/m^2]     
-    cost_MBL  :  1.65e-05  # cost per MBL [$/m/N]
-    EA_MBL    :   14       # quasi-static stiffness per MBL [N/N]
-    EAd_MBL   :   14       # dynamic stiffness per MBL [N/N]
-    EAd_MBL_Lm :  0.34     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
-    spec_grav :  1.38       # specific gravity of polyester used to calculate the volume-equivalent diameter, relative to the reference density of water [-]
+    EA_MBL    :   14        # quasi-static stiffness per MBL [N/N]
+    EAd_MBL   :  11.615     # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm :  0.396     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
+    spec_grav :  1.38       # specific gravity of polyester used to calculate the volume-equivalent diameter, relative to the reference water density [-]
+    cost_MBL  :  1.65e-05   # cost per MBL [$/m/N]
 
-  nylon       :            # nylon synthetic rope
-    mass_d2   :  647.6     # linear mass density per diameter^2 [kg/m^3]
-    EA_d2     :  1.18e8    # stiffness per diameter^2 [N/m^2] 
-    MBL_d2    :  139.4e6   # minimum breaking load per diameter^2 [N/m^2] 
-    dvol_dnom :  0.85      # volume-equivalent diameter per nominal diameter [-]  
-    cost_MBL  :  4.29e-05  # cost per MBL [$/m/N]
+  nylon       :     # nylon synthetic rope
+    mass_d2   :  585.15     # linear mass density per diameter^2 [kg/m/m^2]
+    MBL_d3    :  230.29e6   # minimum breaking load per diameter^3 [N/m^2]
+    MBL_d2    :  207.0e6    # minimum breaking load per diameter^2 [N/m^2] 
+    EA_MBL    :  5          # quasi-static stiffness per MBL [N/N] (can range from 1 to 10)
+    EAd_MBL   :  2.08       # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm : 0.39       # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
+    spec_grav :  1.14       # specific gravity of nylon used to calculate the volume-equivalent diameter, relative to the reference water density [-]
+    cost_MBL  :  4.29e-05   # cost per MBL [$/m/N]
+  
+  hmpe        :     # high modulus polyethylene synthetic rope
+    mass_d2   :  495.72     # linear mass density per diameter^2 [kg/m/m^2]
+    MBL_d3    :  650.65e6   # minimum breaking load per diameter^3 [N/m^2]
+    MBL_d2    :  579.5e6    # minimum breaking load per diameter^2 [N/m^2] 
+    EA_MBL    :  56.54      # quasi-static stiffness per MBL [N/N]
+    EAd_MBL   :  59         # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm : 0.54       # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
+    spec_grav :  0.975      # specific gravity of hmpe/dyneema, used to calculate the volume-equivalent diameter, relative to the reference water density [-]
 
-  wire        :
-    mass_d2   :  3989.7    # linear mass density per diameter^2 [kg/m^3]
-    EA_d2     :  4.04e10   # stiffness per diameter^2 [N/m^2]    
-    MBL_d2    :  633.36e6  # minimum breaking load per diameter^2 [N/m^2]
-    dvol_dnom :  0.8       # volume-equivalent diameter per nominal diameter [-]
-    cost_d2   :  0.04542e6 # cost per diameter^2 with d in meters [$/m]
 
 
 
