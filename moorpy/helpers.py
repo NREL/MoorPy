@@ -687,14 +687,13 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
     
     # internally calculate the volumetric diameter using one of three options
-    if 'dvol_dnom' in mat and 'density' not in mat and 'spec_grav' not in mat:      # if only 'dvol_dnom' is specified in the source
+    if mat['dvol_dnom'] is not None and mat['material_density'] is None and mat['spec_grav'] is None:      # if only 'dvol_dnom' is specified in the source
         d_vol = mat['dvol_dnom']*d                                          # [m]
-    elif 'density' in mat and 'dvol_dnom' not in mat and 'spec_grav' not in mat:    # if only 'density' is specified in the source
+    elif mat['material_density'] is not None and mat['dvol_dnom'] is None and mat['spec_grav'] is None:    # if only 'density' is specified in the source
         material_density = mat['density']                                   # [kg/m^3]
         d_vol = np.sqrt((mass/material_density)*(4/np.pi))                  # [m]
-    elif 'spec_grav' in mat and 'dvol_dnom' not in mat and 'density' not in mat:    # if only 'spec_grav' is specified in the source
-        water_density = lineProps['water_density']                          # [kg/m^3]
-        print('Warning: Is this water density the same that is specified in MoorPy?')
+    elif mat['spec_grav'] is not None and mat['dvol_dnom'] is None and mat['material_density'] is None:    # if only 'spec_grav' is specified in the source
+        water_density = lineProps['water_reference']['density']             # [kg/m^3]
         material_density = (mat['spec_grav']/(water_density/1000))*1000     # [kg/m^3]
         d_vol = np.sqrt((mass/material_density)*(4/np.pi))                  # [m]
     else:
@@ -766,31 +765,55 @@ def loadLineProps(source):
     
     # combine loaded coefficients and default values into dictionary that will be saved for each material
     for mat, props in lineProps.items():    
-        output[mat] = {}
-        output[mat]['mass_0'   ] = getFromDict(props, 'mass_0'   , default=0.0)
-        output[mat]['mass_d'   ] = getFromDict(props, 'mass_d'   , default=0.0)
-        output[mat]['mass_d2'  ] = getFromDict(props, 'mass_d2'  , default=0.0)
-        output[mat]['mass_d3'  ] = getFromDict(props, 'mass_d3'  , default=0.0)
-        output[mat]['EA_0'     ] = getFromDict(props, 'EA_0'     , default=0.0)
-        output[mat]['EA_d'     ] = getFromDict(props, 'EA_d'     , default=0.0)
-        output[mat]['EA_d2'    ] = getFromDict(props, 'EA_d2'    , default=0.0)
-        output[mat]['EA_d3'    ] = getFromDict(props, 'EA_d3'    , default=0.0)
-        output[mat]['EA_MBL'   ] = getFromDict(props, 'EA_MBL'   , default=0.0)
-        output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
-        output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
+        if mat != 'water_reference':
+            output[mat] = {}
+            output[mat]['mass_0'   ] = getFromDict(props, 'mass_0'   , default=0.0)
+            output[mat]['mass_d'   ] = getFromDict(props, 'mass_d'   , default=0.0)
+            output[mat]['mass_d2'  ] = getFromDict(props, 'mass_d2'  , default=0.0)
+            output[mat]['mass_d3'  ] = getFromDict(props, 'mass_d3'  , default=0.0)
+            output[mat]['EA_0'     ] = getFromDict(props, 'EA_0'     , default=0.0)
+            output[mat]['EA_d'     ] = getFromDict(props, 'EA_d'     , default=0.0)
+            output[mat]['EA_d2'    ] = getFromDict(props, 'EA_d2'    , default=0.0)
+            output[mat]['EA_d3'    ] = getFromDict(props, 'EA_d3'    , default=0.0)
+            output[mat]['EA_MBL'   ] = getFromDict(props, 'EA_MBL'   , default=0.0)
+            output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
+            output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
+            
+            output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
+            output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
+            output[mat]['MBL_d2'   ] = getFromDict(props, 'MBL_d2'   , default=0.0)
+            output[mat]['MBL_d3'   ] = getFromDict(props, 'MBL_d3'   , default=0.0)
+            #output[mat]['dvol_dnom'] = getFromDict(props, 'dvol_dnom', default=1.0)
+
+            if 'dvol_dnom' in props and 'density' not in props and 'spec_grav' not in props:
+                output[mat]['dvol_dnom'] = getFromDict(props, 'dvol_dnom')
+                output[mat]['material_density'] = None
+                output[mat]['spec_grav'] = None
+            elif 'density' in props and 'dvol_dnom' not in props and 'spec_grav' not in props:
+                output[mat]['dvol_dnom'] = None
+                output[mat]['material_density'] = getFromDict(props, 'density')
+                output[mat]['spec_grav'] = None
+            elif 'spec_grav' in props and 'dvol_dnom' not in props and 'density' not in props:
+                output[mat]['dvol_dnom'] = None
+                output[mat]['material_density'] = None
+                output[mat]['spec_grav'] = getFromDict(props, 'spec_grav')
+            else:
+                raise ValueError("Only one parameter can be specified to calculate the volumetric diameter. Choose either 'dvol_dnom', 'density', or 'spec_grav'")
+
+            output[mat]['cost_0'   ] = getFromDict(props, 'cost_0'   , default=0.0)
+            output[mat]['cost_d'   ] = getFromDict(props, 'cost_d'   , default=0.0)
+            output[mat]['cost_d2'  ] = getFromDict(props, 'cost_d2'  , default=0.0)
+            output[mat]['cost_d3'  ] = getFromDict(props, 'cost_d3'  , default=0.0)
+            output[mat]['cost_mass'] = getFromDict(props, 'cost_mass', default=0.0)
+            output[mat]['cost_EA'  ] = getFromDict(props, 'cost_EA'  , default=0.0)
+            output[mat]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
         
-        output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
-        output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
-        output[mat]['MBL_d2'   ] = getFromDict(props, 'MBL_d2'   , default=0.0)
-        output[mat]['MBL_d3'   ] = getFromDict(props, 'MBL_d3'   , default=0.0)
-        output[mat]['dvol_dnom'] = getFromDict(props, 'dvol_dnom', default=1.0)
-        output[mat]['cost_0'   ] = getFromDict(props, 'cost_0'   , default=0.0)
-        output[mat]['cost_d'   ] = getFromDict(props, 'cost_d'   , default=0.0)
-        output[mat]['cost_d2'  ] = getFromDict(props, 'cost_d2'  , default=0.0)
-        output[mat]['cost_d3'  ] = getFromDict(props, 'cost_d3'  , default=0.0)
-        output[mat]['cost_mass'] = getFromDict(props, 'cost_mass', default=0.0)
-        output[mat]['cost_EA'  ] = getFromDict(props, 'cost_EA'  , default=0.0)
-        output[mat]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
+        elif mat == 'water_reference':
+            output[mat] = {}
+            output[mat]['density'] = getFromDict(props, 'density', default=1025.0)
+        
+        else:
+            raise ValueError(f"Mooring property dictionary entry '{mat}' not supported at this time")
     
     return output
 
