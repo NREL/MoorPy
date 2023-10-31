@@ -68,7 +68,7 @@ lineProps:
     EA_MBL    :   14        # quasi-static stiffness per MBL [N/N]
     EAd_MBL   :  11.615     # dynamic stiffness per MBL [N/N]
     EAd_MBL_Lm :  0.396     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
-    spec_grav :  1.38       # specific gravity of polyester used to calculate the volume-equivalent diameter, relative to the reference water density [-]
+    density   :  1380       # density of the polyester material [kg/m^3] (taken from specific gravity of 1.38, relative to 1000 kg/m^3)
     cost_MBL  :  1.65e-05   # cost per MBL [$/m/N]
 
   nylon       :     # nylon synthetic rope
@@ -78,7 +78,7 @@ lineProps:
     EA_MBL    :  5          # quasi-static stiffness per MBL [N/N] (can range from 1 to 10)
     EAd_MBL   :  2.08       # dynamic stiffness per MBL [N/N]
     EAd_MBL_Lm : 0.39       # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
-    spec_grav :  1.14       # specific gravity of nylon used to calculate the volume-equivalent diameter, relative to the reference water density [-]
+    density   :  1140       # density of the nylon material [kg/m^3] (taken from specific gravity of 1.14, relative to 1000 kg/m^3)
     cost_MBL  :  4.29e-05   # cost per MBL [$/m/N]
   
   hmpe        :     # high modulus polyethylene synthetic rope
@@ -88,7 +88,7 @@ lineProps:
     EA_MBL    :  56.54      # quasi-static stiffness per MBL [N/N]
     EAd_MBL   :  59         # dynamic stiffness per MBL [N/N]
     EAd_MBL_Lm : 0.54       # dynamic stiffness per MBL per fraction of mean load (not %) [N/N]
-    spec_grav :  0.975      # specific gravity of hmpe/dyneema, used to calculate the volume-equivalent diameter, relative to the reference water density [-]
+    density   :  975        # density of the hmpe/dyneema material [kg/m^3] (taken from specific gravity of 0.975, relative to 1000 kg/m^3
 
 
 
