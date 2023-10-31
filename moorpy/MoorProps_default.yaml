@@ -3,10 +3,7 @@
 # lineProps -> [line material name] -> [line material coefficients]
 
 # All possible lineProps coefficients are as follow:
-#    mass_0    :     # linear mass density offset [kg/m]
-#    mass_d    :     # linear mass density per diameter [kg/m^2]
 #    mass_d2   :     # linear mass density per diameter^2 [kg/m^3]
-#    mass_d3   :     # linear mass density per diameter^3 [kg/m^4]
 #    
 #    MBL_0     :     # minimum breaking load offset [N]
 #    MBL_d     :     # minimum breaking load per diameter [N/m]
@@ -23,7 +20,6 @@
 #
 #    dvol_dnom :     # volume-equivalent diameter per nominal diameter [-]
 #    density   :     # density of the line material [kg/m^3] (e.g., chain density = 7850 kg/m^3)
-#    spec_grav :     # specific gravity of the line material [-] (relative to a reference density, usually water)
 #    NOTE: Only one of the above three variables can be used as input!
 #    
 #    cost_0    :     # cost offset [$/m]
@@ -46,10 +42,6 @@
 
 lineProps: 
 
-  water_reference: 
-    density   : 1025.0  # [kg/m^3]
-
-  
   chain       :     # R4 grade studless chain (the default chain that will be used when linetypename='chain')
     mass_d2   :  20.01e3    # linear mass density per diameter^2 [kg/m/m^2]    
     EA_d3     : -3.927e7    # stiffness per diameter^3 [N/m^3]

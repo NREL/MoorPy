@@ -629,28 +629,13 @@ def dsolvePlot(info):
 
 def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=1025.0, g=9.81, **kwargs):
     '''Sets up a dictionary that represents a mooring line type based on the 
-    specified diameter and material type. The
-
-    - This function requires at least one input: the line diameter in millimeters.
-    - The rest of the inputs are optional: describe the desired type of line (chain, polyester, wire, etc.),
-    the type of chain (studless or studlink), the source of data (Orcaflex-original or altered), or a name identifier
-    - The function will output a MoorPy linetype object
-
-    # support options for :
-    
-    # 1. dictionary passed in (this is what will be done when called from a System method)
-    
-        (a) by default, System will load in MoorPy's default line property information YAML
-        
-        (b) or user specify's alternate YAML file when making the system
-        
-    
-    # 2. yaml filename pass in or use default moorpy yaml and load yaml (used when called independently)
-    
-    System.linePropsDatabase will be a dictionary of stored YAML coefficients
-    
-    System.lineTypes will become a dictionary of LineType DICTIONARIES
-        
+    specified diameter and material type. The returned dictionary can serve as
+    a MoorPy line type. Data used for determining these properties is a MoorPy
+    lineTypes dictionary data structure, created by loadLineProps. This data
+    can be passed in via the lineProps parameter, or a new data set can be
+    generated based on a YAML filename or dictionary passed in via the source 
+    parameter. The lineProps dictionary should be error-checked at creation,
+    so it is not error check in this function for efficiency.
         
     Parameters
     ----------
@@ -658,10 +643,16 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
         nominal diameter [mm].
     material : string
         string identifier of the material type be used.
+    lineProps : dictionary
+        A MoorPy lineProps dictionary data structure containing the property scaling coefficients.
     source : dict or filename (optional)
         YAML file name or dictionary containing line property scaling coefficients
     name : any dict index (optional)
-        Identifier for the line type (otherwise will be generated automatically).    
+        Identifier for the line type (otherwise will be generated automatically).
+    rho : float (optional)
+        Water density used for computing apparent (wet) weight [kg/m^3].
+    g : float (optional)
+        Gravitational constant used for computing weight [m/s^2].
     '''
     
     if lineProps==None and source==None:
@@ -680,30 +671,19 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     # calculate the relevant properties for this specific line type
     mat = lineProps[material]       # shorthand for the sub-dictionary of properties for the material in question    
     d = dnommm*0.001                # convert nominal diameter from mm to m      
-    mass = mat['mass_0'] + mat['mass_d']*d + mat['mass_d2']*d**2 + mat['mass_d3']*d**3 
+    mass = mat['mass_d2']*d**2
     MBL  = mat[ 'MBL_0'] + mat[ 'MBL_d']*d + mat[ 'MBL_d2']*d**2 + mat[ 'MBL_d3']*d**3 
     EA   = mat[  'EA_0'] + mat[  'EA_d']*d + mat[  'EA_d2']*d**2 + mat[  'EA_d3']*d**3 + mat['EA_MBL']*MBL 
     cost =(mat['cost_0'] + mat['cost_d']*d + mat['cost_d2']*d**2 + mat['cost_d3']*d**3 
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
     
-    # internally calculate the volumetric diameter using one of three options
-    if mat['dvol_dnom'] is not None and mat['material_density'] is None and mat['spec_grav'] is None:      # if only 'dvol_dnom' is specified in the source
-        d_vol = mat['dvol_dnom']*d                                          # [m]
-    elif mat['material_density'] is not None and mat['dvol_dnom'] is None and mat['spec_grav'] is None:    # if only 'density' is specified in the source
-        material_density = mat['density']                                   # [kg/m^3]
-        d_vol = np.sqrt((mass/material_density)*(4/np.pi))                  # [m]
-    elif mat['spec_grav'] is not None and mat['dvol_dnom'] is None and mat['material_density'] is None:    # if only 'spec_grav' is specified in the source
-        water_density = lineProps['water_reference']['density']             # [kg/m^3]
-        material_density = (mat['spec_grav']/(water_density/1000))*1000     # [kg/m^3]
-        d_vol = np.sqrt((mass/material_density)*(4/np.pi))                  # [m]
-    else:
-        raise ValueError("Only one parameter can be specified to calculate the volumetric diameter. Choose either 'dvol_dnom', 'density', or 'spec_grav'")
-    
-    # use the volumetric diameter to calculate the weight per unit length (could have also used mass, water density, and material density)
+    # internally calculate the volumetric diameter using a ratio
+    d_vol = mat['dvol_dnom']*d  # [m]
+
+    # use the volumetric diameter to calculate the apparent weight per unit length 
     w = (mass - np.pi/4*d_vol**2 *rho)*g
     
     # stiffness values for viscoelastic approach 
-    #EAs = mat['EA_MBL']*MBL      # quasi-static stiffness: Krs x MBL [N]
     EAd = mat['EAd_MBL']*MBL     # dynamic stiffness constant: Krd alpha term x MBL [N]
     EAd_Lm = mat['EAd_MBL_Lm']   # dynamic stiffness Lm slope: Krd beta term (to be multiplied by mean load) [-]
     
@@ -733,10 +713,14 @@ def loadLineProps(source):
     
     Parameters
     ----------
-    
     source : dict or filename
         YAML file name or dictionary containing line property scaling coefficients
-            
+    
+    Returns
+    -------
+    dictionary
+        LineProps dictionary listing each supported mooring line type and 
+        subdictionaries of scaling coefficients for each.
     '''
 
     if type(source) is dict:
@@ -764,57 +748,41 @@ def loadLineProps(source):
     output = dict()  # output dictionary combining default values with loaded coefficients
     
     # combine loaded coefficients and default values into dictionary that will be saved for each material
-    for mat, props in lineProps.items():    
-        if mat != 'water_reference':
-            output[mat] = {}
-            output[mat]['mass_0'   ] = getFromDict(props, 'mass_0'   , default=0.0)
-            output[mat]['mass_d'   ] = getFromDict(props, 'mass_d'   , default=0.0)
-            output[mat]['mass_d2'  ] = getFromDict(props, 'mass_d2'  , default=0.0)
-            output[mat]['mass_d3'  ] = getFromDict(props, 'mass_d3'  , default=0.0)
-            output[mat]['EA_0'     ] = getFromDict(props, 'EA_0'     , default=0.0)
-            output[mat]['EA_d'     ] = getFromDict(props, 'EA_d'     , default=0.0)
-            output[mat]['EA_d2'    ] = getFromDict(props, 'EA_d2'    , default=0.0)
-            output[mat]['EA_d3'    ] = getFromDict(props, 'EA_d3'    , default=0.0)
-            output[mat]['EA_MBL'   ] = getFromDict(props, 'EA_MBL'   , default=0.0)
-            output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
-            output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
-            
-            output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
-            output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
-            output[mat]['MBL_d2'   ] = getFromDict(props, 'MBL_d2'   , default=0.0)
-            output[mat]['MBL_d3'   ] = getFromDict(props, 'MBL_d3'   , default=0.0)
-            #output[mat]['dvol_dnom'] = getFromDict(props, 'dvol_dnom', default=1.0)
+    for mat, props in lineProps.items():  
+        output[mat] = {}
+        output[mat]['mass_d2'  ] = getFromDict(props, 'mass_d2')  # mass must scale with d^2
+        output[mat]['EA_0'     ] = getFromDict(props, 'EA_0'     , default=0.0)
+        output[mat]['EA_d'     ] = getFromDict(props, 'EA_d'     , default=0.0)
+        output[mat]['EA_d2'    ] = getFromDict(props, 'EA_d2'    , default=0.0)
+        output[mat]['EA_d3'    ] = getFromDict(props, 'EA_d3'    , default=0.0)
+        output[mat]['EA_MBL'   ] = getFromDict(props, 'EA_MBL'   , default=0.0)
+        output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
+        output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
+        
+        output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
+        output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
+        output[mat]['MBL_d2'   ] = getFromDict(props, 'MBL_d2'   , default=0.0)
+        output[mat]['MBL_d3'   ] = getFromDict(props, 'MBL_d3'   , default=0.0)
+        output[mat]['dvol_dnom'] = getFromDict(props, 'dvol_dnom', default=1.0)
 
-            if 'dvol_dnom' in props and 'density' not in props and 'spec_grav' not in props:
-                output[mat]['dvol_dnom'] = getFromDict(props, 'dvol_dnom')
-                output[mat]['material_density'] = None
-                output[mat]['spec_grav'] = None
-            elif 'density' in props and 'dvol_dnom' not in props and 'spec_grav' not in props:
-                output[mat]['dvol_dnom'] = None
-                output[mat]['material_density'] = getFromDict(props, 'density')
-                output[mat]['spec_grav'] = None
-            elif 'spec_grav' in props and 'dvol_dnom' not in props and 'density' not in props:
-                output[mat]['dvol_dnom'] = None
-                output[mat]['material_density'] = None
-                output[mat]['spec_grav'] = getFromDict(props, 'spec_grav')
+        # special handling if material density is provided
+        if 'density' in props:
+            if 'dvol_dnom' in props:
+                raise ValueError("Only one parameter can be specified to calculate the volumetric diameter. Choose either 'dvol_dnom' or 'density'.")
             else:
-                raise ValueError("Only one parameter can be specified to calculate the volumetric diameter. Choose either 'dvol_dnom', 'density', or 'spec_grav'")
+                mass_d2 = output[mat]['mass_d2']
+                material_density = getFromDict(props, 'density')
+                output[mat]['dvol_dnom'] = np.sqrt((mass_d2/material_density)*(4/np.pi))
+        
+        # cost coefficients
+        output[mat]['cost_0'   ] = getFromDict(props, 'cost_0'   , default=0.0)
+        output[mat]['cost_d'   ] = getFromDict(props, 'cost_d'   , default=0.0)
+        output[mat]['cost_d2'  ] = getFromDict(props, 'cost_d2'  , default=0.0)
+        output[mat]['cost_d3'  ] = getFromDict(props, 'cost_d3'  , default=0.0)
+        output[mat]['cost_mass'] = getFromDict(props, 'cost_mass', default=0.0)
+        output[mat]['cost_EA'  ] = getFromDict(props, 'cost_EA'  , default=0.0)
+        output[mat]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
 
-            output[mat]['cost_0'   ] = getFromDict(props, 'cost_0'   , default=0.0)
-            output[mat]['cost_d'   ] = getFromDict(props, 'cost_d'   , default=0.0)
-            output[mat]['cost_d2'  ] = getFromDict(props, 'cost_d2'  , default=0.0)
-            output[mat]['cost_d3'  ] = getFromDict(props, 'cost_d3'  , default=0.0)
-            output[mat]['cost_mass'] = getFromDict(props, 'cost_mass', default=0.0)
-            output[mat]['cost_EA'  ] = getFromDict(props, 'cost_EA'  , default=0.0)
-            output[mat]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
-        
-        elif mat == 'water_reference':
-            output[mat] = {}
-            output[mat]['density'] = getFromDict(props, 'density', default=1025.0)
-        
-        else:
-            raise ValueError(f"Mooring property dictionary entry '{mat}' not supported at this time")
-    
     return output
 
 

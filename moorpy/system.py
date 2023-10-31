@@ -3182,9 +3182,9 @@ class System():
             else:
                 j = j + 1
                 if color==None and 'material' in line.type:
-                    if 'chain' in line.type['material'] or 'Cadena80' in line.type['material']:
+                    if 'chain' in line.type['material']:
                         line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                    elif 'rope' in line.type['material'] or 'polyester' in line.type['material'] or 'Dpoli169' in line.type['material']:
+                    elif 'rope' in line.type['material'] or 'polyester' in line.type['material']:
                         line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                     elif 'nylon' in line.type['material']:
                         line.drawLine(time, ax, color=[.8,.8,.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
