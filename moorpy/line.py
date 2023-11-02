@@ -1069,8 +1069,8 @@ class Line():
         if self.type['EAd'] > 0:
             # switch to dynamic stiffness value
             EA_old = self.type['EA']
-            EA_new = self.type['EAd'] + self.type['EAd_Lm']*self.TA  # this implements the sloped Krd = alpha + beta*Lm
-            self.EA = EA_new
+            EA_new = self.type['EAd'] + self.type['EAd_Lm']*np.mean([self.TA, self.TB])  # this implements the sloped Krd = alpha + beta*Lm
+            self.EA = np.max([EA_new, EA_old])  # only if the dynamic stiffness is higher than the static stiffness, activate the dynamic stiffness
             
             # adjust line length to maintain current tension (approximate)
             self.L = self.L0 * (1 + self.TB/EA_old)/(1 + self.TB/EA_new)
