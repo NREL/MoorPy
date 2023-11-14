@@ -43,52 +43,52 @@
 lineProps: 
 
   chain       :     # R4 grade studless chain (the default chain that will be used when linetypename='chain')
-    mass_d2   :  20.01e3    # linear mass density per diameter^2 [kg/m/m^2]    
-    EA_d3     : -3.927e7    # stiffness per diameter^3 [N/m^3]
-    EA_d2     :  85.61e9    # stiffness per diameter^2 [N/m^2]    
-    MBL_d3    : -2.192e9    # minimum breaking load per diameter^3 [N/m^3]
-    MBL_d2    :  1.206e9    # minimum breaking load per diameter^2 [N/m^2] 
-    MBL_d     :  9.107e2    # minimum breaking load per diameter [N/m]   
-    dvol_dnom :   1.801     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
-    cost_mass :   2.585     # cost per mass [$/kg]
+    mass_d2   :  20.0e3    # linear mass density per diameter^2 [kg/m/m^2]    
+    EA_d3     : -3.93e7    # stiffness per diameter^3 [N/m^3]
+    EA_d2     :  85.6e9    # stiffness per diameter^2 [N/m^2]    
+    MBL_d3    : -2.19e9    # minimum breaking load per diameter^3 [N/m^3]
+    MBL_d2    :  1.21e9    # minimum breaking load per diameter^2 [N/m^2] 
+    MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
+    dvol_dnom :   1.80     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
+    cost_mass :   2.585    # cost per mass [$/kg]
     
   chain_studlink :  # R4 grade studlink chain
-    mass_d2   :  21.9e3     # linear mass density per diameter^2 [kg/m/m^2]    
-    EA_d2     :  87.97e9    # stiffness per diameter^2 [N/m^2]    
-    MBL_d3    : -2.192e9    # minimum breaking load per diameter^3 [N/m^3]
-    MBL_d2    :  1.206e9    # minimum breaking load per diameter^2 [N/m^2] 
-    MBL_d     :  9.107e2    # minimum breaking load per diameter [N/m]   
-    dvol_dnom :   1.885     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
-    cost_mass :   2.585     # cost per mass [$/kg]           
+    mass_d2   :  21.9e3    # linear mass density per diameter^2 [kg/m/m^2]    
+    EA_d2     :  88.0e9    # stiffness per diameter^2 [N/m^2]    
+    MBL_d3    : -2.19e9    # minimum breaking load per diameter^3 [N/m^3]
+    MBL_d2    :  1.21e9    # minimum breaking load per diameter^2 [N/m^2] 
+    MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
+    dvol_dnom :   1.89     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
+    cost_mass :   2.585    # cost per mass [$/kg]           
             
 
   polyester   :     # polyester synthetic rope
-    mass_d2   :  678.75     # linear mass density per diameter^2 [kg/m/m^2]       
-    MBL_d2    :  308.2e6    # minimum breaking load per diameter^2 [N/m^2]     
-    EA_MBL    :   14        # quasi-static stiffness per MBL [N/N]
-    EAd_MBL   :  11.615     # dynamic stiffness per MBL [N/N]
-    EAd_MBL_Lm :  39.6     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
-    density   :  1380       # density of the polyester material [kg/m^3] (taken from specific gravity of 1.38, relative to 1000 kg/m^3)
-    cost_MBL  :  1.65e-05   # cost per MBL [$/m/N]
+    mass_d2   :  679       # linear mass density per diameter^2 [kg/m/m^2]       
+    MBL_d2    :  308e6     # minimum breaking load per diameter^2 [N/m^2]     
+    EA_MBL    :   14       # quasi-static stiffness per MBL [N/N]
+    EAd_MBL   :   11.6     # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm :  40.0     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
+    density   :  1380      # density of the polyester material [kg/m^3] (taken from specific gravity of 1.38, relative to 1000 kg/m^3)
+    cost_MBL  :  1.65e-05  # cost per MBL [$/m/N]
 
   nylon       :     # nylon synthetic rope
-    mass_d2   :  585.15     # linear mass density per diameter^2 [kg/m/m^2]
-    MBL_d3    :  230.29e6   # minimum breaking load per diameter^3 [N/m^2]
-    MBL_d2    :  207.0e6    # minimum breaking load per diameter^2 [N/m^2] 
-    EA_MBL    :  5          # quasi-static stiffness per MBL [N/N] (can range from 1 to 10)
-    EAd_MBL   :  2.08       # dynamic stiffness per MBL [N/N]
-    EAd_MBL_Lm : 39.0       # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
-    density   :  1140       # density of the nylon material [kg/m^3] (taken from specific gravity of 1.14, relative to 1000 kg/m^3)
-    cost_MBL  :  4.29e-05   # cost per MBL [$/m/N]
+    mass_d2   :  585       # linear mass density per diameter^2 [kg/m/m^2]
+    MBL_d3    :  230e6     # minimum breaking load per diameter^3 [N/m^2]
+    MBL_d2    :  207e6     # minimum breaking load per diameter^2 [N/m^2] 
+    EA_MBL    :  5         # quasi-static stiffness per MBL [N/N] (can range from 1 to 10)
+    EAd_MBL   :  2.08      # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm : 39.0      # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
+    density   :  1140      # density of the nylon material [kg/m^3] (taken from specific gravity of 1.14, relative to 1000 kg/m^3)
+    cost_MBL  :  4.29e-05  # cost per MBL [$/m/N]
   
   hmpe        :     # high modulus polyethylene synthetic rope
-    mass_d2   :  495.72     # linear mass density per diameter^2 [kg/m/m^2]
-    MBL_d3    :  650.65e6   # minimum breaking load per diameter^3 [N/m^2]
-    MBL_d2    :  579.5e6    # minimum breaking load per diameter^2 [N/m^2] 
-    EA_MBL    :  56.54      # quasi-static stiffness per MBL [N/N]
-    EAd_MBL   :  59         # dynamic stiffness per MBL [N/N]
-    EAd_MBL_Lm : 54.0       # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
-    density   :  975        # density of the hmpe/dyneema material [kg/m^3] (taken from specific gravity of 0.975, relative to 1000 kg/m^3
+    mass_d2   :  496       # linear mass density per diameter^2 [kg/m/m^2]
+    MBL_d3    :  651e6     # minimum breaking load per diameter^3 [N/m^2]
+    MBL_d2    :  580e6     # minimum breaking load per diameter^2 [N/m^2] 
+    EA_MBL    :  56        # quasi-static stiffness per MBL [N/N]
+    EAd_MBL   :  59        # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm : 54.0      # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
+    density   :  975       # density of the hmpe/dyneema material [kg/m^3] (taken from specific gravity of 0.975, relative to 1000 kg/m^3
 
 
 
