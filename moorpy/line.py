@@ -32,8 +32,6 @@ class Line():
             line seabed friction coefficient (will be set negative if line is fully suspended). The default is 0.
         isRod : boolean, optional
             determines whether the line is a rod or not. The default is 0.
-        attachments : TYPE, optional
-            ID numbers of any Points attached to the Line. The default is [0,0]. << consider removing
 
         Returns
         -------
@@ -60,26 +58,23 @@ class Line():
         self.rB = np.zeros(3)
         self.fA = np.zeros(3) # end forces
         self.fB = np.zeros(3)
+        self.TA = 0  # end tensions [N]
+        self.TB = 0
+        self.KA = np.zeros([3,3])  # 3D stiffness matrix of end A [N/m]
+        self.KB = np.zeros([3,3])  # 3D stiffness matrix of end B
+        self.KAB= np.zeros([3,3])  # 3D stiffness matrix of cross coupling between ends
         
-        #Perhaps this could be made less intrusive by defining it using a line.addpoint() method instead, similar to point.attachline().
-        #self.attached = attachments  # ID numbers of the Points at the Line ends [a,b] >>> NOTE: not fully supported <<<<
-        self.th = 0           # heading of line from end A to B
         self.HF = 0           # fairlead horizontal force saved for next solve
         self.VF = 0           # fairlead vertical force saved for next solve
-        self.KA = []          # to be filled with the 2x2 end stiffness matrix from catenary
-        self.KB = []          # to be filled with the 2x2 end stiffness matrix from catenary
         self.info = {}        # to hold all info provided by catenary
         
         self.qs = 1  # flag indicating quasi-static analysis (1). Set to 0 for time series data
         self.show = True      # a flag that will be set to false if we don't want to show the line (e.g. if results missing)
-        #print("Created Line "+str(self.number))
         self.color = 'k'
         self.lw=0.5
         
         self.fCurrent = np.zeros(3)  # total current force vector on the line [N]
-        
-        
-
+    
     
     def loadData(self, dirname, rootname, sep='.MD.'):
         '''Loads line-specific time series data from a MoorDyn output file'''
@@ -315,7 +310,7 @@ class Line():
     def getLineCoords(self, Time, n=0, segmentTensions=False):
         '''Gets the updated line coordinates for drawing and plotting purposes.'''
         
-        if n==0: n = self.nNodes
+        if n==0: n = self.nNodes   # <<< not used!
     
         # special temporary case to draw a rod for visualization. This assumes the rod end points have already been set somehow
         if self.qs==1 and self.isRod > 0:
@@ -405,10 +400,12 @@ class Line():
         Ss = np.linspace(0, self.L, n)
         Xs, Ys, Zs, Ts = self.getLineCoords(0.0, n=n)
         
-        X = np.interp(s, Ss, Xs)*dr[0]/LH
-        Y = np.interp(s, Ss, Ys)*dr[1]/LH
+        X = np.interp(s, Ss, Xs)*dr[0]/LH  #?
+        Y = np.interp(s, Ss, Ys)*dr[1]/LH  #?
         Z = np.interp(s, Ss, Zs)
         T = np.interp(s, Ss, Ts)
+        
+        # <<< is this function used for anything?  Does it make sense?
         
         return X, Y, Z, T
         
@@ -443,10 +440,10 @@ class Line():
         
         linebit = []  # make empty list to hold plotted lines, however many there are
         
+        Xs, Ys, Zs, Ts = self.getLineCoords(Time)
+        
         if self.isRod > 0:
             
-            Xs, Ys, Zs, Te = self.getLineCoords(Time)
-        
             # apply any 3D to 2D transformation here to provide desired viewing angle
             Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] 
             Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] 
@@ -458,11 +455,7 @@ class Line():
         
         # drawing lines...
         else:            
-            # >>> can probably streamline the next bit of code a fair bit <<<
-            if self.qs==1:
-                Xs, Ys, Zs, Ts = self.getLineCoords(Time)
-            elif self.qs==0:
-                Xs, Ys, Zs, Ts = self.getLineCoords(Time)
+            if self.qs==0:
                 self.rA = np.array([Xs[0], Ys[0], Zs[0]])
                 self.rB = np.array([Xs[-1], Ys[-1], Zs[-1]])
             
@@ -525,18 +518,17 @@ class Line():
         if color == 'self':
             color = self.color  # attempt to allow custom colors
             lw = self.lw
+        elif color == None:
+            color = [0.3, 0.3, 0.3]  # if no color, default to grey
+            lw = 1
         else:
             lw = 1
         
         linebit = []  # make empty list to hold plotted lines, however many there are
-    
+        
+        Xs, Ys, Zs, tensions = self.getLineCoords(Time)
+        
         if self.isRod > 0:
-            
-            if color==None:
-                color = [0.3, 0.3, 0.3]  # if no color provided, default to dark grey rather than rainbow rods
-                
-            Xs, Ys, Zs, Ts = self.getLineCoords(Time)
-            
             for i in range(int(len(Xs)/2-1)):
                 linebit.append(ax.plot(Xs[2*i:2*i+2],Ys[2*i:2*i+2],Zs[2*i:2*i+2]            , color=color))  # side edges
                 linebit.append(ax.plot(Xs[[2*i,2*i+2]],Ys[[2*i,2*i+2]],Zs[[2*i,2*i+2]]      , color=color))  # end A edges
@@ -548,11 +540,7 @@ class Line():
         
         # drawing lines...
         else:
-            # >>> can probably streamline the next bit of code a fair bit <<<
-            if self.qs==1:  # returns the node positions and tensions of the line, doesn't matter what time
-                Xs, Ys, Zs, tensions = self.getLineCoords(Time)
-            elif self.qs==0: # returns the node positions and time data at the given time
-                Xs, Ys, Zs, tensions = self.getLineCoords(Time)
+            if self.qs==0:
                 self.rA = np.array([Xs[0], Ys[0], Zs[0]])
                 self.rB = np.array([Xs[-1], Ys[-1], Zs[-1]])
             
@@ -599,9 +587,6 @@ class Line():
         return linebit
     
     
-
-        
-        
     def redrawLine(self, Time, colortension=False, cmap_tension='rainbow', drawU=True):  #, linebit):
         '''Update 3D line drawing based on instantaneous position'''
         
@@ -907,94 +892,6 @@ class Line():
             plt.plot(self.info['X'], self.info['Z'])
             plt.show()
     
-    
-    """ These 3 functions no longer used - can delete  
-    def getEndForce(self, endB):
-        '''Returns the force of the line at the specified end based on the endB value
-
-        Parameters
-        ----------
-        endB : boolean
-            An indicator of which end of the line is the force wanted
-
-        Raises
-        ------
-        LineError
-            If the given endB value is not a 1 or 0
-
-        Returns
-        -------
-        fA or fB: array
-            The force vector at the end of the line
-
-        '''
-        
-        if endB == 1:
-            return self.fB
-        elif endB == 0:
-            return self.fA
-        else:
-            raise LineError("getEndForce: endB value has to be either 1 or 0")
-            
-            
-    def getStiffnessMatrix(self):
-        '''Returns the stiffness matrix of a line derived from analytic terms in the jacobian of catenary
-
-        Raises
-        ------
-        LineError
-            If a singluar matrix error occurs while taking the inverse of the Line's Jacobian matrix.
-
-        Returns
-        -------
-        K2_rot : matrix
-            the analytic stiffness matrix of the line in the rotated frame.
-
-        '''
-
-        # take the inverse of the Jacobian to get the starting analytic stiffness matrix
-        '''
-        if np.isnan(self.jacobian[0,0]): #if self.LBot >= self.L and self.HF==0. and self.VF==0.  << handle tricky cases here?
-            K = np.array([[0., 0.], [0., 1.0/self.jacobian[1,1] ]])
-        else:
-            try:
-                K = np.linalg.inv(self.jacobian)
-            except:
-                raise LineError(self.number, f"Check Line Length ({self.L}), it might be too long, or check catenary ProfileType")
-        '''
-        
-        # solve for required variables to set up the perpendicular stiffness. Keep it horizontal
-        L_xy = np.linalg.norm(self.rB[:2] - self.rA[:2])
-        T_xy = np.linalg.norm(self.fB[:2])
-        Kt = T_xy/L_xy
-        
-        # initialize the line's analytic stiffness matrix in the "in-line" plane
-        KA = np.array([[self.KA2[0,0], 0 , self.KA2[0,1]],
-                       [     0      , Kt,      0      ],
-                       [self.KA2[1,0], 0 , self.KA2[1,1]]])
-                       
-        KB = np.array([[self.KB2[0,0], 0 , self.KB2[0,1]],
-                       [     0      , Kt,      0      ],
-                       [self.KB2[1,0], 0 , self.KB2[1,1]]])
-        
-        # create the rotation matrix based on the heading angle that the line is from the horizontal
-        R = rotationMatrix(0,0,self.th)
-        
-        # rotate the matrix to be about the global frame [K'] = [R][K][R]^T
-        KA_rot = np.matmul(np.matmul(R, KA), R.T)
-        KB_rot = np.matmul(np.matmul(R, KB), R.T)
-        
-        return KA_rot, KB_rot
-    
-    
-    def getLineTens(self):
-        '''Calls the catenary function to return the tensions of the Line for a quasi-static analysis'''
-        
-        self.staticSolve(profiles=1) # call with flag to tell Catenary to return node info (may be unnecessary)
-
-        Ts = self.info["Te"]
-        return Ts
-    """
 
     def getTension(self, s):
         '''Returns tension at a given point along the line

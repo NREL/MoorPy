@@ -102,7 +102,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         reverseFlag = False
     
     # avoid issue with tolerance on the margin of full seabed contact
-    if ZF <= Tol:
+    if abs(ZF <= Tol) and alpha==0:
         ZF = 0
     
     # ensure the input variables are realistic

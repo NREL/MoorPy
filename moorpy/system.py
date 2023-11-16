@@ -2555,14 +2555,12 @@ class System():
         
         
     
-    def getCoupledStiffnessA(self, lines_only=False, tensions=False, nTries=3, plots=0):
+    def getCoupledStiffnessA(self, lines_only=False, tensions=False):
         '''Calculates the stiffness matrix for coupled degrees of freedom of a mooring system
         with free uncoupled degrees of freedom equilibrated - analytical appraoch. 
         
         Parameters
         ----------
-        plots : boolean, optional
-            Determines whether the stiffness calculation process is plotted and/or animated or not. The default is 0.
         lines_only : boolean
             Whether to consider only line forces and ignore body/point properties.
         tensions : boolean
