@@ -985,7 +985,7 @@ class System():
         outputList : list of strings, optional
             Optional list of additional requested output channels
         Lm : float
-            Mean load on mooring line as percentage of MBL, used for dynamic stiffness calculation. Only used if line type has a nonzero EAd
+            Mean load on mooring line as FRACTION of MBL, used for dynamic stiffness calculation. Only used if line type has a nonzero EAd
 
         Returns
         -------
@@ -1203,9 +1203,9 @@ class System():
             for key, lineType in self.lineTypes.items(): 
                 di = lineTypeDefaults.copy()  # start with a new dictionary of just the defaults
                 di.update(lineType)           # then copy in the lineType's existing values
-                if di['EAd'] > 0:
+                if 'EAd' in di.keys() and di['EAd'] > 0:
                     if Lm > 0:
-                        print('Calculating dynamic stiffness with Lm = ' + str(Lm)+'% of MBL')
+                        print('Calculating dynamic stiffness with Lm = ' + str(Lm)+'* MBL')
                         L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e}|{:7.3e} 4E9|11e6 {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
                              key, di['d_vol'], di['m'], di['EA'], di['EAd'] + di['EAd_Lm']*Lm*di['MBL'], di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
                     else:
