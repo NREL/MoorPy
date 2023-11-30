@@ -284,7 +284,39 @@ class System():
         
         #print("Created Line "+str(self.lineList[-1].number))
         # handle display message if/when MoorPy is reorganized by classes
+    
+    """
+    def addSubsystem(self, lengths, lineTypes, pointA=0, pointB=0):
+        '''Convenience function to add a Subsystem to a mooring system. IN PROGRESS.
+
+        Parameters
+        ----------
+        pointA int, optional
+            Point number to attach end A of the Subsystem to.
+        pointB int, optional
+            Point number to attach end B of the Subsystem to.
+        '''
         
+        if not isinstance(lineType, dict):                      # If lineType is not a dict, presumably it is a key for System.LineTypes.
+            if lineType in self.lineTypes:                      # So make sure it matches up with a System.LineType
+                lineType = self.lineTypes[lineType]             # in which case that entry will get passed to Line.init
+            else:
+                raise ValueError(f"The specified lineType name ({lineType}) does not correspond with any lineType stored in this MoorPy System")
+        
+        self.lineList.append( Subsystem(self, ...) )
+        
+        if pointA > 0:
+            if pointA <= len(self.pointList):
+                self.pointList[pointA-1].attachLine(self.lineList[-1].number, 0)
+            else:
+                raise Exception(f"Provided pointA of {pointA} exceeds number of points.")
+        if pointB > 0:
+            if pointB <= len(self.pointList):
+                self.pointList[pointB-1].attachLine(self.lineList[-1].number, 1)
+            else:
+                raise Exception(f"Provided pointB of {pointB} exceeds number of points.")
+    """
+    
     """    
     def removeLine(self, lineID):
         '''Removes a line from the system.'''
@@ -1612,6 +1644,15 @@ class System():
         
         return T   
         
+    def saveMaxTensions(self, T):
+        '''Store max tensions at each line computed elsewhere for later
+        use in MoorPy (e.g., for computing anchor costs).'''
+        
+        n = len(self.lineList)
+        
+        for i, line in enumerate(self.lineList):
+            self.lineList[i].loads['tenA_max'] = T[  i]
+            self.lineList[i].loads['tenB_max'] = T[n+i]
     
     
     def mooringEq(self, X, DOFtype="free", lines_only=False, tol=0.001, profiles=0):
@@ -2180,6 +2221,9 @@ class System():
             #if iter > 100:
             #    print(iter)
             #    breakpoint()
+            
+            
+            if np.sum(np.isnan(dX)) > 0: breakpoint()
                     
             return dX
 

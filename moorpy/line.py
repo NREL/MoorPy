@@ -47,6 +47,7 @@ class Line():
         self.L = L              # line unstretched length (may be modified if using nonlinear elasticity) [m]
         self.L0 = L             # line reference unstretched length [m]
         self.type = lineType    # dictionary of a System.lineTypes entry
+        self.cost = {}          # empty dictionary to contain cost information
         
         self.EA = self.type['EA']  # use the default stiffness value for now (may be modified if using nonlinear elasticity) [N]
         
@@ -953,6 +954,12 @@ class Line():
         return np.vstack([ Xs, Ys, Zs])
 
     
+    def getCost(self):
+        '''Fill in and returns a cost dictionary for this Line object.'''
+        self.cost = {}  # clear any old cost numbers
+        self.cost['material'] = self.type['cost']*self.L0
+        return cost
+    
     def attachLine(self, lineID, endB):
         pass
 
@@ -1004,7 +1011,7 @@ def from2Dto3Drotated(K2D, F, L, R):
     L : float
         Line horizontal distance end-to-end [m]
     R : 3x3 matrix
-        Rotation matrix from global frame to plane to the local
+        Rotation matrix from global frame to the local
         X-Z plane of the line
         
     Returns

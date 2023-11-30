@@ -86,7 +86,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
     if W < 0:
         W = -W
         ZF = -ZF
-        CB = -10000.   # <<< TODO: set this to the distance to sea surface <<<
+        CB = 0 #-10000.   # <<< TODO: could set hA, hB to distances to sea surface <<<
         flipFlag = True
     else:
         flipFlag = False
@@ -167,6 +167,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
             HF = (XF/L -1.0)*EA + 0.5*CB*W*L
             HA = np.max([0.0, HF - CB*W*L])
         else:                                   # case 3: seabed friction and zero anchor tension
+            if EA*CB*W*(XF-L) < 0: # something went wrong
+                breakpoint() 
             HF = np.sqrt(2*EA*CB*W*(XF-L))
             HA = 0.0
             
@@ -213,7 +215,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                     else:                           # the tension is nonzero
                         Xs[I] = s[I] + CB*W/EA*(s[I] - xB)**2
                         Te[I] = HF - CB*W*(L-s[I])
-
+        
     
     # ProfileType 4 case - fully slack
     elif (W > 0.0) and (L >= XF/np.cos(np.radians(alpha)) + LHanging):
@@ -1383,7 +1385,9 @@ if __name__ == "__main__":
     print(f" F_lateral / ((strain+tol)EA) is {F_lateral/(((d+Tol)/L-1)*EA):6.2e} !!!!!!")
     print(f" F_lateral / ((strain-tol)EA) is {F_lateral/(((d-Tol)/L-1)*EA):6.2e} !!!!!!")
     
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(XF, ZF, L, EA, W, CB=-20, Tol=Tol, MaxIter=40, plots=2)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(XF, ZF, L, EA, W, CB=-20, Tol=Tol, MaxIter=40, plots=2)
+    
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(400.00297786197154, 0.0, 400.0, 700000000.0, -221.18695627569764, CB=0.0, alpha=-0.0, HF0=5211.258450277256, VF0=0.0, Tol=2e-05, MaxIter=100, plots=1)
     
     print((fAH1, fAV1, fBH1, fBV1))
     
