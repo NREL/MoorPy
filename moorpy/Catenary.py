@@ -437,7 +437,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         X, Y, info2 = dsolve2(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, 
                               ytol=Tol, stepfac=1, maxIter=MaxIter, a_max=1.2)
         
-      
         # retry if it failed        
         if  info2['iter'] >= MaxIter-1  or  info2['oths']['error']==True or np.linalg.norm(info2['err']) > 10*Tol:
             #  ! Perhaps we failed to converge because our initial guess was too far off.
@@ -460,7 +459,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                     
                 HF = np.max([ abs( 0.5*W* XF/ Lamda0 ), Tol ])     # As above, set the lower limit of the guess value of HF to the tolerance
                 VF = 0.5*W*( ZF/np.tanh(Lamda0) + L )
-        
+
             X0 = [HF, VF]
             Ytarget = [0,0]
             args = dict(cat=[XF, ZF, L, EA, W, CB, hA, hB, alpha, WL, WEA, L_EA, CB_EA]) #, step=[0.1,0.8,1.5])   # step: alpha_min, alpha0, alphaR
@@ -468,10 +467,9 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
             #X, Y, info3 = msolve.dsolve(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, tol=Tol, maxIter=MaxIter, a_max=1.1) #, dX_last=info2['dX'])
             X, Y, info3 = dsolve2(eval_func_cat, X0, Ytarget=Ytarget, step_func=step_func_cat, args=args, 
                                   ytol=Tol, stepfac=1, maxIter=MaxIter, a_max=1.2)
-                
+            
             # retry if it failed              
             if  info3['iter'] >= MaxIter-1  or  info3['oths']['error']==True:
-                
                 X0 = X
                 Ytarget = [0,0]
                 args = dict(cat=[XF, ZF, L, EA, W, CB, hA, hB, alpha, WL, WEA, L_EA, CB_EA]) #, step=[0.05,1.0,1.0])  
@@ -485,82 +483,79 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                     
                     
                     # ----- last-ditch attempt for a straight line -----
-                    d = np.sqrt(XF*XF+ZF*ZF)
-                    sin_angle = XF/d
-                    F_lateral = sin_angle*np.abs(W)*L
-                    F_EA = (d/L-1)*EA
+                    d = np.sqrt(XF*XF+ZF*ZF)                    
+                    
+                    # if it's taut -- let's do an approximation that ignores weight
+                    if d/L - 1 > 0:  
+                        
+                        # tension, assuming a straight line and ignoring weight, is
+                        T0 = (d/L - 1) * EA
+                        
+                        # solve the horizontal equivalent using a parabola approximation!
+                        theta = np.arctan2(ZF,XF) # rotation angle
+                        W2 = W*np.cos(theta)  # transformed vertical weight (i.e. transverse distributed load)
+                        
+                        # Get line profile for future plotting. The quadratic term is just w/T0. 
+                        # Figure out the right z = w/T0 x^2 + bx + c
+                        c = 0
+                        # z(d) = 0 = w/T0 d^2 + b d
+                        b = -W2/T0 * d  # slope at x=0
+                        X2 = np.linspace(0, d, nNodes)
+                        Z2 = W2/T0*X2**2 + b*X2
+                        
+                        Xs_parabola = X2*np.cos(theta) - Z2*np.sin(theta) # put in global frame
+                        Zs_parabola = X2*np.sin(theta) + Z2*np.cos(theta)
+                        
+                        # Now get the forces and stiffnesses, again assuming it's just based on elasticity
+                        # This is back in the regular orientation - should we add weight in?
+                        HF =  T0*np.cos(theta)
+                        VF =  T0*np.sin(theta)
+                        HA =  T0*np.cos(theta)
+                        VA =  T0*np.sin(theta)
+                        R = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]]) # rotation matrix
+                        Kl = EA/L # inline stiffness
+                        Kt = T0/d # transverse stiffness
+                        K = np.matmul(R, np.matmul( np.array([[Kl,0],[0,Kt]]), R.T) ) # stiffness matrix (should check some of the math)
 
+                        # put things in the format expected from the normal solve (this could all be refactored)
+                        X = np.zeros(2)
+                        HF = X[0]       = HF
+                        VF = X[1]       = VF
+                        HA = info4['oths']['HA'] = HA
+                        VA = info4['oths']['VA'] = VA
+                        
+                        info4['oths']["stiffnessA"] = np.array(K)
+                        info4['oths']["stiffnessB"] = np.array(K)
+                        info4['oths']["stiffnessAB"] = np.array(-K)
+                        
+                        info4['oths']['ProfileType'] = -1 # flag for the parabolic solution for the coordinates...
+                        info4['oths']['error'] = False
+                        info4['oths']['message'] = 'Approximated as a straight massless spring as a last resort.'
+                        
+                        
+                        info.update(info4['oths'])  # <<< hopefully I modified enough in info4 for this to work
+                        info['catenary'] = info4
                     
-
-                    print(f" F_lateral/F_EA is {F_lateral/F_EA:7.5f} !!!!   and strain is {d/L-1 : 7.5f}.")
-                    
-                    print(f" F_lateral / (strain+tol)EA is {F_lateral/((d+Tol)/L-1)*EA:7.5f} !!!!!!")
-                    
-                    #breakpoint()
-                    
-                    
-                    print("catenary solve failed on all 3 attempts.")
-                    print(f"catenary({XF}, {ZF}, {L}, {EA}, {W}, CB={CB}, HF0={HF0}, VF0={VF0}, Tol={Tol}, MaxIter={MaxIter}, plots=1)")
-                    
-                    print("First attempt's iterations are as follows:")
-                    for i in range(info2['iter']+1):
-                        print(f" Iteration {i}: HF={info2['Xs'][i,0]: 8.4e}, VF={info2['Xs'][i,1]: 8.4e}, EX={info2['Es'][i,0]: 6.2e}, EZ={info2['Es'][i,1]: 6.2e}")
-                    
-                    print("Second attempt's iterations are as follows:")
-                    for i in range(info3['iter']+1):
-                        print(f" Iteration {i}: HF={info3['Xs'][i,0]: 8.4e}, VF={info3['Xs'][i,1]: 8.4e}, EX={info3['Es'][i,0]: 6.2e}, EZ={info3['Es'][i,1]: 6.2e}")
-                                    
-                    
-                    print("Last attempt's iterations are as follows:")
-                    for i in range(info4['iter']+1):
-                        print(f" Iteration {i}: HF={info4['Xs'][i,0]: 8.4e}, VF={info4['Xs'][i,1]: 8.4e}, EX={info4['Es'][i,0]: 6.2e}, EZ={info4['Es'][i,1]: 6.2e}")
-                                
-
-                    '''
-                    # plot solve performance
-                    fig, ax = plt.subplots(4,1, sharex=True)
-                    ax[0].plot(np.hstack([info2['Xs'][:,0], info3['Xs'][:,0], info4['Xs'][:,0]]))
-                    ax[1].plot(np.hstack([info2['Xs'][:,1], info3['Xs'][:,1], info4['Xs'][:,1]]))
-                    ax[2].plot(np.hstack([info2['Es'][:,0], info3['Es'][:,0], info4['Es'][:,0]]))
-                    ax[3].plot(np.hstack([info2['Es'][:,1], info3['Es'][:,1], info4['Es'][:,1]]))
-                    ax[0].set_ylabel("HF")
-                    ax[1].set_ylabel("VF")
-                    ax[2].set_ylabel("X err")
-                    ax[3].set_ylabel("Z err")
-                                    
-                    # plot solve path
-                    plt.figure()
-                    
-                    #c = np.hypot(info2['Es'][:,0], info2['Es'][:,1])
-                    
-                    
-                    c = np.arange(info2['iter']+1)
-                    c = cm.jet((c-np.min(c))/(np.max(c)-np.min(c)))
-                    
-                    for i in np.arange(info2['iter']):
-                        plt.plot(info2['Xs'][i:i+2,0], info2['Xs'][i:i+2,1],":", c=c[i])
-                    plt.plot(info2['Xs'][0,0], info2['Xs'][0,1],"o")
-                    
-                    c = np.arange(info3['iter']+1)
-                    c = cm.jet((c-np.min(c))/(np.max(c)-np.min(c)))
-                    
-                    for i in np.arange(info3['iter']):
-                        plt.plot(info3['Xs'][i:i+2,0], info3['Xs'][i:i+2,1], c=c[i])
-                    plt.plot(info3['Xs'][0,0], info3['Xs'][0,1],"*")
-                    
-                    c = np.arange(info4['iter']+1)
-                    c = cm.jet((c-np.min(c))/(np.max(c)-np.min(c)))
-                    
-                    for i in np.arange(info4['iter']):
-                        plt.plot(info4['Xs'][i:i+2,0], info4['Xs'][i:i+2,1], c=c[i])
-                    plt.plot(info4['Xs'][0,0], info4['Xs'][0,1],"*")
-                   
-                    plt.title("catenary solve path for troubleshooting")
-                    plt.show()
-                
-                    #breakpoint()
-                    '''
-                    raise CatenaryError("catenary solver failed. "+info4['oths']['message'])
+                    # Otherwise, we'd need an iterative solve of tension, curvature, and distributed load.
+                    # It could potentially be with a parabola. We don't have that yet, so fail.
+                    else:
+                        print("catenary solve failed on all 3 attempts.")
+                        print(f"catenary({XF}, {ZF}, {L}, {EA}, {W}, CB={CB}, HF0={HF0}, VF0={VF0}, Tol={Tol}, MaxIter={MaxIter}, plots=1)")
+                        
+                        print("First attempt's iterations are as follows:")
+                        for i in range(info2['iter']+1):
+                            print(f" Iteration {i}: HF={info2['Xs'][i,0]: 8.4e}, VF={info2['Xs'][i,1]: 8.4e}, EX={info2['Es'][i,0]: 6.2e}, EZ={info2['Es'][i,1]: 6.2e}")
+                        
+                        print("Second attempt's iterations are as follows:")
+                        for i in range(info3['iter']+1):
+                            print(f" Iteration {i}: HF={info3['Xs'][i,0]: 8.4e}, VF={info3['Xs'][i,1]: 8.4e}, EX={info3['Es'][i,0]: 6.2e}, EZ={info3['Es'][i,1]: 6.2e}")
+                                        
+                        
+                        print("Last attempt's iterations are as follows:")
+                        for i in range(info4['iter']+1):
+                            print(f" Iteration {i}: HF={info4['Xs'][i,0]: 8.4e}, VF={info4['Xs'][i,1]: 8.4e}, EX={info4['Es'][i,0]: 6.2e}, EZ={info4['Es'][i,1]: 6.2e}")
+                        
+                        raise CatenaryError("catenary solver failed. "+info4['oths']['message'])
                 
                 else:                            # if the solve was successful,
                     info.update(info4['oths'])   # copy info from last solve into existing info dictionary
@@ -815,7 +810,13 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                         Xs[I] = ( np.log( VFMinWLs_HF + SQRT1VFMinWLs_HF2 ) - np.log( VFMinWL_HF + SQRT1VFMinWL_HF2 ) )*HF_W + s_EA* HF;
                         Zs[I] = ( SQRT1VFMinWLs_HF2 - SQRT1VFMinWL_HF2 )*HF_W + s_EA*( VFMinWL + 0.5*Ws );
                         Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs );
-                 
+                    
+                    if ProfileType==-1:  # new last-ditch solution attempt for taut lines 
+                        Xs[I] = Xs_parabola[I]
+                        Zs[I] = Zs_parabola[I]
+                        Te[I] = T0
+                    
+                    
                     # A portion of the line must rest on the seabed
                     elif ProfileType in [2,3]:             
                             
@@ -1005,10 +1006,15 @@ def eval_func_cat(X, args):
     SQRT1VF_HF2      = np.sqrt( 1.0 + VF_HF2      )
     SQRT1VFMinWL_HF2 = np.sqrt( 1.0 + VFMinWL_HF2 )
     
-
+    # simple inelastic approximation of arc lenght of a parabola with exactly zero laid length
+    s = np.sqrt(4*XF**2 + 16*ZF**2)  # some constanst
+    lp = s/4 + XF**2/4/ZF*np.log((4*ZF + s)/2/ZF)  # length of parabola (slight underestimate vs lenght of catenary)
+    d = np.linalg.norm([XF, ZF])  # distance from points 
+    # this is a crude check that nothing should be laying along the seabed:ZF/HF >> 0 and L-d << (lp-d)
 
     # determine line profile type
-    if hA > 0.0  or  W < 0.0  or  VFMinWL > np.tan(np.radians(alpha)) : # no portion of the line rests on the seabed
+    if (hA > 0.0  or  W < 0.0  or  VFMinWL > np.tan(np.radians(alpha))
+        or (ZF/XF > 0.1 and L-d < 0.001*(lp-d)) ): # no portion of the line rests on the seabed
         ProfileType = 1
     elif not alpha==0:              # a portion of line rests along a *sloped* seabed
         ProfileType = 7
@@ -1357,43 +1363,59 @@ if __name__ == "__main__":
     #          CB=0.0, HF0=9216801.959569097, VF0=9948940.060081193, Tol=2e-05, MaxIter=100, plots=1)
     #catenary(400.0000111513176, 2e-05, 400.0, 70000000000.0, 34.91060469991227, 
     #    CB=0.0, HF0=4224.074763303775, VF0=0.0, Tol=2e-05, MaxIter=100, plots=1)
+    # tricky near-taut case with starting point
+    #catenary(119.3237383002058, 52.49668849178113, 130.36140355177318, 700000000.0, 34.91060469991227, CB=0.0, HF0=9298749.157482728, VF0=4096375.3052922436, Tol=2e-05, MaxIter=100, plots=1)
+    
     
     
     Tol =2e-05
     
-    XF=231.8516245613182
-    ZF=248.3746210557402
-    L = 339.7721054751881 #- Tol
-    EA=7e8
-    W=34.91
-    '''
-    XF=40.0
-    ZF=30.0
-    L = 50 - 0.001
-    EA=7e9
-    W=3
-    '''
-    d = np.sqrt(XF*XF+ZF*ZF)
-    sin_angle = XF/d
-    F_lateral = sin_angle*np.abs(W)*L
-    F_EA = (d/L-1)*EA
+    for dl in [-1, -0.1, -0.01, 0, 0.01, 0.1, 1]:  # for exploring line length sensitivity
     
-    #L = d
+        '''
+        XF= 119.3237383002058
+        ZF= 52.49668849178113
+        L = 130.36140355177318 + dl
+        EA= 700000000.0
+        W = 34.91060469991227
+        '''
+        XF=246.22420940032947
+        ZF=263.55766330843164
+        L =360.63566262396927 + dl
+        EA=700000000.0
+        W =3.08735
+        '''
+        XF=231.8516245613182
+        ZF=248.3746210557402
+        L = 339.7721054751881 #- Tol
+        EA=7e8
+        W =34.91
+        
+        XF=40.0
+        ZF=30.0
+        L = 50 - 0.001
+        EA=7e9
+        W=3
+        '''
+        d = np.sqrt(XF*XF+ZF*ZF)
+        sin_angle = XF/d
+        F_lateral = sin_angle*np.abs(W)*L
+        F_EA = (d/L-1)*EA
+        
+        #L = d
 
-    print(f" F_lateral/F_EA is {F_lateral/F_EA:6.2e} !!!!   and strain is {d/L-1 : 7.5f}.")
-    
-    print(f" F_lateral / ((strain+tol)EA) is {F_lateral/(((d+Tol)/L-1)*EA):6.2e} !!!!!!")
-    print(f" F_lateral / ((strain-tol)EA) is {F_lateral/(((d-Tol)/L-1)*EA):6.2e} !!!!!!")
-    
-    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(XF, ZF, L, EA, W, CB=-20, Tol=Tol, MaxIter=40, plots=2)
-    
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(400.00297786197154, 0.0, 400.0, 700000000.0, -221.18695627569764, CB=0.0, alpha=-0.0, HF0=5211.258450277256, VF0=0.0, Tol=2e-05, MaxIter=100, plots=1)
-    
-    print((fAH1, fAV1, fBH1, fBV1))
+        #print(f" F_lateral/F_EA is {F_lateral/F_EA:6.2e} !!!!   and strain is {d/L-1 : 7.2e}.")
+        #print(f" F_lateral / ((strain+tol)EA) is {F_lateral/(((d+Tol)/L-1)*EA):6.2e} !!!!!!")
+        #print(f" F_lateral / ((strain-tol)EA) is {F_lateral/(((d-Tol)/L-1)*EA):6.2e} !!!!!!")
+        
+        (fAH1, fAV1, fBH1, fBV1, info1) = catenary(XF, ZF, L, EA, W, CB=0, Tol=Tol, MaxIter=40, plots=2)
+        print("{:10.1f} {:10.1f} {:10.1f} {:10.1f}".format(fAH1, fAV1, fBH1, fBV1))
+        #print("{:10.1f} {:10.1f} {:10.1f} {:10.1f}".format(*info1['stiffnessB'].ravel().tolist() ))
+        
     
     plt.plot(info1['X'], info1['Z'] )
     #plt.plot(info1['s'], info1['X'] )
     #plt.axis('equal')
     
-    
-    plt.show()
+    plt.close('all')
+    #plt.show()
