@@ -517,12 +517,16 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                         Kt = T0/d # transverse stiffness
                         K = np.matmul(R, np.matmul( np.array([[Kl,0],[0,Kt]]), R.T) ) # stiffness matrix (should check some of the math)
 
-                        # put things in the format expected from the normal solve (this could all be refactored)
+                        # put things in the format expected for later parts of the code
                         X = np.zeros(2)
                         HF = X[0]       = HF
                         VF = X[1]       = VF
-                        HA = info4['oths']['HA'] = HA
-                        VA = info4['oths']['VA'] = VA
+                        
+                        info4['oths']['HF'] = HF
+                        info4['oths']['VF'] = VF
+                        info4['oths']['HA'] = HA
+                        info4['oths']['VA'] = VA
+                        info4['oths']['LBot'] = 0
                         
                         info4['oths']["stiffnessA"] = np.array(K)
                         info4['oths']["stiffnessB"] = np.array(K)
