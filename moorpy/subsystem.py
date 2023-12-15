@@ -570,4 +570,23 @@ class Subsystem(System, Line):
         self.Ks = curvature
 
         return curvature
+    
+    
+    def loadData(self, dirname, rootname, line_IDs):
+        '''Load data from MoorDyn into the Subsystem lineList.
         
+        dirname 
+            folder where output files are located
+        rootname
+            root name of the OpenFAST primary file (.fst)
+        line_IDs : list
+            list of the line numbers (of MoorDyn) that correspond to the 
+            lineList. These are the numbers of the line.out file to load.
+        
+        '''
+        
+        self.qs = 0  # indicate this Subsystem is reading in MoorDyn data
+        
+        for i, line in enumerate(self.lineList):
+            line.loadData(dirname, rootname, line_IDs[i])
+  

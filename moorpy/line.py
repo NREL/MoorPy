@@ -77,7 +77,7 @@ class Line():
         self.fCurrent = np.zeros(3)  # total current force vector on the line [N]
     
     
-    def loadData(self, dirname, rootname, sep='.MD.'):
+    def loadData(self, dirname, rootname, sep='.MD.', id=0):
         '''Loads line-specific time series data from a MoorDyn output file'''
         
         self.qs = 0 # signals time series data
@@ -86,8 +86,11 @@ class Line():
             strtype='Rod'
         elif self.isRod==0:
             strtype='Line'
-
-        filename = dirname+rootname+sep+strtype+str(self.number)+'.out'
+            
+        if id==0:
+            id = self.number
+        
+        filename = dirname+rootname+sep+strtype+str(id)+'.out'
         
         if path.exists(filename):
 
