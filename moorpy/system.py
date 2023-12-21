@@ -826,13 +826,14 @@ class System():
         # line types
         for d in data['line_types']:
             dia = float(d['diameter']    )
-            w   = float(d['mass_density'])*self.g
+            m   =  float(d['mass_density'])
+            w   = (m - np.pi/4*dia**2 *self.rho)*self.g #submerged weight
             EA  = float(d['stiffness']   )
             if d['breaking_load']:
                 MBL = float(d['breaking_load'])
             else:
                 MBL = 0
-            self.lineTypes[d['name']] = dict(name=d['name'], d_vol=dia, w=w, EA=EA, MBL=MBL)
+            self.lineTypes[d['name']] = dict(name=d['name'], d_vol=dia, w=w, m=m, EA=EA, MBL=MBL)
             
         # rod types TBD
         
