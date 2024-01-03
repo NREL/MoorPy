@@ -18,6 +18,7 @@ from moorpy.body import Body
 from moorpy.point import Point
 from moorpy.line import Line
 from moorpy.lineType import LineType
+from moorpy.compositeLine import CompositeLine
 import matplotlib as mpl
 #import moorpy.MoorSolve as msolve
 from moorpy.helpers import (rotationMatrix, rotatePosition, getH, printVec, 
@@ -271,7 +272,7 @@ class System():
             else:
                 raise ValueError(f"The specified lineType name ({lineType}) does not correspond with any lineType stored in this MoorPy System")
         
-        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, lineType, nSegs=nSegs, cb=cb) )
+        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, lineType, nSegs=nSegs, cb=cb, attachments = [pointA,pointB]) )
         
         if pointA > 0:
             if pointA <= len(self.pointList):
@@ -377,6 +378,11 @@ class System():
 
         # <<< the "name" keyword in this method is confusing in that it isn't the index key. Does it have a purpose? <<<
 
+    def captureCompositeLine(self,point_id):
+        if not hasattr(self,'compositeLineList'):
+            self.compositeLineList = []
+        
+        self.compositeLineList.append(CompositeLine(self,point_id))
 
     def setLineType(self, dnommm, material, source=None, name="", **kwargs):
         '''Add or update a System lineType using the new dictionary-based method.
@@ -767,7 +773,7 @@ class System():
                         nSegs  = np.int_(entries[5])         
                         
                         #lineList.append( Line(dirName, num, lUnstr, dia, nSegs) )
-                        self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs)) #attachments = [int(entries[4]), int(entries[5])]) )
+                        self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs, attachments = [int(entries[2]), int(entries[3])]) )
                         
                         # attach end A
                         numA = int("".join(filter(str.isdigit, entries[2])))  # get number from the attachA string

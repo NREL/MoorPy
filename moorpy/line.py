@@ -7,6 +7,7 @@ from moorpy.nonlinear import nonlinear
 from moorpy.helpers import (unitVector, LineError, CatenaryError, 
                      rotationMatrix, makeTower, read_mooring_file, 
                      quiver_data_to_segments, printVec, printMat)
+from moorpy.dynamic_tension_functions import get_dynamic_matrices,get_dynamic_tension,get_modes
 from os import path
 
  
@@ -41,6 +42,8 @@ class Line():
         
         self.sys    = mooringSys       # store a reference to the overall mooring system (instance of System class)
         
+        self.attached = attachments  # ID numbers of the Points at the Line ends [a,b] >>> NOTE: not fully supported <<<<
+
         self.number = num
         self.isRod = isRod
             
@@ -75,7 +78,7 @@ class Line():
         self.lw=0.5
         
         self.fCurrent = np.zeros(3)  # total current force vector on the line [N]
-    
+
     
     def loadData(self, dirname, rootname, sep='.MD.', id=0):
         '''Loads line-specific time series data from a MoorDyn output file'''
@@ -1001,6 +1004,26 @@ class Line():
         # revert to original line length
         self.L = self.L0
     
+    def getDynamicMatrices(self, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_tol=1e-4):
+        M,A,B,K,r_mean,EA_segs = get_dynamic_matrices(self, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_tol=seabed_tol)
+        return M,A,B,K,r_mean,EA_segs
+
+    def dynamicSolve(self,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_tol=1e-4,tol = 0.01,iters=100, w = 0.8):
+        T_nodes_psd,T_nodes_std,s,r_static,r_dynamic,r_total,X = get_dynamic_tension(self,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,
+                                                                                     seabed_tol=seabed_tol,tol = tol,iters=iters, w = w)
+        return T_nodes_psd,T_nodes_std,s,r_static,r_dynamic,r_total,X
+    
+    def getModes(self,fix_A=True,fix_B=True,plot_modes=False,amp_factor=1,adj_view = False,kbot=3E+06,cbot=3E+05,seabed_tol=1E-04):
+        
+        if plot_modes:
+            freqs,mode_shapes,r_nodes,M,A,K,fig,ax = get_modes(self,fix_A=fix_A,fix_B=fix_B,plot_modes=plot_modes,amp_factor=amp_factor,adj_view = adj_view,
+                                                               kbot=kbot,cbot=cbot,seabed_tol=seabed_tol)
+            return freqs,mode_shapes,r_nodes,M,A,K,fig,ax
+        else:
+            freqs,mode_shapes,r_nodes,M,A,K = get_modes(self,fix_A=fix_A,fix_B=fix_B,plot_modes=plot_modes,amp_factor=amp_factor,adj_view = adj_view,
+                                                        kbot=kbot,cbot=cbot,seabed_tol=seabed_tol)
+            return freqs,mode_shapes,r_nodes,M,A,K
+
 
 def from2Dto3Drotated(K2D, F, L, R): 
     '''Initialize a line end's analytic stiffness matrix in the 
