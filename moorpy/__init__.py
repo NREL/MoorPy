@@ -8,6 +8,7 @@ from moorpy.point import Point
 from moorpy.body import Body
 from moorpy.lineType import LineType
 from moorpy.system import System
+from moorpy.subsystem import Subsystem
 
 from moorpy.helpers import *
 from moorpy.Catenary import catenary
