@@ -486,7 +486,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                     d = np.sqrt(XF*XF+ZF*ZF)                    
                     
                     # if it's taut -- let's do an approximation that ignores weight
-                    if d/L - 1 > 0:  
+                    if d/L > 1:  
                         
                         # tension, assuming a straight line and ignoring weight, is
                         T0 = (d/L - 1) * EA
@@ -519,8 +519,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
 
                         # put things in the format expected for later parts of the code
                         X = np.zeros(2)
-                        HF = X[0]       = HF
-                        VF = X[1]       = VF
+                        X[0] = HF
+                        X[1] = VF
                         
                         info4['oths']['HF'] = HF
                         info4['oths']['VF'] = VF
@@ -540,6 +540,32 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                         info.update(info4['oths'])  # <<< hopefully I modified enough in info4 for this to work
                         info['catenary'] = info4
                     
+                    # if it's slightly slack and mostly on the seabed, make a bilinear approximation
+                    elif d/L > 0.9: 
+                        L_bot = (d**2 - L**2)/(2*(XF-L))  # length on seabed
+                        Ls = L - L_bot
+                        VF = Ls*W                   # weight of suspended length
+                        HF = (XF - L_bot)/ZF * VF
+                   
+                        # put things in the format expected for later parts of the code
+                        X = np.zeros(2)
+                        X[0] = HF
+                        X[1] = VF
+                        
+                        info4['oths']['HF'] = HF
+                        info4['oths']['VF'] = VF
+                        info4['oths']['HA'] = HA
+                        info4['oths']['VA'] = VA
+                        info4['oths']['LBot'] = 0
+                        
+                        info4['oths']["stiffnessA"] = np.array(K)
+                        info4['oths']["stiffnessB"] = np.array(K)
+                        info4['oths']["stiffnessAB"] = np.array(-K)
+                        
+                        info4['oths']['ProfileType'] = -2 # flag for the bilinear solution for the coordinates...
+                        info4['oths']['error'] = False
+                        info4['oths']['message'] = 'Approximated as bilinear with seabed contact as a last resort.'
+                        
                     # Otherwise, we'd need an iterative solve of tension, curvature, and distributed load.
                     # It could potentially be with a parabola. We don't have that yet, so fail.
                     else:
@@ -574,7 +600,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         
         # check for errors ( WOULD SOME NOT ALREADY HAVE BEEN CAUGHT AND RAISED ALREADY?)
         if info['error']==True:
-            #breakpoint()
+            breakpoint()
             # >>>> what about errors for which we can first plot the line profile?? <<<<
             raise CatenaryError("Error in catenary computations: "+info['message'])
 
@@ -1369,9 +1395,11 @@ if __name__ == "__main__":
     #    CB=0.0, HF0=4224.074763303775, VF0=0.0, Tol=2e-05, MaxIter=100, plots=1)
     # tricky near-taut case with starting point
     #catenary(119.3237383002058, 52.49668849178113, 130.36140355177318, 700000000.0, 34.91060469991227, CB=0.0, HF0=9298749.157482728, VF0=4096375.3052922436, Tol=2e-05, MaxIter=100, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(829.0695733253751, 2.014041774600628e-05, 829.0695771203765, 700000000.0, 34.91060469991227, CB=0.0, HF0=0.0, VF0=0.0, Tol=2e-05, MaxIter=100, plots=1)
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(829.0695733253751, 2.014041774600628e-05, 
+          829.0695771203765, 700000000.0, 34.91060469991227, Tol=2e-05, MaxIter=100, plots=1)
     
-    
-    
+    """
     Tol =2e-05
     
     for dl in [-1, -0.1, -0.01, 0, 0.01, 0.1, 1]:  # for exploring line length sensitivity
@@ -1416,7 +1444,7 @@ if __name__ == "__main__":
         print("{:10.1f} {:10.1f} {:10.1f} {:10.1f}".format(fAH1, fAV1, fBH1, fBV1))
         #print("{:10.1f} {:10.1f} {:10.1f} {:10.1f}".format(*info1['stiffnessB'].ravel().tolist() ))
         
-    
+    """
     plt.plot(info1['X'], info1['Z'] )
     #plt.plot(info1['s'], info1['X'] )
     #plt.axis('equal')
