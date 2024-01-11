@@ -87,13 +87,12 @@ class Subsystem(System, Line):
             self.currentMod = 1
             self.current = getFromDict(kwargs, 'current', shape=3)
             
-        # seabed bathymetry - seabedMod 0 = flat; 1 = uniform slope, 2 = grid
-        self.seabedMod = 0
-        
         self.shared     = getFromDict(kwargs, 'shared', dtype=bool, default=False)  # flag to indicate shared line
         self.span    = getFromDict(kwargs, 'span', default=0)                 # spacing (to rename as span<<<)
         self.rBFair     = getFromDict(kwargs, 'rBFair', shape=-1, default=[0,0,0])  # [m] end coordinates relative to attached body's ref point
 
+        # seabed bathymetry - seabedMod 0 = flat; 1 = uniform slope, 2 = grid
+        self.seabedMod = 0
         
         if 'xSlope' in kwargs or 'ySlope' in kwargs:
             self.seabedMod = 1
@@ -103,7 +102,8 @@ class Subsystem(System, Line):
         if 'bathymetry' in kwargs:
             self.seabedMod = 2
             self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = self.readBathymetryFile(kwargs['bathymetry'])
-        
+        # Note, System and Subsystem bathymetry can be set after creation 
+        # by setBathymetry, which uses link to existing data, for efficiency.
         
         # initializing variables and lists        
         self.nDOF = 0       # number of (free) degrees of freedom of the mooring system (needs to be set elsewhere)        
@@ -221,7 +221,7 @@ class Subsystem(System, Line):
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
     
     
-    def staticSolve(self, reset=False, tol=0.0001, profiles=0):
+    def staticSolve(self, reset=False, tol=0.01, profiles=0):
         '''Solve internal equilibrium of the Subsystem and saves the forces
         and stiffnesses at the ends in the global reference frame. All the 
         This method mimics the behavior of the Line.staticSolve method and 

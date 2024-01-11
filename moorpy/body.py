@@ -8,8 +8,9 @@ from moorpy.helpers import transformPosition, rotationMatrix, rotatePosition, tr
 class Body():
     '''A class for any object in the mooring system that will have its own reference frame'''
     
-    def __init__(self, mooringSys, num, type, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), 
-                                   f6Ext=np.zeros(6), I=np.zeros(3), CdA=np.zeros(3), Ca=np.zeros(3)):
+    def __init__(self, mooringSys, num, type, r6, m=0, v=0, rCG=np.zeros(3),
+                 AWP=0, rM=np.zeros(3), f6Ext=np.zeros(6), I=np.zeros(3),
+                 CdA=np.zeros(3), Ca=np.zeros(3), DOFs=[0,1,2,3,4,5]):
         '''Initialize Body attributes
 
         Parameters
@@ -40,10 +41,9 @@ class Body():
             Product of drag coefficient and frontal area in three directions [m^2].
         Ca : array, optional
             Added mass coefficient in three directions.
-        attachedP: list, int
-            list of ID numbers of any Points attached to the Body
-        rPointRel: list, float
-            list of coordinates of each attached Point relative to the Body reference frame [m]
+        DOFs: list, optional
+            list of the DOFs for this body (0=surge,1=sway,...5=yaw). Any not 
+            listed will be held fixed. E.g. [0,1,5] for 2D horizontal motion.
         
         Returns
         -------
@@ -83,6 +83,8 @@ class Body():
                 
         self.f6Ext  = np.array(f6Ext, dtype=float)    # for adding external forces and moments in global orientation (not including weight/buoyancy)
         
+        self.DOFs = DOFs
+        self.nDOF = len(DOFs)
         
         self.attachedP   = []          # ID numbers of any Points attached to the Body
         self.rPointRel   = []          # coordinates of each attached Point relative to the Body reference frame
@@ -160,10 +162,13 @@ class Body():
 
         '''
         
+        # update the position/orientation of the body
         if len(r6)==6:
             self.r6 = np.array(r6, dtype=np.float_)  # update the position of the Body itself
+        elif len(r6) == self.nDOF:
+            self.r6[self.DOFs] = r6  # mapping to use only some DOFs
         else:
-            raise ValueError(f"Body setPosition method requires an argument of size 6, but size {len(r6):d} was provided")
+            raise ValueError(f"Body setPosition method requires an argument of size 6 or nDOF, but size {len(r6):d} was provided")
         
         self.R = rotationMatrix(self.r6[3], self.r6[4], self.r6[5])   # update body rotation matrix
         
@@ -185,7 +190,7 @@ class Body():
             
         
    
-    def getForces(self, lines_only=False):
+    def getForces(self, lines_only=False, all_DOFs=False):
         '''Sums the forces and moments on the Body, including its own plus those from any attached objects.
         Forces and moments are aligned with global x/y/z directions but are relative 
         to the body's local reference point.
@@ -193,13 +198,14 @@ class Body():
         Parameters
         ----------
         lines_only : boolean, optional
-            An option for calculating forces from just the mooring lines or not. The default is False.
+            If true, the Body's contribution to the forces is ignored.
+        all_DOFs : boolean, optional
+            True: return all forces/moments; False: only those in DOFs list.
 
         Returns
         -------
         f6 : array
             The 6DOF forces and moments applied to the body in its current position [N, Nm]
-
         '''
     
         f6 = np.zeros(6)
@@ -239,11 +245,14 @@ class Body():
         moment_about_body_ref = np.matmul(rotMat.T, f6[3:])                         # transform moments so that they are about the body's local/rotated axes
         f6[3:] = moment_about_body_ref                                              # use these moments
         '''
-        return f6
-    
+        
+        if all_DOFs:
+            return f6
+        else:
+            return f6[self.DOFs]
 
     
-    def getStiffness(self, X = [], tol=0.0001, dx = 0.1):
+    def getStiffness(self, X = [], tol=0.0001, dx = 0.1, all_DOFs=False):
         '''Gets the stiffness matrix of a Body due only to mooring lines with all other objects free to equilibriate.
         The rotational indices of the stiffness matrix correspond to the global x/y/z directions.
         
@@ -253,6 +262,8 @@ class Body():
             The position vector (6DOF) of the main axes of the Body at which the stiffness matrix is to be calculated.
         dx : float, optional
             The change in displacement to be used for calculating the change in force. The default is 0.01.
+        all_DOFs : boolean, optional
+            True: return all forces/moments; False: only those in DOFs list.
 
         Returns
         -------
@@ -295,18 +306,27 @@ class Body():
         self.sys.solveEquilibrium3(tol=tol)       # find equilibrium of mooring system given this Body in current position
         self.type = type0                         # restore the Body's type to its original value
         
-        return K
-        
+        # Return stiffness matrix
+        if all_DOFs:
+            return K
+        else:  # only return rows/columns of active DOFs
+            return K[:,self.DOFs][self.DOFs,:]
         
     
-    def getStiffnessA(self, lines_only=False):
+    def getStiffnessA(self, lines_only=False, all_DOFs=False):
         '''Gets the analytical stiffness matrix of the Body with other objects fixed.
+
+        Parameters
+        ----------
+        lines_only : boolean, optional
+            If true, the Body's contribution to its stiffness is ignored.
+        all_DOFs : boolean, optional
+            True: return all forces/moments; False: only those in DOFs list.
 
         Returns
         -------
         K : matrix
             6x6 analytic stiffness matrix.
-
         '''
                 
         K = np.zeros([6,6])
@@ -345,8 +365,11 @@ class Body():
             K[3:,3:] += Kw + Kb
             K[2 ,2 ] += Kwp
             
-        
-        return K
+        # Return stiffness matrix
+        if all_DOFs:
+            return K
+        else:  # only return rows/columns of active DOFs
+            return K[:,self.DOFs][self.DOFs,:]
     
         
     

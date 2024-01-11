@@ -357,7 +357,7 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     start_time = time.time()
     # process inputs and format as arrays in case they aren't already
     
-    X = np.array(X0, dtype=np.float_)         # start off design variable
+    X = np.array(np.atleast_1d(X0), dtype=np.float_)         # start off design variable
     N = len(X)
     
     Xs = np.zeros([maxIter,N]) # make arrays to store X and error results of the solve
@@ -380,7 +380,7 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     if ytol==0:  # if not using ytol
         if np.isscalar(tol) and tol <= 0.0:
             raise ValueError('tol value passed to dsovle2 must be positive')
-        elif not np.isscalar(tol) and any(tol <= 0):
+        elif not np.isscalar(tol) and any(np.array(tol) <= 0):
             raise ValueError('every tol entry passed to dsovle2 must be positive')
         
     # if a step function wasn't provided, provide a default one
@@ -910,6 +910,36 @@ def makeTower(twrH, twrRad):
     Zs = np.array(Z)    
     
     return Xs, Ys, Zs
+
+
+def readBathymetryFile(self, filename):
+    '''Read a MoorDyn-style bathymetry input file (rectangular grid of depths)
+    and return the lists of x and y coordinates and the matrix of depths.
+    '''
+    f = open(filename, 'r')
+
+    # skip the header
+    line = next(f)
+    # collect the number of grid values in the x and y directions from the second and third lines
+    line = next(f)
+    nGridX = int(line.split()[1])
+    line = next(f)
+    nGridY = int(line.split()[1])
+    # allocate the Xs, Ys, and main bathymetry grid arrays
+    bathGrid_Xs = np.zeros(nGridX)
+    bathGrid_Ys = np.zeros(nGridY)
+    bathGrid = np.zeros([nGridY, nGridX])  # MH swapped order June 30
+    # read in the fourth line to the Xs array
+    line = next(f)
+    bathGrid_Xs = [float(line.split()[i]) for i in range(nGridX)]
+    # read in the remaining lines in the file into the Ys array (first entry) and the main bathymetry grid
+    for i in range(nGridY):
+        line = next(f)
+        entries = line.split()
+        bathGrid_Ys[i] = entries[0]
+        bathGrid[i,:] = entries[1:]
+    
+    return bathGrid_Xs, bathGrid_Ys, bathGrid
 
 
 def read_mooring_file(dirName,fileName):

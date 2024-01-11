@@ -24,7 +24,7 @@ from moorpy.helpers import (rotationMatrix, rotatePosition, getH, printVec,
                             set_axes_equal, dsolve2, SolveError, MoorPyError, 
                             loadLineProps, getLineProps, read_mooring_file, 
                             printMat, printVec, getInterpNums, unitVector,
-                            getFromDict, addToDict)
+                            getFromDict, addToDict, readBathymetryFile)
 
 
 
@@ -47,6 +47,8 @@ class System():
             Water density of the system. The default is 1025.
         g : float, optional
             Gravity of the system. The default is 9.81.
+        bathymetry : filename, optional
+            Filename for MoorDyn-style bathymetry input file.
 
         Returns
         -------
@@ -91,7 +93,7 @@ class System():
         
         if 'bathymetry' in kwargs:
             self.seabedMod = 2
-            self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = self.readBathymetryFile(kwargs['bathymetry'])
+            self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = readBathymetryFile(kwargs['bathymetry'])
         
         
         # initializing variables and lists        
@@ -974,35 +976,7 @@ class System():
             self.pointList[pointDict[d['endA']]].attachLine(num, 0)
             self.pointList[pointDict[d['endB']]].attachLine(num, 1)
 
-        
-    def readBathymetryFile(self, filename):
-        f = open(filename, 'r')
 
-        # skip the header
-        line = next(f)
-        # collect the number of grid values in the x and y directions from the second and third lines
-        line = next(f)
-        nGridX = int(line.split()[1])
-        line = next(f)
-        nGridY = int(line.split()[1])
-        # allocate the Xs, Ys, and main bathymetry grid arrays
-        bathGrid_Xs = np.zeros(nGridX)
-        bathGrid_Ys = np.zeros(nGridY)
-        bathGrid = np.zeros([nGridY, nGridX])  # MH swapped order June 30
-        # read in the fourth line to the Xs array
-        line = next(f)
-        bathGrid_Xs = [float(line.split()[i]) for i in range(nGridX)]
-        # read in the remaining lines in the file into the Ys array (first entry) and the main bathymetry grid
-        for i in range(nGridY):
-            line = next(f)
-            entries = line.split()
-            bathGrid_Ys[i] = entries[0]
-            bathGrid[i,:] = entries[1:]
-        
-        return bathGrid_Xs, bathGrid_Ys, bathGrid
-    
-    
-        
     def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', outputList=[], Lm = 0):
         '''Unloads a MoorPy system into a MoorDyn-style input file
 
@@ -1369,11 +1343,11 @@ class System():
         
         for body in self.bodyList:
             if body.type == 0: 
-                nDOF += 6
-                DOFtypes += [0]*6
+                nDOF += body.nDOF
+                DOFtypes += [0]*body.nDOF
             if body.type ==-1: 
-                nCpldDOF += 6
-                DOFtypes += [-1]*6
+                nCpldDOF += body.nDOF
+                DOFtypes += [-1]*body.nDOF
         
         for point in self.pointList:
             if point.type == 0: 
@@ -1509,9 +1483,11 @@ class System():
         # gather DOFs from bodies
         for body in self.bodyList:
             if body.type in types:
-                X = np.append(X, body.r6)
-                if len(dXvals)>0: dX += 3*[dXvals[-2]] + 3*[dXvals[-1]]
-                
+                X = np.append(X, body.r6[body.DOFs])  # only include active DOFs
+                if len(dXvals) > 0:  # set translation and rotational dx vals
+                    dX += [dXvals[-2]] * sum(i in body.DOFs for i in [0,1,2])
+                    dX += [dXvals[-1]] * sum(i in body.DOFs for i in [3,4,5])
+         
         # gather DOFs from points
         for point in self.pointList:
             if point.type in types:
@@ -1563,8 +1539,8 @@ class System():
         # update positions of bodies
         for body in self.bodyList:
             if body.type in types:
-                body.setPosition(X[i:i+6])
-                i += 6
+                body.setPosition(X[i:i+body.nDOF])
+                i += body.nDOF
                 
         # update position of Points
         for point in self.pointList:
@@ -1612,8 +1588,8 @@ class System():
         # gather net loads from bodies
         for body in self.bodyList:
                 if body.type in types:
-                    f[i:i+6] = body.getForces(lines_only=lines_only)
-                    i += 6
+                    f[i:i+body.nDOF] = body.getForces(lines_only=lines_only)
+                    i += body.nDOF
                     
         # gather net loads from points
         for point in self.pointList:
@@ -1916,9 +1892,10 @@ class System():
         for body in self.bodyList:
             if body.type in types:
                 zInds.append(i+2)
-                i+=6
+                i+=body.nDOF
                 rtol = tol/max([np.linalg.norm(rpr) for rpr in body.rPointRel])    # estimate appropriate body rotational tolerance based on attachment point radii
-                tols += 3*[tol] + 3*[rtol]
+                tols += [tol ] * sum(i in body.DOFs for i in [0,1,2])
+                tols += [rtol] * sum(i in body.DOFs for i in [3,4,5])
                 
         for point in self.pointList:
             if point.type in types:
@@ -2716,7 +2693,7 @@ class System():
                 
                 # get body's self-stiffness matrix (now only cross-coupling terms will be handled on a line-by-line basis)
                 K6 = body1.getStiffnessA(lines_only=lines_only)
-                K[i:i+6,i:i+6] += K6
+                K[i:i+body1.nDOF, i:i+body1.nDOF] += K6
                 
                 
                 # go through each attached point
@@ -2730,7 +2707,7 @@ class System():
                     for lineID in point1.attached:      # go through each attached line to the Point, looking for when its other end is attached to something that moves
 
                         endFound = 0                    # simple flag to indicate when the other end's attachment has been found
-                        j = i+6                         # first index of the DOFs this line is attached to. Start it off at the next spot after body1's DOFs
+                        j = i + body1.nDOF              # first index of the DOFs this line is attached to. Start it off at the next spot after body1's DOFs
                         
                         # get cross-coupling stiffness of line: force on end attached to body1 due to motion of other end
                         if point1.attachedEndB == 1:    
@@ -2762,16 +2739,17 @@ class System():
                                         # loads on body1 due to motions of body2
                                         K66 = np.block([[   KB        , np.matmul(KB, H1)],
                                                   [np.matmul(H2.T, KB), np.matmul(np.matmul(H2, KB), H1.T)]])
+                                        K66 = K66[body1.DOFs, body2.DOFs]  # trim to only use enabled DOFs
                                         
-                                        K[i:i+6, j:j+6] += K66
-                                        K[j:j+6, i:i+6] += K66.T  # mirror
+                                        K[i:i+body1.nDOF, j:j+body2.nDOF] += K66
+                                        K[j:j+body2.nDOF, i:i+body1.nDOF] += K66.T  # mirror
                                         
                                         # note: the additional rotational stiffness due to change in moment arm does not apply to this cross-coupling case
 
                                         endFound = 1  # signal that the line has been handled so we can move on to the next thing
                                         break  
 
-                                j += 6 # if this body has DOFs we're considering, then count them
+                                j += body2.nDOF # if this body has DOFs we're considering, then count them
                         
                         
                         # look through free Points
@@ -2784,10 +2762,10 @@ class System():
                                         #K[i  :i+3, j:j+3] += K3
                                         #K[i+3:i+6, j:j+3] += np.matmul(H1.T, K3)          
                                         K63 = np.vstack([KB, np.matmul(H1.T, KB)])                                        
-                                        K63 = K63[:,point2.DOFs]                        # trim the matrix to only use the enabled DOFs of each point
+                                        K63 = K63[body1.DOFs, point2.DOFs]  # trim to only use enabled DOFs
                                         
-                                        K[i:i+6          , j:j+point2.nDOF] += K63
-                                        K[j:j+point2.nDOF, i:i+6          ] += K63.T    # mirror 
+                                        K[i:i+ body1.nDOF, j:j+point2.nDOF] += K63
+                                        K[j:j+point2.nDOF, i:i+ body1.nDOF] += K63.T    # mirror 
                                         
                                         break
                                     
@@ -2795,7 +2773,7 @@ class System():
                                     
                                 # note: No cross-coupling with fixed points. The body's own stiffness matrix is now calculated at the start.
               
-                i += 6    # moving along to the next body...
+                i += body1.nDOF  # moving along to the next body...
                 
 
         # go through each movable point in the system
@@ -2841,10 +2819,9 @@ class System():
                             j += point2.nDOF                  # if this point has DOFs we're considering, then count them
                                 
                 i += n
-                
-        
         
         return K
+    
     
     def getAnchorLoads(self, sfx, sfy, sfz, N):
         ''' Calculates anchor loads
@@ -2978,6 +2955,28 @@ class System():
             line.revertToStaticStiffness()
     
     
+    def setBathymetry(self, x, y, depth):
+        '''Provide a System with existing bathymetry data, rather than having
+        it read in its own data and store it locally. This allows reuse of
+        bathymetry grid data that may be stored elsewhere. It saves a ref.
+        
+        Parameters
+        ----------
+        x : list or array
+            X coordinates of rectangular bathymetry grid [m].
+        y : list or array
+            Y coordinates of rectangular bathymetry grid [m].
+        depth : 2D array
+            Matrix of depths at x and y locations [m]. Positive depths.
+            Shape should be [len(x), len(y)]
+        '''
+        # Save references to the passed data (not copy or create new arrays)
+        self.bathGrid_Xs = x 
+        self.bathGrid_Ys = y
+        self.bathGrid    = depth
+        self.seabedMod = 2
+    
+    
     def getDepthFromBathymetry(self, x, y):   #BathymetryGrid, BathGrid_Xs, BathGrid_Ys, LineX, LineY, depth, nvec)
         ''' interpolates local seabed depth and normal vector
         
@@ -3093,8 +3092,6 @@ class System():
             Adds point numbers to plot in text. Default is False.
         endpoints: bool, optional
             Adds visible end points to lines. Default is False.
-        bathymetry: bool, optional
-            Creates a bathymetry map of the seabed based on an input file. Default is False.
             
         Returns
         -------
@@ -3113,7 +3110,7 @@ class System():
         draw_body       = kwargs.get("draw_body"      , True      )     # toggle to draw the Bodies or not
         draw_clumps     = kwargs.get('draw_clumps'    , False     )     # toggle to draw clump weights and float of the mooring system
         draw_anchors    = kwargs.get('draw_anchors'   , False     )     # toggle to draw the anchors of the mooring system or not  
-        bathymetry      = kwargs.get("bathymetry"     , False     )     # toggle (and string) to include bathymetry or not. Can do full map based on text file, or simple squares
+        draw_seabed     = kwargs.get('draw_seabed'    , True      )     # toggle to draw the seabed bathymetry or not
         args_bath       = kwargs.get("args_bath"      , {}        )     # dictionary of optional plot_surface arguments
         '''
         cmap_bath       = kwargs.get("cmap"           , 'ocean'   )     # matplotlib colormap specification
@@ -3267,7 +3264,7 @@ class System():
             if pointlabels == True:
                 ax.text(point.r[0], point.r[1], point.r[2], i, c = 'r')
             
-            if bathymetry==True:     # if bathymetry is true, then make squares at each anchor point
+            if draw_seabed:     # if bathymetry is true, then make squares at each anchor point
                 if point.attachedEndB[0] == 0 and point.r[2] < -400:
                     points.append([point.r[0]+250, point.r[1]+250, point.r[2]])
                     points.append([point.r[0]+250, point.r[1]-250, point.r[2]])
@@ -3277,31 +3274,16 @@ class System():
                     Z = np.array(points)
                     verts = [[Z[0],Z[1],Z[2],Z[3]]]
                     ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=1.0))
-            
-        if isinstance(bathymetry, str):   # or, if it's a string, load in the bathymetry file
+        
+        # draw the seabed if requested (only works for full bathymetries so far)
+        if draw_seabed and self.seabedMod == 2:
 
-            # parse through the MoorDyn bathymetry file
-            bathGrid_Xs, bathGrid_Ys, bathGrid = self.readBathymetryFile(bathymetry)
             if rang=='hold':
                 rang = (np.min(-bathGrid), np.max(-bathGrid))
-            '''
-            # First method: plot nice 2D squares using Poly3DCollection
-            nX = len(bathGrid_Xs)
-            nY = len(bathGrid_Ys)
-            # store a list of points in the grid
-            Z = [[bathGrid_Xs[j],bathGrid_Ys[i],-bathGrid[i,j]] for i in range(nY) for j in range(nX)]
-            # plot every square in the grid (e.g. 16 point grid yields 9 squares)
-            verts = []
-            for i in range(nY-1):
-                for j in range(nX-1):
-                    verts.append([Z[j+nX*i],Z[(j+1)+nX*i],Z[(j+1)+nX*(i+1)],Z[j+nX*(i+1)]])
-                    ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=0.5))
-                    verts = []
-            '''
-            # Second method: plot a 3D surface, plot_surface
-            X, Y = np.meshgrid(bathGrid_Xs, bathGrid_Ys)
             
-            bath = ax.plot_surface(X,Y,-bathGrid, vmin=rang[0], vmax=rang[1], **args_bath)
+            X, Y = np.meshgrid(self.bathGrid_Xs, self.bathGrid_Ys)
+            
+            bath = ax.plot_surface(X,Y,-self.bathGrid, vmin=rang[0], vmax=rang[1], **args_bath)
             
             if cbar_bath_size!=1.0:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
                 cbar_bath=True
@@ -3315,7 +3297,6 @@ class System():
             waterX, waterY = np.meshgrid(waterXs, waterYs)
             ax.plot_surface(waterX, waterY, np.array([[-50,-50],[-50,-50]]), alpha=0.5)
     
-        
         fig.suptitle(title)
         
         set_axes_equal(ax)
@@ -3361,7 +3342,7 @@ class System():
         pointlabels      = kwargs.get('pointlabels'     , False     )   # toggle to include point number labels in the plot
         draw_body        = kwargs.get("draw_body"       , False     )   # toggle to draw the Bodies or not
         draw_anchors     = kwargs.get('draw_anchors'    , False     )   # toggle to draw the anchors of the mooring system or not   
-        bathymetry       = kwargs.get("bathymetry"      , False     )   # toggle (and string) to include bathymetry contours or not based on text file
+        draw_seabed     = kwargs.get('draw_seabed'    , True      )     # toggle to draw the seabed bathymetry or not
         cmap_bath        = kwargs.get("cmap_bath"       , 'ocean'   )   # matplotlib colormap specification
         alpha            = kwargs.get("opacity"         , 1.0       )   # the transparency of the bathymetry plot_surface
         rang             = kwargs.get('rang'            , 'hold'    )   # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
@@ -3465,13 +3446,11 @@ class System():
                 yloc = np.dot([point.r[0], point.r[1], point.r[2]], Yuvec)
                 ax.text(xloc, yloc, i, c = 'r')
         
-        if isinstance(bathymetry, str):   # or, if it's a string, load in the bathymetry file
-
-            # parse through the MoorDyn bathymetry file
-            bathGrid_Xs, bathGrid_Ys, bathGrid = self.readBathymetryFile(bathymetry)
+        # draw the seabed if requested (only works for full bathymetries so far)
+        if draw_seabed and self.seabedMod == 2:
             
-            X, Y = np.meshgrid(bathGrid_Xs, bathGrid_Ys)
-            Z = -bathGrid
+            X, Y = np.meshgrid(self.bathGrid_Xs, self.bathGrid_Ys)
+            Z = -self.bathGrid
             if rang=='hold':
                 rang = (np.min(Z), np.max(Z))
             
