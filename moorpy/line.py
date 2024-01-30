@@ -63,7 +63,7 @@ class Line():
         self.TB = 0
         self.KA = np.zeros([3,3])  # 3D stiffness matrix of end A [N/m]
         self.KB = np.zeros([3,3])  # 3D stiffness matrix of end B
-        self.KAB= np.zeros([3,3])  # 3D stiffness matrix of cross coupling between ends
+        self.KBA= np.zeros([3,3])  # 3D stiffness matrix of cross coupling between ends
         
         self.HF = 0           # fairlead horizontal force saved for next solve
         self.VF = 0           # fairlead vertical force saved for next solve
@@ -852,7 +852,7 @@ class Line():
         # save 3d stiffness matrix in global orientation for both line ends (3 DOF + 3 DOF)
         self.KA  = from2Dto3Drotated(info['stiffnessA'], -fBH, LH, R.T)  # reaction at A due to motion of A
         self.KB  = from2Dto3Drotated(info['stiffnessB'], -fBH, LH, R.T)  # reaction at B due to motion of B
-        self.KAB = from2Dto3Drotated(info['stiffnessAB'], fBH, LH, R.T)  # reaction at B due to motion of A
+        self.KBA = from2Dto3Drotated(info['stiffnessBA'], fBH, LH, R.T)  # reaction at B due to motion of A
 
         # may want to skip stiffness calcs when just getting profiles for plotting...
         
@@ -958,10 +958,12 @@ class Line():
 
     
     def getCost(self):
-        '''Fill in and returns a cost dictionary for this Line object.'''
+        '''Fill in a cost dictionary and return the total cost for this Line object.'''
         self.cost = {}  # clear any old cost numbers
         self.cost['material'] = self.type['cost']*self.L0
-        return cost
+        total_cost = sum(self.cost.values()) 
+        return total_cost
+    
     
     def attachLine(self, lineID, endB):
         pass

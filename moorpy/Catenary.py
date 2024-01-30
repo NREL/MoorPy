@@ -50,7 +50,16 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
     Returns
     -------
     : tuple
-        (end 1 horizontal tension, end 1 vertical tension, end 2 horizontal tension, end 2 vertical tension, info dictionary) [N] (positive up)
+        (end 1 horizontal tension, end 1 vertical tension, end 2 horizontal 
+        tension, end 2 vertical tension, info dictionary) [N] (positive up).
+        Info dictionary contains the following:
+        HF and VF - horizontal and vertical tension components of end B [N].
+        stiffnessA - 2D stiffness matrix for end A [N/m].
+        stiffnessB - 2D stiffness matrix for end B [N/m].
+        stiffnessBA - 2D stiffness matrix for force at B due to movement of A [N/m].
+        LBot - length of line section laying on the seabed [m].
+        ProfileType
+        Zextreme - extreme z coordinate of the line section (in direction of wet weight) [m].
     
     '''
 
@@ -187,7 +196,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         info["VF"] = 0.0
         info["stiffnessB"]  = np.array([[ dHF_dXF, 0.0], [0.0, dVF_dZF]])
         info["stiffnessA"]  = np.array([[ dHF_dXF, 0.0], [0.0, dVF_dZF]])
-        info["stiffnessAB"] = np.array([[-dHF_dXF, 0.0], [0.0, 0.0]])
+        info["stiffnessBA"] = np.array([[-dHF_dXF, 0.0], [0.0, 0.0]])
         info["LBot"] = L
         info['ProfileType'] = 0
         info['Zextreme'] = 0
@@ -235,7 +244,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
             info["VF"] = VF
             info["stiffnessB"]  = np.array([[0.0, 0.0], [0.0, dVF_dZF]])
             info["stiffnessA"]  = np.array([[0.0, 0.0], [0.0, W]]) 
-            info["stiffnessAB"] = np.array([[0.0, 0.0], [0.0, 0.0]])
+            info["stiffnessBA"] = np.array([[0.0, 0.0], [0.0, 0.0]])
             info["LBot"] = L - LHanging
             info['ProfileType'] = 4
             info['Zextreme'] = 0
@@ -277,7 +286,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
             info["VF"] = VF
             info["stiffnessB"]  = np.array([[0.0, 0.0], [0.0, W / np.sqrt(2.0*hB/EA_W + 1.0)]])
             info["stiffnessA"]  = np.array([[0.0, 0.0], [0.0, W / np.sqrt(2.0*hA/EA_W + 1.0)]])
-            info["stiffnessAB"] = np.array([[0.0, 0.0], [0.0, 0.0]])
+            info["stiffnessBA"] = np.array([[0.0, 0.0], [0.0, 0.0]])
             info["LBot"] = L - LHanging
             info['ProfileType'] = 5
             info['Zextreme'] = -hA
@@ -327,7 +336,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
             info["VF"] = VF
             info["stiffnessB"]  = np.array([[ VF/ZF, 0.0], [0.0, 0.5*W]])
             info["stiffnessA"]  = np.array([[ VF/ZF, 0.0], [0.0, 0.5*W]]) 
-            info["stiffnessAB"] = np.array([[-VF/ZF, 0.0], [0.0,-0.5*W]])
+            info["stiffnessBA"] = np.array([[-VF/ZF, 0.0], [0.0,-0.5*W]])
             info["LBot"] = 0.0
             info['ProfileType'] = 6
             info['Zextreme'] = -hA
@@ -367,7 +376,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
             info["VF"] = VF
             info["stiffnessB"]  = np.array([[ VF/ZF, 0.0], [0.0, EA/L]])
             info["stiffnessA"]  = np.array([[ VF/ZF, 0.0], [0.0, EA/L]]) 
-            info["stiffnessAB"] = np.array([[-VF/ZF, 0.0], [0.0,-EA/L]])
+            info["stiffnessBA"] = np.array([[-VF/ZF, 0.0], [0.0,-EA/L]])
             info["LBot"] = 0.0
             info['ProfileType'] = 6
             info['Zextreme'] = 0
@@ -530,7 +539,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                         
                         info4['oths']["stiffnessA"] = np.array(K)
                         info4['oths']["stiffnessB"] = np.array(K)
-                        info4['oths']["stiffnessAB"] = np.array(-K)
+                        info4['oths']["stiffnessBA"] = np.array(-K)
                         
                         info4['oths']['ProfileType'] = -1 # flag for the parabolic solution for the coordinates...
                         info4['oths']['error'] = False
@@ -560,7 +569,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                         
                         info4['oths']["stiffnessA"] = np.array(K)
                         info4['oths']["stiffnessB"] = np.array(K)
-                        info4['oths']["stiffnessAB"] = np.array(-K)
+                        info4['oths']["stiffnessBA"] = np.array(-K)
                         
                         info4['oths']['ProfileType'] = -2 # flag for the bilinear solution for the coordinates...
                         info4['oths']['error'] = False
@@ -734,7 +743,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
             info['stiffnessB'] = np.array([[ dH_dX               ,  K2[0,1] *K1[0,0]*dxdH        ], 
                                            [K2[1,0] *K1[0,0]*dxdH,  K2[1,1] -K2[1,0]*dxdH*K2[0,1]]])
                                      
-            info['stiffnessAB']= np.array([[-K1[0,0] *K2[0,0]*dxdH,  K1[0,1] *K2[0,0]*dxdH ],    # this is the lower-left submatrix, A motions, B reaction forces (corrected/flipped sign of entry 0,1)
+            info['stiffnessBA']= np.array([[-K1[0,0] *K2[0,0]*dxdH,  K1[0,1] *K2[0,0]*dxdH ],    # this is the lower-left submatrix, A motions, B reaction forces (corrected/flipped sign of entry 0,1)
                                            [-K1[0,0] *dxdH*K2[1,0], -K1[0,1] *dxdH*K2[1,0] ]])
 
             
@@ -945,15 +954,15 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
     # get A and AB stiffness matrices for catenary profiles here based on fairlead (B) stiffness matrix
     if ProfileType == 1:
         info['stiffnessA'] = np.array(info['stiffnessB'])
-        info['stiffnessAB'] = -info['stiffnessB']
+        info['stiffnessBA'] = -info['stiffnessB']
         
     elif ProfileType in [2,3,7]:
         if CB == 0.0:
             info['stiffnessA'] = np.array([[info['stiffnessB'][0,0], 0], [0, dV_dZ_s(Tol, HF)]])  # vertical term is very approximate 
-            info['stiffnessAB'] = np.array([[-info['stiffnessB'][0,0], 0], [0, 0]])  # note: A and AB stiffnesses for this case only valid if zero friction
+            info['stiffnessBA'] = np.array([[-info['stiffnessB'][0,0], 0], [0, 0]])  # note: A and AB stiffnesses for this case only valid if zero friction
         else:
             info['stiffnessA'] = np.ones([2,2]) * np.nan  # if friction, flag to ensure users don't use this
-            info['stiffnessAB'] = np.ones([2,2]) * np.nan  # if friction, flag to ensure users don't use this
+            info['stiffnessBA'] = np.ones([2,2]) * np.nan  # if friction, flag to ensure users don't use this
     
     # un-swap line ends if they've been previously swapped, and apply global sign convention 
     # (vertical force positive-up, horizontal force positive from A to B)
@@ -972,8 +981,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         info["stiffnessA"][1,0] = -info["stiffnessA"][1,0]
         info["stiffnessB"][0,1] = -info["stiffnessB"][0,1]
         info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
-        info["stiffnessAB"][0,1] = -info["stiffnessAB"][0,1]  # for cross coupling matrix could also maybe transpose? but should be symmetrical so no need
-        info["stiffnessAB"][1,0] = -info["stiffnessAB"][1,0]
+        info["stiffnessBA"][0,1] = -info["stiffnessBA"][0,1]  # for cross coupling matrix could also maybe transpose? but should be symmetrical so no need
+        info["stiffnessBA"][1,0] = -info["stiffnessBA"][1,0]
         
     else:
         FxA =  HA
@@ -995,8 +1004,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         info["stiffnessA"][1,0] = -info["stiffnessA"][1,0]
         info["stiffnessB"][0,1] = -info["stiffnessB"][0,1]
         info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
-        info["stiffnessAB"][0,1] = -info["stiffnessAB"][0,1]
-        info["stiffnessAB"][1,0] = -info["stiffnessAB"][1,0]
+        info["stiffnessBA"][0,1] = -info["stiffnessBA"][0,1]
+        info["stiffnessBA"][1,0] = -info["stiffnessBA"][1,0]
         
         # TODO <<< should add more info <<<
 

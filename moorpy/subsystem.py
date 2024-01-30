@@ -195,7 +195,7 @@ class Subsystem(System, Line):
         # if a points list is provided, apply any mass or other properties it contains?
     
     
-    def setEndPosition(self, r, endB):
+    def setEndPosition(self, r, endB, sink=False):
         '''Sets either end position of the subsystem in the global/system
         reference frame. This is included mainly to mimic the Line method.
 
@@ -205,12 +205,18 @@ class Subsystem(System, Line):
             x,y,z coorindate position vector of the line end [m].
         endB : boolean
             An indicator of whether the r array is at the end or beginning of the line
+        sink : bool
+            If true, and if there is a subsystem, the z position will be on the seabed.
 
         Raises
         ------
         LineError
             If the given endB value is not a 1 or 0
         '''
+        
+        if sink: # set z coordinate on seabed
+            z = getDepthFromBathymetry(r[0], r[1])
+            r = np.array([r[0], r[1], z])  # (making a copy of r to not overwrite it)
         
         # set end coordinates in global frame just like for a Line
         if endB == 1:
@@ -269,7 +275,7 @@ class Subsystem(System, Line):
         R = np.eye(3)
         self.KA_L  = from2Dto3Drotated(K[:2,:2], -self.fB_L[0], LH, R.T)  # reaction at A due to motion of A
         self.KB_L  = from2Dto3Drotated(K[2:,2:], -self.fB_L[0], LH, R.T)  # reaction at B due to motion of B
-        self.KAB_L = from2Dto3Drotated(K[2:,:2], -self.fB_L[0], LH, R.T)  # reaction at B due to motion of A
+        self.KBA_L = from2Dto3Drotated(K[2:,:2], -self.fB_L[0], LH, R.T)  # reaction at B due to motion of A
         
         self.TA = np.linalg.norm(self.fA_L)  # tensions [N]
         self.TB = np.linalg.norm(self.fB_L)
@@ -280,7 +286,7 @@ class Subsystem(System, Line):
         
         self.KA  = np.matmul(np.matmul(self.R, self.KA_L ), self.R.T)
         self.KB  = np.matmul(np.matmul(self.R, self.KB_L ), self.R.T)
-        self.KAB = np.matmul(np.matmul(self.R, self.KAB_L), self.R.T)
+        self.KBA = np.matmul(np.matmul(self.R, self.KBA_L), self.R.T)
         
         #self.LBot = info["LBot"]  <<< this should be calculated considering all lines
         

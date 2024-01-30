@@ -56,8 +56,8 @@ def test_stiffnesses_swap():
     ms.initialize()
     
     # compare stiffnesses
-    assert_allclose(np.hstack([ms.lineList[0].KA, ms.lineList[0].KB, ms.lineList[0].KAB]),
-                    np.hstack([ms.lineList[1].KB, ms.lineList[1].KA, ms.lineList[1].KAB]), rtol=0, atol=10.0, verbose=True)
+    assert_allclose(np.hstack([ms.lineList[0].KA, ms.lineList[0].KB, ms.lineList[0].KBA]),
+                    np.hstack([ms.lineList[1].KB, ms.lineList[1].KA, ms.lineList[1].KBA]), rtol=0, atol=10.0, verbose=True)
 
 
 def test_stiffness_body():
@@ -82,8 +82,8 @@ def test_stiffness_body():
     ms.initialize()
     
     # compare stiffnesses
-    assert_allclose(np.hstack([ms.lineList[0].KA, ms.lineList[0].KB, ms.lineList[0].KAB]),
-                    np.hstack([ms.lineList[1].KB, ms.lineList[1].KA, ms.lineList[1].KAB]), rtol=0, atol=10.0, verbose=True)
+    assert_allclose(np.hstack([ms.lineList[0].KA, ms.lineList[0].KB, ms.lineList[0].KBA]),
+                    np.hstack([ms.lineList[1].KB, ms.lineList[1].KA, ms.lineList[1].KBA]), rtol=0, atol=10.0, verbose=True)
 
 
     

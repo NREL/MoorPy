@@ -2711,17 +2711,10 @@ class System():
                         
                         # get cross-coupling stiffness of line: force on end attached to body1 due to motion of other end
                         if point1.attachedEndB == 1:    
-                            KB = self.lineList[lineID-1].KAB
+                            KB = self.lineList[lineID-1].KBA
                         else:
-                            KB = self.lineList[lineID-1].KAB.T
-                        '''    
-                        KA, KB = self.lineList[lineID-1].getStiffnessMatrix()
-                        # flip sign for coupling
-                        if point1.attachedEndB == 1:    # assuming convention of end A is attached to the first point, so if not,
-                            KB = -KA                    # swap matrices of ends A and B
-                        else:
-                            KB = -KB
-                        '''
+                            KB = self.lineList[lineID-1].KBA.T
+                        
                         # look through Bodies further on in the list (coupling with earlier Bodies will already have been taken care of)
                         for body2 in self.bodyList[self.bodyList.index(body1)+1: ]:
                             if body2.type in d:
@@ -2737,15 +2730,16 @@ class System():
                                         H2 = getH(r2)
                                         
                                         # loads on body1 due to motions of body2
-                                        K66 = np.block([[   KB        , np.matmul(KB, H1)],
-                                                  [np.matmul(H2.T, KB), np.matmul(np.matmul(H2, KB), H1.T)]])
-                                        K66 = K66[body1.DOFs, body2.DOFs]  # trim to only use enabled DOFs
+                                        K66 = np.block([[   KB        , np.matmul(KB, H2)],
+                                                  [np.matmul(H1.T, KB), np.matmul(np.matmul(H2, KB), H1.T)]])
                                         
-                                        K[i:i+body1.nDOF, j:j+body2.nDOF] += K66
+                                        # Trim for only enabled DOFs of the two bodies
+                                        K66 = K66[body1.DOFs,:][:,body2.DOFs]
+                                        
+                                        K[i:i+body1.nDOF, j:j+body2.nDOF] += K66    # f on B1 due to x of B2
                                         K[j:j+body2.nDOF, i:i+body1.nDOF] += K66.T  # mirror
                                         
                                         # note: the additional rotational stiffness due to change in moment arm does not apply to this cross-coupling case
-
                                         endFound = 1  # signal that the line has been handled so we can move on to the next thing
                                         break  
 
@@ -2759,12 +2753,12 @@ class System():
                                     if lineID in point2.attached:    # the line is also attached to it
                                         
                                         # only add up one off-diagonal sub-matrix for now, then we'll mirror at the end                                          
-                                        #K[i  :i+3, j:j+3] += K3
-                                        #K[i+3:i+6, j:j+3] += np.matmul(H1.T, K3)          
                                         K63 = np.vstack([KB, np.matmul(H1.T, KB)])                                        
-                                        K63 = K63[body1.DOFs, point2.DOFs]  # trim to only use enabled DOFs
                                         
-                                        K[i:i+ body1.nDOF, j:j+point2.nDOF] += K63
+                                        # Trim for only enabled DOFs of the point and body
+                                        K63 = K63[body1.DOFs,:][:,point2.DOFs]
+                                        
+                                        K[i:i+ body1.nDOF, j:j+point2.nDOF] += K63  # f on B1 due to x of P2
                                         K[j:j+point2.nDOF, i:i+ body1.nDOF] += K63.T    # mirror 
                                         
                                         break
@@ -2796,25 +2790,19 @@ class System():
                     # go through movable points to see if one is attached
                     for point2 in self.pointList[self.pointList.index(point)+1: ]:
                         if point2.type in d:
-                            if lineID in point2.attached:                                # if this point is at the other end of the line
-                                '''
-                                KA, KB = self.lineList[lineID-1].getStiffnessMatrix()       # get full 3x3 stiffness matrix of the line that attaches them 
-                                # flip sign for coupling
-                                if point.attachedEndB == 1:     # assuming convention of end A is attached to the first point, so if not,
-                                    KB = -KA                    # swap matrices of ends A and B
-                                else:
-                                    KB = -KB
-                                '''
+                            if lineID in point2.attached:  # if this point is at the other end of the line
+
                                 # get cross-coupling stiffness of line: force on end attached to point1 due to motion of other end
                                 if point.attachedEndB == 1:    
-                                    KB = self.lineList[lineID-1].KAB
+                                    KB = self.lineList[lineID-1].KBA
                                 else:
-                                    KB = self.lineList[lineID-1].KAB.T
+                                    KB = self.lineList[lineID-1].KBA.T
                                  
-                                KB = KB[point.DOFs,:][:,point2.DOFs]                     # trim the matrix to only use the enabled DOFs of each point
+                                # Trim stiffness matrix to only use the enabled DOFs of each point
+                                KB = KB[point.DOFs,:][:,point2.DOFs]
                                 
-                                K[i:i+n          , j:j+point2.nDOF] += KB
-                                K[j:j+point2.nDOF, i:i+n          ] += KB.T  # mirror
+                                K[i:i+n          , j:j+point2.nDOF] += KB    # force on P1 due to movement of P2
+                                K[j:j+point2.nDOF, i:i+n          ] += KB.T  # mirror (f on P2 due to x of P1)
                                 
                             j += point2.nDOF                  # if this point has DOFs we're considering, then count them
                                 
@@ -2851,6 +2839,13 @@ class System():
                 convec = np.linalg.norm([(confz*sfz), (confx*sfx), (confy*sfy)], axis = 0)/9.81
                 anchorloads.append(max(convec))
         return(anchorloads)
+    
+    
+    def getCost(self):
+        '''Fill in and return a cost dictionary for the System.'''
+        pass
+        # sume up quantities across line cots dict
+
     
     def ropeContact(self, lineNums, N):
         ''' Determines whether Node 1 is off the ground for lines in lineNums
@@ -3042,7 +3037,7 @@ class System():
             else:
                 dc_dx = 0.0  # maybe this should raise an error
             
-            if dx > 0.0:
+            if dy > 0.0:
                 dc_dy = (cx1-cx0)/dy
             else:
                 dc_dy = 0.0  # maybe this should raise an error
@@ -3263,7 +3258,7 @@ class System():
             i = i + 1
             if pointlabels == True:
                 ax.text(point.r[0], point.r[1], point.r[2], i, c = 'r')
-            
+            '''  MH: This needs to be way more generalized/versatile if it's going to be included!
             if draw_seabed:     # if bathymetry is true, then make squares at each anchor point
                 if point.attachedEndB[0] == 0 and point.r[2] < -400:
                     points.append([point.r[0]+250, point.r[1]+250, point.r[2]])
@@ -3274,6 +3269,7 @@ class System():
                     Z = np.array(points)
                     verts = [[Z[0],Z[1],Z[2],Z[3]]]
                     ax.add_collection3d(Poly3DCollection(verts, facecolors='limegreen', linewidths=1, edgecolors='g', alpha=1.0))
+            '''
         
         # draw the seabed if requested (only works for full bathymetries so far)
         if draw_seabed and self.seabedMod == 2:

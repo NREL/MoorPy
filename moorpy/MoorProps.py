@@ -503,7 +503,7 @@ def getAnchorCost(fx, fz, type="drag-embedment",soil_type='medium clay', method 
     # mooring line sizing:  Tension limit for QS: 50% MBS.  Or FOS = 2
     
 
-    return anchorMatCost, anchorInstCost, anchorDecomCost   # [USD]
+    return anchorMatCost, anchorInstCost, anchorDecomCost, info   # [USD]
 
 
 def getAnchorProps(fx, fz, type="drag-embedment", display=0):
