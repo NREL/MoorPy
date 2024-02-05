@@ -215,7 +215,7 @@ class Subsystem(System, Line):
         '''
         
         if sink: # set z coordinate on seabed
-            z = getDepthFromBathymetry(r[0], r[1])
+            z, _ = self.getDepthFromBathymetry(r[0], r[1])
             r = np.array([r[0], r[1], z])  # (making a copy of r to not overwrite it)
         
         # set end coordinates in global frame just like for a Line
