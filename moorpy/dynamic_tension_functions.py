@@ -5,6 +5,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from collections.abc import Iterable
 
+
 def get_horizontal_oop_vec(p1,p2):
     """
     Evaluates the horizontal out of plane vector given the coordinates of two points.
@@ -21,6 +22,7 @@ def get_horizontal_oop_vec(p1,p2):
         oop_vec = np.cross(hor_vec,ver_vec)
         n_op = oop_vec/np.linalg.norm(oop_vec)
     return n_op
+
 
 def get_dynamic_matrices(Line, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_tol=1e-4):
     """
@@ -238,6 +240,7 @@ def get_dynamic_matrices(Line, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_t
 
     return M,A,B,K,r_mean,EA_segs
 
+
 def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_tol=1e-4,tol = 0.01,iters=100, w = 0.8, conv_time=True):
     """
     Evaluates dynamic tension at all the nodes for an instance of MoorPy's Line or CompositeLine classes.
@@ -365,6 +368,7 @@ def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
 
     return T_nodes_psd,T_nodes_std,s,r_static,r_dynamic,r_total,X
 
+
 def get_modes(line,fix_A=True,fix_B=True,plot_modes=False,amp_factor=1,adj_view = False,kbot=3E+06,cbot=3E+05,seabed_tol=1E-04):
     M,A,_,K,r_nodes,_ = line.getDynamicMatrices(np.ones(1), np.ones(1),0.,line.sys.depth,kbot,cbot,seabed_tol=seabed_tol)
 
@@ -377,7 +381,7 @@ def get_modes(line,fix_A=True,fix_B=True,plot_modes=False,amp_factor=1,adj_view 
         n2 = -1
     else:
         n2 = r_nodes.shape[0]
-
+    
     eigvals,eigvecs = la.eig(K[3*n1:3*n2,3*n1:3*n2],M[3*n1:3*n2,3*n1:3*n2]+A[3*n1:3*n2,3*n1:3*n2])
     stable_eigvals = eigvals[np.real(eigvals)>0]
     stable_eigvecs = eigvecs[:,np.real(eigvals)>0]

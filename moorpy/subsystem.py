@@ -160,7 +160,7 @@ class Subsystem(System, Line):
         if shared:
             self.addPoint(-1, rA, DOFs=[2]) # add shared line point, free only to move in z
         else:
-            self.addPoint(-1, rA, DOFs=[0,2])                # add anchor point
+            self.addPoint(-1, rA, DOFs=[0,2])  # add anchor point
 
         # Go through each line segment and add its upper point, add the line, and connect the line to the points
         for i in range(self.nLines):
@@ -193,6 +193,88 @@ class Subsystem(System, Line):
             self.pointList[-1].attachLine(i+1, 1)       # attach end B of the line
 
         # if a points list is provided, apply any mass or other properties it contains?
+    
+        self.nLines = len(self.lineList)
+        self.nNodes = np.sum([line.nNodes for line in self.lineList]) - self.nLines + 1
+    
+    
+    def makeFromSystem(self, sys, point_id):
+        '''Populate a Subsystem based on a series of mooring lines in an
+        existing system (sys), starting at an end point (point_id).
+        Taken from Serag's CompositeLine class.
+        In this version, the subsystem still needs to be added to a system
+        afterward.
+        '''
+        
+        if len(self.pointList)+len(self.lineList) > 0:
+            raise Exception('makeFromSystem can only be called for an empty Subsystem.')
+        
+        point = sys.pointList[point_id-1] # Starting point id
+
+        # check starting point to make sure it is either coupled or fixed and that it is not connected to more than 1 line.
+        if point.type == 0:
+            raise Exception(f'Starting point ({point.number}) must not be free (change point type to -1 or 1).')
+        elif len(point.attached)>1:
+            raise Exception(f'Starting point ({point.number}) cannot be connected to more than 1 line')
+
+        # Save point A info
+        self.rA = np.array(point.r)
+        self.addPoint(1, self.rA)  # add anchor point
+
+        # Move through the points along the composite
+        while True:
+            # make sure that the point is free
+            if len(point.attached) > 2:
+                raise Exception(f'Point {point.number} is attached to more than two lines.')
+            
+            # get the line id and line object
+            line_id = point.attached[-1] # get next line's id
+            line = sys.lineList[line_id - 1] # get line object
+            self.lineTypes[line.type['name']] = dict(line.type)  # copy the lineType dict
+            self.addLine(line.L0, self.lineTypes[line.type['name']]) # add the line
+            
+
+            # get the next point
+            attached_points = line.attached.copy() # get the IDs of the points attached to the line
+            pointA_id = point.number # get first point ID
+            attached_points.remove(pointA_id) # remove first point from attached point list
+            pointB_id = attached_points[0] # get second point id
+            point = sys.pointList[pointB_id-1] # get second point object
+
+            if line(point.attached) == 1:  # must be the endpoint
+                self.addPoint(-1, point.r)
+            else:  # intermediate point along line
+                self.addPoint(0, point.r, DOFs=[0,2]) # may need to ensure there's no y component
+                
+            # Attach the line ends to the points
+            self.pointList[-2].attachLine(len(self.lineList), 0)
+            self.pointList[-1].attachLine(len(self.lineList), 1)
+             
+            # break from the loop when a point with a single attachment is reached
+            if len(point.attached) == 1:
+                break
+        
+        # make sure that the last point is not a free point
+        if point.type == 0:
+            raise Exception(f'Last point ({point.number}) is a free point.')
+        
+        self.rB = np.array(point.r)
+        self.nLines = len(self.lineList)
+        self.nNodes = np.sum([line.nNodes for line in self.lineList]) - self.nLines + 1
+    
+        
+    def initialize(self):
+        '''Initializes the subsystem objects to their initial positions, and
+        counts number of nodes.'''
+        
+        self.nDOF, self.nCpldDOF, _ = self.getDOFs()
+        
+        self.nNodes = np.sum([line.nNodes for line in self.lineList]) - self.nLines + 1
+        
+        for point in self.pointList:
+            point.setPosition(point.r)
+            
+        self.staticSolve()
     
     
     def setEndPosition(self, r, endB, sink=False):
@@ -393,6 +475,59 @@ class Subsystem(System, Line):
         '''Revert mooring system model back to the static stiffness
         values and the original unstretched lenths.'''
         System.revertToStaticStiffness(self)
+    
+    
+    # ----- Function for dynamic frequency-domain tensions -----
+    
+    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot,
+                           seabed_tol=1e-4):
+        '''Compute M,A,B,K matrices for the Subsystem. This calls 
+        get_dynamic_matrices() for each Line in the Subsystem then combines
+        the results. Note that this method overrides the Line method. Other
+        Line methods used for dynamics can be used directly in Subsystem.
+        '''
+        self.nNodes = np.sum([line.nNodes for line in self.lineList]) - self.nLines + 1
+        
+        EA_segs = np.zeros(self.nNodes-1) # extensional stiffness of the segments
+        n_dofs = 3*self.nNodes # number of dofs
+        M = np.zeros([n_dofs,n_dofs], dtype='float')
+        A = np.zeros([n_dofs,n_dofs], dtype='float')
+        B = np.zeros([n_dofs,n_dofs], dtype='float')
+        K = np.zeros([n_dofs,n_dofs], dtype='float')
+        r_mean = np.zeros([self.nNodes,3], dtype='float')
+        r_dynamic = np.ones((len(omegas),self.nNodes,3),dtype='float')*r_dynamic
+        v_dynamic = 1j*omegas[:,None,None]*r_dynamic
+
+        n = 0  # starting index of the next line's entries in the matrices
+        
+        for line in self.lineList:
+            n1 = int(n/3) 
+            n2 = n1 + line.nNodes
+
+            # Filling matrices for line (dof n to dof 3xline_nodes+n)
+            M_n,A_n,B_n,K_n,r_n,EA_segs_n = line.getDynamicMatrices(omegas, S_zeta,r_dynamic[:,n1:n2,:],depth,kbot,cbot,seabed_tol=seabed_tol)
+            M[n:3*line.nNodes+n,n:3*line.nNodes+n] += M_n
+            A[n:3*line.nNodes+n,n:3*line.nNodes+n] += A_n
+            B[n:3*line.nNodes+n,n:3*line.nNodes+n] += B_n
+            K[n:3*line.nNodes+n,n:3*line.nNodes+n] += K_n
+
+            # Attachment point properties
+            attachment = self.pointList[line.attached[-1]-1] # attachment point
+            attachment_idx = n2 - 1 # last node index
+            sigma_vp = np.sqrt(np.trapz(np.abs(v_dynamic[:,attachment_idx,:])**2*S_zeta[:,None],omegas,axis=0)) # standard deviations of the global components of the attachment point's velocity
+
+            M[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += attachment.m*np.eye(3) 
+            A[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += attachment.Ca* self.rho * attachment.v * np.eye(3)
+            B[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += 0.5* self.rho * attachment.CdA * np.pi*(3*attachment.v/4/np.pi)**(2/3) \
+                                                                                   * np.eye(3) * np.sqrt(8/np.pi) * np.diag(sigma_vp)
+
+            # Static line properties
+            r_mean[n1:n2,:] = r_n
+            EA_segs[n1:n2-1] = EA_segs_n 
+
+            n += 3*line.nNodes - 3 # next line starting node add the number of dofs of the current line minus 3 to get the last shared node
+        
+        return M,A,B,K,r_mean,EA_segs
     
     
     # ---- Extra convenience functions (subsystem should be in equilibrium) -----
