@@ -89,7 +89,8 @@ class Subsystem(System, Line):
             
         self.shared     = getFromDict(kwargs, 'shared', dtype=bool, default=False)  # flag to indicate shared line
         self.span    = getFromDict(kwargs, 'span', default=0)                 # spacing (to rename as span<<<)
-        self.rBFair     = getFromDict(kwargs, 'rBFair', shape=-1, default=[0,0,0])  # [m] end coordinates relative to attached body's ref point
+        self.rBFair = getFromDict(kwargs, 'rBFair', shape=-1, default=[0,0,0])  # [m] end coordinates relative to attached body's ref point
+        self.rAFair = getFromDict(kwargs, 'rAFair', shape=-1, default=[0,0,0])  # [m] counterpart to rBFair for shared lines
 
         # seabed bathymetry - seabedMod 0 = flat; 1 = uniform slope, 2 = grid
         self.seabedMod = 0
@@ -118,23 +119,24 @@ class Subsystem(System, Line):
         self.qs = 1         # flag that it's a MoorPy analysis, so System methods don't complain. One day should replace this <<<
     
     
-    def makeGeneric(self, lengths, types, points=[], shared=False):
+    def makeGeneric(self, lengths, types, suspended=0):
         '''Creates a cable of n components going between an anchor point and
         a floating body (or a bridle point). If shared, it goes between two
         floating bodies.
 
         Parameters
         ----------
-        lengths
+        lengths : list of floats
             List of each section's length. This also implies the number of
             sections.
-        types
+        types : list of dicts
             List of lineType names for each section. These names must match
             keys in the parent system lineTypes dictionary or the subsystem's lineTypes dictionary...
-        i_buoy
-            list of which sections have buoyancy
-        cable_type_name
-            name of the cable type of the cable
+        suspended : int
+            Selector shared/suspended cases: 
+            - 0 (default): end A is on the seabed,
+            - 1: the assembly is suspended and end A is at another floating system,
+            - 2: the assembly is suspended and assumed symmetric, end A is the midpoint.
         '''
         
         # some initialization steps.
@@ -145,19 +147,20 @@ class Subsystem(System, Line):
         
         # get cumulative sum of line lengths, starting from anchor segment
         Lcsum = np.cumsum(np.array(lengths))
-
-        if shared:
-            rA = np.array([-0.5*self.span, 0, -1])           # shared line midpiont coordinates
+        
+        # set end A location depending on whether configuration is suspended/symmetrical
+        if suspended==2:  # symmetrical suspended case
+            rA = np.array([-0.5*self.span, 0, -1])  # shared line midpiont coordinates
+        elif suspended==1:  # general suspended case
+            rA = np.array([-self.span + self.rAFair, 0, self.rAFair[2]])  # other suspended end
         else:
             rA = np.array([-self.span, 0, -self.depth])    # anchor coordinates
         rB = np.array([-self.rBFair[0], 0, self.rBFair[2]])     # fairlead coordinates
 
-        # add the imaginary body and anchor/mid point
-        #self.addBody(-1, np.zeros(6)) <<<<<<<<<<<<<<<  we'll probaly NOT have a body, just do calcs as if there were one
         self.rA = rA
         self.rB = rB
 
-        if shared:
+        if suspended==2:
             self.addPoint(-1, rA, DOFs=[2]) # add shared line point, free only to move in z
         else:
             self.addPoint(-1, rA, DOFs=[0,2])                # add anchor point
