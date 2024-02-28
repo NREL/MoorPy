@@ -912,7 +912,7 @@ def makeTower(twrH, twrRad):
     return Xs, Ys, Zs
 
 
-def readBathymetryFile(self, filename):
+def readBathymetryFile(filename):
     '''Read a MoorDyn-style bathymetry input file (rectangular grid of depths)
     and return the lists of x and y coordinates and the matrix of depths.
     '''

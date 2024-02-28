@@ -3275,7 +3275,7 @@ class System():
         if draw_seabed and self.seabedMod == 2:
 
             if rang=='hold':
-                rang = (np.min(-bathGrid), np.max(-bathGrid))
+                rang = (np.min(-self.bathGrid), np.max(-self.bathGrid))
             
             X, Y = np.meshgrid(self.bathGrid_Xs, self.bathGrid_Ys)
             
