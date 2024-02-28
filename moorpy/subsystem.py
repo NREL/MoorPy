@@ -152,7 +152,7 @@ class Subsystem(System, Line):
         if suspended==2:  # symmetrical suspended case
             rA = np.array([-0.5*self.span, 0, -1])  # shared line midpiont coordinates
         elif suspended==1:  # general suspended case
-            rA = np.array([-self.span + self.rAFair, 0, self.rAFair[2]])  # other suspended end
+            rA = np.array([-self.span + self.rAFair[0], 0, self.rAFair[2]])  # other suspended end
         else:
             rA = np.array([-self.span, 0, -self.depth])    # anchor coordinates
         rB = np.array([-self.rBFair[0], 0, self.rBFair[2]])     # fairlead coordinates
@@ -300,12 +300,23 @@ class Subsystem(System, Line):
             plt.show()    
     
     
-    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, cmap='rainbow'):
+    def drawLine2d(self, Time, ax, color="k", endpoints=False, Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, plotnodes=[], plotnodesline=[],label="",cmap='rainbow', alpha=1.0):
         '''wrapper to System.plot2d with some transformation applied'''
         
         for i, line in enumerate(self.lineList):
             
-            Xs0, Ys0, Zs, tensions = self.getLineCoords(Time)
+            # color and width settings
+            if color == 'self':
+                color = line.color  # attempt to allow custom colors
+                lw = line.lw
+            elif color == None:
+                color = [0.3, 0.3, 0.3]  # if no color, default to grey
+                lw = 1
+            else:
+                lw = 1
+            
+            # get the Line's local coordinates
+            Xs0, Ys0, Zs, tensions = line.getLineCoords(Time)
             
             # transform to global coordinates
             Xs = self.rA[0] + Xs0*self.cos_th - Ys0*self.sin_th
@@ -323,7 +334,12 @@ class Subsystem(System, Line):
                     rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
                     ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba, zorder=100)
             else:
-                ax.plot(Xs2d, Ys2d, color=color, lw=lw, zorder=100)
+                ax.plot(Xs2d, Ys2d, color=color, lw=lw, zorder=100, label=label, alpha=alpha)
+            
+            if len(plotnodes) > 0:
+                for i,node in enumerate(plotnodes):
+                    if self.number==plotnodesline[i]:
+                        ax.plot(Xs2d[node], Ys2d[node], 'o', color=color, markersize=5)
             
             if endpoints == True:
                 ax.scatter([Xs2d[0], Xs2d[-1]], [Ys2d[0], Ys2d[-1]], color = color)
