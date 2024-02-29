@@ -689,7 +689,7 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     
     # Set up a main identifier for the linetype unless one is provided
     if name=="":
-        typestring = f"{type}{dnommm:.0f}"
+        typestring = f"{material}{dnommm:.0f}"  # note: previously was type instead of material, undefined
     else:
         typestring = name
     
@@ -697,7 +697,7 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
 
     lineType = dict(name=typestring, d_vol=d_vol, m=mass, EA=EA, w=w,
                     MBL=MBL, EAd=EAd, EAd_Lm=EAd_Lm, input_d=d,
-                    cost=cost, notes=notes, input_type=type, material=material)
+                    cost=cost, notes=notes, material=material)
     
     lineType.update(kwargs)   # add any custom arguments provided in the call to the lineType's dictionary
           
