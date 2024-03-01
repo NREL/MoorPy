@@ -1862,25 +1862,12 @@ class System():
         # create arrays for the initial positions of the objects that need to find equilibrium, and the max step sizes
         X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[30, 0.02])
         
-        # temporary for backwards compatibility <<<<<<<<<<
-        '''
-        if rmsTol != 0.0:
-            tols = np.zeros(len(X0)) + rmsTol
-            print("WHAT IS PASSING rmsTol in to solveEquilibrium?")
-            breakpoint()
-        elif np.isscalar(tol):
-            if tol < 0:
-                tols = -tol*db    # tolerances set relative to max step size
-                lineTol = 0.05*tols[0]  # hard coding a tolerance for catenary calcs <<<<<<<<<<<
-            else:
-                tols = 1.0*tol   # normal case, passing dsovle(2) a scalar for tol
-        else:
-            tols = np.array(tol)  # assuming tolerances are passed in for each free variable
-        '''
         
-        # store z indices for later seabed contact handling, and create vector of tolerances
+        # ----- Store z indices and create vector of tolerances -----
+        
         zInds = []
         tols = []
+        
         i = 0      # index to go through system DOF vector
         if DOFtype == "free":
             types = [0]
@@ -1888,20 +1875,23 @@ class System():
             types = [-1]
         elif DOFtype == "both":
             types = [0,-1]
-            
+        
+        # For bodies and points, only include active DOFs
         for body in self.bodyList:
             if body.type in types:
-                zInds.append(i+2)
-                i+=body.nDOF
+                if 2 in body.DOFs:  # note the z index if it's an active DOF
+                    zInds.append(i + body.DOFs.index(2))
+                i+=body.nDOF  # advance the index to the start of the next object
+                
                 rtol = tol/max([np.linalg.norm(rpr) for rpr in body.rPointRel])    # estimate appropriate body rotational tolerance based on attachment point radii
                 tols += [tol ] * sum(i in body.DOFs for i in [0,1,2])
                 tols += [rtol] * sum(i in body.DOFs for i in [3,4,5])
                 
         for point in self.pointList:
             if point.type in types:
-                if 2 in point.DOFs:
-                    zInds.append(i + point.DOFs.index(2))   # may need to check this bit <<<<
-                i+=point.nDOF                              # note: only including active DOFs of the point (z may not be one of them)                              
+                if 2 in point.DOFs:  # note the z index if it's an active DOF
+                    zInds.append(i + point.DOFs.index(2))
+                i+=point.nDOF  # advance the index to the start of the next object
         
                 tols += point.nDOF*[tol]
                 
@@ -1915,6 +1905,8 @@ class System():
             if display > 0:
                 print("There are no DOFs so solveEquilibrium is returning without adjustment.")
             return True
+        
+        # ----- Set up the equilibrium solver functions -----
         
         # clear some arrays to log iteration progress
         self.freeDOFs.clear()    # clear stored list of positions, so it can be refilled for this solve process
@@ -3279,7 +3271,8 @@ class System():
             
             X, Y = np.meshgrid(self.bathGrid_Xs, self.bathGrid_Ys)
             
-            bath = ax.plot_surface(X,Y,-self.bathGrid, vmin=rang[0], vmax=rang[1], **args_bath)
+            bath = ax.plot_surface(X,Y,-self.bathGrid, vmin=rang[0], vmax=rang[1],
+                                   rstride=1, cstride=1, **args_bath)
             
             if cbar_bath_size!=1.0:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
                 cbar_bath=True
