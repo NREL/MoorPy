@@ -985,6 +985,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         info["stiffnessBA"][0,1] = -info["stiffnessBA"][0,1]  # for cross coupling matrix could also maybe transpose? but should be symmetrical so no need
         info["stiffnessBA"][1,0] = -info["stiffnessBA"][1,0]
         
+        info['Zextreme'] = info['Zextreme'] + ZF
+        
     else:
         FxA =  HA
         FzA =  VA
@@ -1007,6 +1009,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
         info["stiffnessBA"][0,1] = -info["stiffnessBA"][0,1]
         info["stiffnessBA"][1,0] = -info["stiffnessBA"][1,0]
+        
+        info['Zextreme'] = -info['Zextreme']
         
         # TODO <<< should add more info <<<
 

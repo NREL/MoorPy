@@ -468,17 +468,16 @@ class Subsystem(System, Line):
     def getHog(self, iLine):
         '''Compute the z elevation of the highest point along a line section.'''
         line = self.lineList[iLine]
-        return max([line.info['Zextreme'], line.rA[2], line.rB[2]])
+        return max([line.z_extreme, line.rA[2], line.rB[2]])
     
     def getSag(self, iLine):
         '''Compute the z elevation of the lowest point along a line section.'''
         line = self.lineList[iLine]
-        return min([line.info['Zextreme'], line.rA[2], line.rB[2]])
+        return min([line.z_extreme, line.rA[2], line.rB[2]])
     
     def getMinSag(self):
         '''Compute the z elevation of the lowest point of the whole subsystem.'''
-        return min([line.info['Zextreme'] + 
-                    min(line.rA[2], line.rB[2]) for line in self.lineList])
+        return min([ min([line.z_extreme, line.rA[2], line.rB[2]]) for line in self.lineList ])
 
     
     def getTen(self, iLine):
