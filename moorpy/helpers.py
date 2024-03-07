@@ -902,6 +902,24 @@ def addToDict(dict1, dict2, key1, key2, default=None):
     dict2[key2] = val
 
 
+def drawBox(ax, r1, r2, color=[0,0,0,0.2]):
+    '''Draw a box along the x-y-z axes between two provided corner points.'''
+    
+    
+    ax.plot([r1[0], r2[0]], [r1[1], r1[1]], [r1[2], r1[2]], color=color) # along x
+    ax.plot([r1[0], r2[0]], [r2[1], r2[1]], [r1[2], r1[2]], color=color)
+    ax.plot([r1[0], r2[0]], [r1[1], r1[1]], [r2[2], r2[2]], color=color)
+    ax.plot([r1[0], r2[0]], [r2[1], r2[1]], [r2[2], r2[2]], color=color)
+    ax.plot([r1[0], r1[0]], [r1[1], r2[1]], [r1[2], r1[2]], color=color) # along y
+    ax.plot([r2[0], r2[0]], [r1[1], r2[1]], [r1[2], r1[2]], color=color)
+    ax.plot([r1[0], r1[0]], [r1[1], r2[1]], [r2[2], r2[2]], color=color)
+    ax.plot([r2[0], r2[0]], [r1[1], r2[1]], [r2[2], r2[2]], color=color)
+    ax.plot([r1[0], r1[0]], [r1[1], r1[1]], [r1[2], r2[2]], color=color) # along z
+    ax.plot([r1[0], r1[0]], [r2[1], r2[1]], [r1[2], r2[2]], color=color)
+    ax.plot([r2[0], r2[0]], [r1[1], r1[1]], [r1[2], r2[2]], color=color)
+    ax.plot([r2[0], r2[0]], [r2[1], r2[1]], [r1[2], r2[2]], color=color)
+
+
 def makeTower(twrH, twrRad):
     '''Sets up mesh points for visualizing a cylindrical structure (should align with RAFT eventually.'''
     

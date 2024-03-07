@@ -2599,7 +2599,7 @@ class System():
         # invert matrix
         K_inv_all = np.linalg.inv(K_all)
         
-        # remove free DOFs (this corresponds to saying that the same of forces on these DOFs will remain zero)
+        # remove free DOFs (this corresponds to saying that the sum of forces on these DOFs will remain zero)
         #indices = list(range(n))                # list of DOF indices that will remain active for this step
         mask = [True]*n                         # this is a mask to be applied to the array K indices
         

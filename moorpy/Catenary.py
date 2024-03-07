@@ -59,7 +59,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         stiffnessBA - 2D stiffness matrix for force at B due to movement of A [N/m].
         LBot - length of line section laying on the seabed [m].
         ProfileType
-        Zextreme - extreme z coordinate of the line section (in direction of wet weight) [m].
+        Zextreme - extreme z coordinate of the line section (in direction of 
+        wet weight), relative to height of end A [m].
     
     '''
 

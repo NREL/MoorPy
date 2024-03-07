@@ -841,6 +841,7 @@ class Line():
         
         # save other important info
         self.LBot = info["LBot"]
+        self.z_extreme = self.rA[2] + info["Zextreme"]
         self.info = info
         
         # save forces in global reference frame

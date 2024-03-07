@@ -129,9 +129,11 @@ class Subsystem(System, Line):
         lengths : list of floats
             List of each section's length. This also implies the number of
             sections.
-        types : list of dicts
-            List of lineType names for each section. These names must match
-            keys in the parent system lineTypes dictionary or the subsystem's lineTypes dictionary...
+        types : list of strings or dicts
+            List of lineType names or dicts for each section. If strings, 
+            these names must match keys in the parent system lineTypes 
+            dictionary or the subsystem's lineTypes dictionary. If dicts,
+            these dicts are referred to for each lineType (by reference).
         suspended : int
             Selector shared/suspended cases: 
             - 0 (default): end A is on the seabed,
@@ -169,7 +171,10 @@ class Subsystem(System, Line):
         for i in range(self.nLines):
 
             # find the specified lineType dict and save a reference to it
-            if types[i] in self.lineTypes:  # first look for the name in the subsystem
+            if type(types[i]) == dict:  # if it's a dictionary, just point to it
+                self.lineTypes[i] = types[i]
+            # otherwise we're assuming it's a string of the lineType name
+            elif types[i] in self.lineTypes:  # first look for the name in the subsystem
                 self.lineTypes[i] = self.lineTypes[types[i]]
             elif self.sys: # otherwise look in the parent system, if there is one
                 if types[i] in self.sys.lineTypes:  # first look for the name in the subsystem
