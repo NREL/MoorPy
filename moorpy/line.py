@@ -850,12 +850,17 @@ class Line():
         self.TA = np.linalg.norm(self.fA) # end tensions
         self.TB = np.linalg.norm(self.fB)
         
+        # Compute transverse (out-of-plane) stiffness term
+        if fAV > fAH:  # if line is more vertical than horizontal, 
+            Kt = 0.5*(fAV-fBV)/LV  # compute Kt based on vertical tension/span
+        else:  # otherwise use the classic horizontal approach
+            Kt = -fBH/LH
+        
+        
         # save 3d stiffness matrix in global orientation for both line ends (3 DOF + 3 DOF)
-        self.KA  = from2Dto3Drotated(info['stiffnessA'], -fBH, LH, R.T)  # reaction at A due to motion of A
-        self.KB  = from2Dto3Drotated(info['stiffnessB'], -fBH, LH, R.T)  # reaction at B due to motion of B
-        self.KBA = from2Dto3Drotated(info['stiffnessBA'], fBH, LH, R.T)  # reaction at B due to motion of A
-
-        # may want to skip stiffness calcs when just getting profiles for plotting...
+        self.KA  = from2Dto3Drotated(info['stiffnessA'],  Kt, R.T)  # reaction at A due to motion of A
+        self.KB  = from2Dto3Drotated(info['stiffnessB'],  Kt, R.T)  # reaction at B due to motion of B
+        self.KBA = from2Dto3Drotated(info['stiffnessBA'], Kt, R.T)  # reaction at B due to motion of A
         
         
         # ----- calculate current loads if applicable, for use next time -----
@@ -1003,7 +1008,7 @@ class Line():
         self.L = self.L0
     
 
-def from2Dto3Drotated(K2D, F, L, R): 
+def from2Dto3Drotated(K2D, Kt, R): 
     '''Initialize a line end's analytic stiffness matrix in the 
     plane of the catenary then rotate the matrix to be about the 
     global frame using [K'] = [R][K][R]^T
@@ -1012,10 +1017,8 @@ def from2Dto3Drotated(K2D, F, L, R):
     ----------
     K2D : 2x2 matrix
         Planar stiffness matrix of line end [N/m]
-    F : float
-        Line horizontal tension component [N]
-    L : float
-        Line horizontal distance end-to-end [m]
+    Kt : float
+        Transverse (out-of-plane) stiffness term [N/m].
     R : 3x3 matrix
         Rotation matrix from global frame to the local
         X-Z plane of the line
@@ -1023,19 +1026,12 @@ def from2Dto3Drotated(K2D, F, L, R):
     Returns
     -------
     3x3 stiffness matrix in global orientation [N/m].
-    '''
-
-    if L > 0:
-        Kt = F/L         # transverse stiffness term
-    else:
-        Kt = 0.0
-    
+    '''    
     K2 = np.array([[K2D[0,0], 0 , K2D[0,1]],
                    [  0     , Kt,   0     ],
                    [K2D[1,0], 0 , K2D[1,1]]])
     
     return np.matmul(np.matmul(R, K2), R.T)    
-    
 
 
 def RotFrm2Vect( A, B):
