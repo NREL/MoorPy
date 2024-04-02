@@ -59,7 +59,7 @@ class Subsystem(System, Line):
         self.pointList = []
         self.lineList = []
         self.lineTypes = {}  # dict indexed as a list [0:n-1] corresponding to lineList. Contains *references* to lineType dicts.
-        #self.rodTypes = {}
+        self.rodTypes = {}
         
         # some basic subsystem things
         self.rA = np.zeros(3)

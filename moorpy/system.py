@@ -1171,14 +1171,42 @@ class System():
             
             # Figure out mooring line attachments (Create a ix2 array of connection points from a list of m points)
             connection_points = np.empty([len(self.lineList),2])                   #First column is Anchor Node, second is Fairlead node
+            rod_ends = np.empty([len(self.lineList),2])
             for point_ind,point in enumerate(self.pointList,start = 1):                    #Loop through all the points
                 for (line,line_pos) in zip(point.attached,point.attachedEndB):          #Loop through all the lines #s connected to this point
                     if line_pos == 0:                                                       #If the A side of this line is connected to the point
-                        connection_points[line -1,0] = point_ind                                #Save as as an Anchor Node
+                        if point.cable == True:
+                            connection_points[line -1,0] = -point_ind                                #Save as as an Anchor Node
+                            
+                            #determine which end of rod to connect to
+                            F = point.getForces(lines_only = True, xyz = True)
+                            if F[0] > 0:
+                                rod_ends[line - 1, 0] = 1
+                            else:
+                                rod_ends[line - 1, 0] = 0
+                        else:
+                            connection_points[line -1,0] = point_ind                                #Save as as an Anchor Node
                         #connection_points[line -1,0] = self.pointList.index(point) + 1
                     elif line_pos == 1:                                                     #If the B side of this line is connected to the point
-                        connection_points[line -1,1] = point_ind                                #Save as a Fairlead node
+                        if point.cable == True:
+                            connection_points[line -1,1] = -point_ind                                #Save as a Fairlead node
+                        
+                            #determine which end of rod to connect to
+                            F = point.getForces(lines_only = True, xyz = True)
+                            if F[0] > 0:
+                                rod_ends[line - 1, 1] = 0
+                            else:
+                                rod_ends[line - 1, 1] = 1
+                        else:
+                            connection_points[line -1,1] = point_ind                                #Save as a Fairlead node
                         #connection_points[line -1,1] = self.pointList.index(point) + 1
+            
+            #check if any points have cable = True, this determines if rods are needed
+            cable = False
+            for point in self.pointList:
+                if point.cable == True:
+                    cable = True
+                    break
             
             #Line Properties
             flag = "p" # "-" 
@@ -1227,12 +1255,18 @@ class System():
             L.append("TypeName      Diam     Mass/m    Cd     Ca      CdEnd    CaEnd")
             L.append("(name)        (m)      (kg/m)    (-)    (-)     (-)      (-)")
             
+            
             for key, rodType in self.rodTypes.items(): 
                 di = rodTypeDefaults.copy()
                 di.update(rodType)
                 L.append("{:<15} {:7.4f} {:8.2f} {:<7.3f} {:<7.3f} {:<7.3f} {:<7.3f}".format(
                          key, di['d_vol'], di['m'], di['Cd'], di['Ca'], di['CdEnd'], di['CaEnd']))
             
+            # add arbitrary rod for cable connections if cable is True
+            if cable:
+                L.append("{:<15} {:7.4f} {:8.2f} {:<7.3f} {:<7.3f} {:<7.3f} {:<7.3f}".format(
+                         'connector', 0.2, 0.0 , 0.0, 0.0, 0.0, 0.0))
+             
             
             L.append("----------------------- BODIES ------------------------------------------------------")
             L.append("ID   Attachment    X0     Y0     Z0     r0      p0     y0     Mass          CG*          I*      Volume   CdA*   Ca*")
@@ -1258,30 +1292,61 @@ class System():
             # Rod Properties Table TBD <<<
             
             
+            #add zero length rods for dynamic cables
+            rod_id = 0
+            for point in self.pointList:
+                point_pos = point.r
+                if point.cable == True:
+                    
+                    rod_id = rod_id + 1
+                    if point.type == 1:             # point is fixed or attached (anch, body, fix)
+                        point_type = 'Fixed'
+                        
+                        #Check if the point is attached to body
+                        for body in self.bodyList:
+                            for attached_Point in body.attachedP:
+                                if attached_Point == point.number:
+                                    point_type = "Body" + str(body.number)
+                                    point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
+                        
+                    elif point.type == 0:           # point is coupled externally (con, free)
+                        point_type = 'Free'
+                            
+                    elif point.type == -1:          # point is free to move (fair, ves)
+                        point_type = 'Coupled'
+                    
+                    f = point.getForces(lines_only = True, xyz = True)
+                    f_unit = f / np.linalg.norm(f)
+                    rA = [point_pos[0] - f_unit[0], point_pos[1] - f_unit[1], point_pos[2] - f_unit[2]]
+                    rB = [point_pos[0] + f_unit[0], point_pos[1] + f_unit[1], point_pos[2] + f_unit[2]]
+                    L.append("{:<4d} {:9} {:9} {:8.2f} {:8.2f} {:9.2f} {:6.2f} {:6.2f} {:6.2f} {} {}".format(
+                              rod_id, 'connector', point_type, rA[0], rA[1], rA[2], rB[0], rB[1], rB[2], 0, '-'))
+                    
             L.append("---------------------- POINTS -------------------------------------------------------")
             L.append("ID  Attachment     X       Y       Z           Mass  Volume  CdA    Ca")
             L.append("(#)   (-)         (m)     (m)     (m)          (kg)  (mˆ3)  (m^2)   (-)")
             
             for point in self.pointList:
-                point_pos = point.r             # get point position in global reference frame to start with
-                if point.type == 1:             # point is fixed or attached (anch, body, fix)
-                    point_type = 'Fixed'
-                    
-                    #Check if the point is attached to body
-                    for body in self.bodyList:
-                        for attached_Point in body.attachedP:
-                            if attached_Point == point.number:
-                                point_type = "Body" + str(body.number)
-                                point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
-                    
-                elif point.type == 0:           # point is coupled externally (con, free)
-                    point_type = 'Free'
+                if point.cable == False:
+                    point_pos = point.r             # get point position in global reference frame to start with
+                    if point.type == 1:             # point is fixed or attached (anch, body, fix)
+                        point_type = 'Fixed'
                         
-                elif point.type == -1:          # point is free to move (fair, ves)
-                    point_type = 'Coupled'
-                
-                L.append("{:<4d} {:9} {:8.2f} {:8.2f} {:8.2f} {:9.2f} {:6.2f} {:6.2f} {:6.2f}".format(
-                          point.number,point_type, point_pos[0],point_pos[1],point_pos[2], point.m, point.v, point.CdA, point.Ca))
+                        #Check if the point is attached to body
+                        for body in self.bodyList:
+                            for attached_Point in body.attachedP:
+                                if attached_Point == point.number:
+                                    point_type = "Body" + str(body.number)
+                                    point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
+                        
+                    elif point.type == 0:           # point is coupled externally (con, free)
+                        point_type = 'Free'
+                            
+                    elif point.type == -1:          # point is free to move (fair, ves)
+                        point_type = 'Coupled'
+                    
+                    L.append("{:<4d} {:9} {:8.2f} {:8.2f} {:8.2f} {:9.2f} {:6.2f} {:6.2f} {:6.2f}".format(
+                              point.number,point_type, point_pos[0],point_pos[1],point_pos[2], point.m, point.v, point.CdA, point.Ca))
                 
             
             L.append("---------------------- LINES --------------------------------------------------------")
@@ -1290,10 +1355,15 @@ class System():
             
             for i,line in enumerate(self.lineList):
                 nSegs = int(np.ceil(line.L/line_dL)) if line_dL>0 else line.nNodes-1  # if target dL given, set nSegs based on it instead of line.nNodes
-            
-                L.append("{:<4d} {:<15} {:^5d}   {:^5d}   {:8.3f}   {:4d}       {}".format(
-                         line.number, line.type['name'], int(connection_points[i,0]), int(connection_points[i,1]), line.L, nSegs, flag))
-            
+                if connection_points[i,0] < 0:
+                    attach = ['A', 'B']
+                    L.append("{:<4d} {:<15} {}   {}   {:8.3f}   {:4d}       {}".format(
+                        line.number, line.number - 1, 'R'+str(int(-connection_points[i,0]))+attach[int(rod_ends[i,0])], 'R' +str(int(-connection_points[i,1])) +attach[int(rod_ends[i,1])], line.L, nSegs, flag))
+                  
+                else:
+                    L.append("{:<4d} {:<15} {:^5d}   {:^5d}   {:8.3f}   {:4d}       {}".format(
+                             line.number, line.type['name'], int(connection_points[i,0]), int(connection_points[i,1]), line.L, nSegs, flag))
+                
             
             L.append("---------------------- OPTIONS ------------------------------------------------------")
 
