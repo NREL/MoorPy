@@ -851,7 +851,7 @@ class Line():
         self.TB = np.linalg.norm(self.fB)
         
         # Compute transverse (out-of-plane) stiffness term
-        if fAV > fAH:  # if line is more vertical than horizontal, 
+        if LH < 0.01*abs(LV):  # if line is nearly vertical (note: this theshold is unverified)
             Kt = 0.5*(fAV-fBV)/LV  # compute Kt based on vertical tension/span
         else:  # otherwise use the classic horizontal approach
             Kt = -fBH/LH
@@ -860,7 +860,7 @@ class Line():
         # save 3d stiffness matrix in global orientation for both line ends (3 DOF + 3 DOF)
         self.KA  = from2Dto3Drotated(info['stiffnessA'],  Kt, R.T)  # reaction at A due to motion of A
         self.KB  = from2Dto3Drotated(info['stiffnessB'],  Kt, R.T)  # reaction at B due to motion of B
-        self.KBA = from2Dto3Drotated(info['stiffnessBA'], Kt, R.T)  # reaction at B due to motion of A
+        self.KBA = from2Dto3Drotated(info['stiffnessBA'],-Kt, R.T)  # reaction at B due to motion of A
         
         
         # ----- calculate current loads if applicable, for use next time -----

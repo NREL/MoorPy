@@ -340,6 +340,44 @@ def test_seabed(CB):
                     np.hstack([ms2.pointList[0].getForces(), ms2.pointList[-1].getForces()]), rtol=0, atol=10.0, verbose=True)
 
 
+
+def test_6DOF_stiffness():
+    '''Tests 6x6 stiffness matrix of a complex system to check off diagonals.'''
+    
+    # Create new MoorPy System and set its depth
+    ms = mp.System(file='tests/case8.dat')
+
+    # ----- run the model to demonstrate -----
+
+    ms.initialize()                                             # make sure everything's connected
+
+    # find equilibrium of just the mooring lines (the body is 'coupled' and will by default not be moved)
+    ms.solveEquilibrium(tol=0.0001)                                       # equilibrate
+
+
+    #Kmp  = ms.getSystemStiffness( DOFtype='both', dx=0.02, dth=0.001)
+    #KmpA = ms.getSystemStiffnessA(DOFtype='both', )
+    
+    Kn = ms.getCoupledStiffness()
+    Ka = ms.getCoupledStiffnessA()
+    
+
+    #Kn = Kmp
+    #Ka = KmpA
+    #Kn = ms.bodyList[0].getStiffness(tol=0.00001, dx = 0.001)
+    #Ka = ms.bodyList[0].getStiffnessA(lines_only=True)
+    
+    print(Kn)
+    print(Ka)
+    print(Ka-Kn)
+    #print(Ka/Kn)
+    
+    assert_allclose(Ka[:3,:3], Kn[:3,:3], rtol=0.02, atol=5e3, verbose=True) # translational
+    assert_allclose(Ka[3:,:3], Kn[3:,:3], rtol=0.02, atol=5e4, verbose=True) #
+    assert_allclose(Ka[:3,3:], Kn[:3,3:], rtol=0.02, atol=5e4, verbose=True) #
+    assert_allclose(Ka[3:,3:], Kn[3:,3:], rtol=0.02, atol=2e6, verbose=True) # rotational
+
+
 if __name__ == '__main__':
     
     #test_basic()

@@ -249,6 +249,7 @@ class Subsystem(System, Line):
         # outputs should be pointList[0] and [N] .r
         dr =  self.rB - self.rA
         LH = np.hypot(dr[0], dr[1])         # horizontal spacing of line ends
+        LV = dr[2]                          # vertical rise from end A to B
         self.pointList[ 0].setPosition([ -self.span   , 0, self.rA[2]])
         self.pointList[-1].setPosition([ -self.span+LH, 0, self.rB[2]])
         
@@ -273,17 +274,18 @@ class Subsystem(System, Line):
         # save end forces and stiffness matrices (first in local frame)
         self.fA_L = self.pointList[ 0].getForces(xyz=True) # force at end A
         self.fB_L = self.pointList[-1].getForces(xyz=True) # force at end B
-        '''
-        self.KA_L  = K[:3,:3]                # reaction at A due to motion of A
-        self.KB_L  = K[3:,3:]                # reaction at B due to motion of B
-        self.KAB_L = K[3:,:3]                # reaction at B due to motion of A
-        '''
+        
+        # Compute transverse (out-of-plane) stiffness term
+        if LH < 0.01*abs(LV):  # if line is nearly vertical (note: this theshold is unverified)
+            Kt = 0.5*(self.fA_L[2] - self.fB_L[2])/LV  # compute Kt based on vertical tension/span
+        else:  # otherwise use the classic horizontal approach
+            Kt = -self.fB_L[0]/LH  
         
         # expand to get 3D stiffness matrices
         R = np.eye(3)
-        self.KA_L  = from2Dto3Drotated(K[:2,:2], -self.fB_L[0], LH, R.T)  # reaction at A due to motion of A
-        self.KB_L  = from2Dto3Drotated(K[2:,2:], -self.fB_L[0], LH, R.T)  # reaction at B due to motion of B
-        self.KBA_L = from2Dto3Drotated(K[2:,:2], -self.fB_L[0], LH, R.T)  # reaction at B due to motion of A
+        self.KA_L  = from2Dto3Drotated(K[:2,:2],  Kt, R.T)  # reaction at A due to motion of A
+        self.KB_L  = from2Dto3Drotated(K[2:,2:],  Kt, R.T)  # reaction at B due to motion of B
+        self.KBA_L = from2Dto3Drotated(K[2:,:2], -Kt, R.T)  # reaction at B due to motion of A
         
         self.TA = np.linalg.norm(self.fA_L)  # tensions [N]
         self.TB = np.linalg.norm(self.fB_L)
