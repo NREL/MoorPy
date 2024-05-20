@@ -59,7 +59,7 @@ class Subsystem(System, Line):
         self.pointList = []
         self.lineList = []
         self.lineTypes = {}  # dict indexed as a list [0:n-1] corresponding to lineList. Contains *references* to lineType dicts.
-        #self.rodTypes = {}
+        self.rodTypes = {}
         
         # some basic subsystem things
         self.rA = np.zeros(3)
@@ -89,7 +89,8 @@ class Subsystem(System, Line):
             
         self.shared     = getFromDict(kwargs, 'shared', dtype=bool, default=False)  # flag to indicate shared line
         self.span    = getFromDict(kwargs, 'span', default=0)                 # spacing (to rename as span<<<)
-        self.rBFair     = getFromDict(kwargs, 'rBFair', shape=-1, default=[0,0,0])  # [m] end coordinates relative to attached body's ref point
+        self.rBFair = getFromDict(kwargs, 'rBFair', shape=-1, default=[0,0,0])  # [m] end coordinates relative to attached body's ref point
+        self.rAFair = getFromDict(kwargs, 'rAFair', shape=-1, default=[0,0,0])  # [m] counterpart to rBFair for shared lines
 
         # seabed bathymetry - seabedMod 0 = flat; 1 = uniform slope, 2 = grid
         self.seabedMod = 0
@@ -118,23 +119,26 @@ class Subsystem(System, Line):
         self.qs = 1         # flag that it's a MoorPy analysis, so System methods don't complain. One day should replace this <<<
     
     
-    def makeGeneric(self, lengths, types, points=[], shared=False):
+    def makeGeneric(self, lengths, types, suspended=0):
         '''Creates a cable of n components going between an anchor point and
         a floating body (or a bridle point). If shared, it goes between two
         floating bodies.
 
         Parameters
         ----------
-        lengths
+        lengths : list of floats
             List of each section's length. This also implies the number of
             sections.
-        types
-            List of lineType names for each section. These names must match
-            keys in the parent system lineTypes dictionary or the subsystem's lineTypes dictionary...
-        i_buoy
-            list of which sections have buoyancy
-        cable_type_name
-            name of the cable type of the cable
+        types : list of strings or dicts
+            List of lineType names or dicts for each section. If strings, 
+            these names must match keys in the parent system lineTypes 
+            dictionary or the subsystem's lineTypes dictionary. If dicts,
+            these dicts are referred to for each lineType (by reference).
+        suspended : int
+            Selector shared/suspended cases: 
+            - 0 (default): end A is on the seabed,
+            - 1: the assembly is suspended and end A is at another floating system,
+            - 2: the assembly is suspended and assumed symmetric, end A is the midpoint.
         '''
         
         # some initialization steps.
@@ -145,19 +149,20 @@ class Subsystem(System, Line):
         
         # get cumulative sum of line lengths, starting from anchor segment
         Lcsum = np.cumsum(np.array(lengths))
-
-        if shared:
-            rA = np.array([-0.5*self.span, 0, -1])           # shared line midpiont coordinates
+        
+        # set end A location depending on whether configuration is suspended/symmetrical
+        if suspended==2:  # symmetrical suspended case
+            rA = np.array([-0.5*self.span, 0, -1])  # shared line midpiont coordinates
+        elif suspended==1:  # general suspended case
+            rA = np.array([-self.span + self.rAFair[0], 0, self.rAFair[2]])  # other suspended end
         else:
             rA = np.array([-self.span, 0, -self.depth])    # anchor coordinates
         rB = np.array([-self.rBFair[0], 0, self.rBFair[2]])     # fairlead coordinates
 
-        # add the imaginary body and anchor/mid point
-        #self.addBody(-1, np.zeros(6)) <<<<<<<<<<<<<<<  we'll probaly NOT have a body, just do calcs as if there were one
         self.rA = rA
         self.rB = rB
 
-        if shared:
+        if suspended==2:
             self.addPoint(-1, rA, DOFs=[2]) # add shared line point, free only to move in z
         else:
             self.addPoint(-1, rA, DOFs=[0,2])  # add anchor point
@@ -166,7 +171,10 @@ class Subsystem(System, Line):
         for i in range(self.nLines):
 
             # find the specified lineType dict and save a reference to it
-            if types[i] in self.lineTypes:  # first look for the name in the subsystem
+            if type(types[i]) == dict:  # if it's a dictionary, just point to it
+                self.lineTypes[i] = types[i]
+            # otherwise we're assuming it's a string of the lineType name
+            elif types[i] in self.lineTypes:  # first look for the name in the subsystem
                 self.lineTypes[i] = self.lineTypes[types[i]]
             elif self.sys: # otherwise look in the parent system, if there is one
                 if types[i] in self.sys.lineTypes:  # first look for the name in the subsystem
@@ -323,6 +331,7 @@ class Subsystem(System, Line):
         # outputs should be pointList[0] and [N] .r
         dr =  self.rB - self.rA
         LH = np.hypot(dr[0], dr[1])         # horizontal spacing of line ends
+        LV = dr[2]                          # vertical rise from end A to B
         self.pointList[ 0].setPosition([ -self.span   , 0, self.rA[2]])
         self.pointList[-1].setPosition([ -self.span+LH, 0, self.rB[2]])
         
@@ -347,17 +356,18 @@ class Subsystem(System, Line):
         # save end forces and stiffness matrices (first in local frame)
         self.fA_L = self.pointList[ 0].getForces(xyz=True) # force at end A
         self.fB_L = self.pointList[-1].getForces(xyz=True) # force at end B
-        '''
-        self.KA_L  = K[:3,:3]                # reaction at A due to motion of A
-        self.KB_L  = K[3:,3:]                # reaction at B due to motion of B
-        self.KAB_L = K[3:,:3]                # reaction at B due to motion of A
-        '''
+        
+        # Compute transverse (out-of-plane) stiffness term
+        if LH < 0.01*abs(LV):  # if line is nearly vertical (note: this theshold is unverified)
+            Kt = 0.5*(self.fA_L[2] - self.fB_L[2])/LV  # compute Kt based on vertical tension/span
+        else:  # otherwise use the classic horizontal approach
+            Kt = -self.fB_L[0]/LH  
         
         # expand to get 3D stiffness matrices
         R = np.eye(3)
-        self.KA_L  = from2Dto3Drotated(K[:2,:2], -self.fB_L[0], LH, R.T)  # reaction at A due to motion of A
-        self.KB_L  = from2Dto3Drotated(K[2:,2:], -self.fB_L[0], LH, R.T)  # reaction at B due to motion of B
-        self.KBA_L = from2Dto3Drotated(K[2:,:2], -self.fB_L[0], LH, R.T)  # reaction at B due to motion of A
+        self.KA_L  = from2Dto3Drotated(K[:2,:2],  Kt, R.T)  # reaction at A due to motion of A
+        self.KB_L  = from2Dto3Drotated(K[2:,2:],  Kt, R.T)  # reaction at B due to motion of B
+        self.KBA_L = from2Dto3Drotated(K[2:,:2], -Kt, R.T)  # reaction at B due to motion of A
         
         self.TA = np.linalg.norm(self.fA_L)  # tensions [N]
         self.TB = np.linalg.norm(self.fB_L)
@@ -379,12 +389,23 @@ class Subsystem(System, Line):
             plt.show()    
     
     
-    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, cmap='rainbow'):
+    def drawLine2d(self, Time, ax, color="k", endpoints=False, Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, plotnodes=[], plotnodesline=[],label="",cmap='rainbow', alpha=1.0):
         '''wrapper to System.plot2d with some transformation applied'''
         
         for i, line in enumerate(self.lineList):
             
-            Xs0, Ys0, Zs, tensions = self.getLineCoords(Time)
+            # color and width settings
+            if color == 'self':
+                color = line.color  # attempt to allow custom colors
+                lw = line.lw
+            elif color == None:
+                color = [0.3, 0.3, 0.3]  # if no color, default to grey
+                lw = 1
+            else:
+                lw = 1
+            
+            # get the Line's local coordinates
+            Xs0, Ys0, Zs, tensions = line.getLineCoords(Time)
             
             # transform to global coordinates
             Xs = self.rA[0] + Xs0*self.cos_th - Ys0*self.sin_th
@@ -402,7 +423,12 @@ class Subsystem(System, Line):
                     rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
                     ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba, zorder=100)
             else:
-                ax.plot(Xs2d, Ys2d, color=color, lw=lw, zorder=100)
+                ax.plot(Xs2d, Ys2d, color=color, lw=lw, zorder=100, label=label, alpha=alpha)
+            
+            if len(plotnodes) > 0:
+                for i,node in enumerate(plotnodes):
+                    if self.number==plotnodesline[i]:
+                        ax.plot(Xs2d[node], Ys2d[node], 'o', color=color, markersize=5)
             
             if endpoints == True:
                 ax.scatter([Xs2d[0], Xs2d[-1]], [Ys2d[0], Ys2d[-1]], color = color)
@@ -579,17 +605,16 @@ class Subsystem(System, Line):
     def getHog(self, iLine):
         '''Compute the z elevation of the highest point along a line section.'''
         line = self.lineList[iLine]
-        return max([line.info['Zextreme'], line.rA[2], line.rB[2]])
+        return max([line.z_extreme, line.rA[2], line.rB[2]])
     
     def getSag(self, iLine):
         '''Compute the z elevation of the lowest point along a line section.'''
         line = self.lineList[iLine]
-        return min([line.info['Zextreme'], line.rA[2], line.rB[2]])
+        return min([line.z_extreme, line.rA[2], line.rB[2]])
     
     def getMinSag(self):
         '''Compute the z elevation of the lowest point of the whole subsystem.'''
-        return min([line.info['Zextreme'] + 
-                    min(line.rA[2], line.rB[2]) for line in self.lineList])
+        return min([ min([line.z_extreme, line.rA[2], line.rB[2]]) for line in self.lineList ])
 
     
     def getTen(self, iLine):

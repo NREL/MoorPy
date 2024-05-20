@@ -676,7 +676,24 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     EA   = mat[  'EA_0'] + mat[  'EA_d']*d + mat[  'EA_d2']*d**2 + mat[  'EA_d3']*d**3 + mat['EA_MBL']*MBL 
     cost =(mat['cost_0'] + mat['cost_d']*d + mat['cost_d2']*d**2 + mat['cost_d3']*d**3 
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
-    
+    # add in drag and added mass coefficients if available, if not, use defaults
+    if 'Cd' in mat:
+        Cd   = mat['Cd']
+    else:
+        Cd = 1.2
+    if 'Cd_ax' in mat:
+        CdAx = mat['Cd_ax']
+    else:
+        CdAx = 0.2
+    if 'Ca' in mat:
+        Ca = mat['Ca']
+    else:
+        Ca = 1.0
+    if 'Ca_ax' in mat:
+        CaAx = mat['Ca_ax']
+    else:
+        CaAx = 0.0
+        
     # internally calculate the volumetric diameter using a ratio
     d_vol = mat['dvol_dnom']*d  # [m]
 
@@ -689,7 +706,7 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     
     # Set up a main identifier for the linetype unless one is provided
     if name=="":
-        typestring = f"{type}{dnommm:.0f}"
+        typestring = f"{material}{dnommm:.0f}"  # note: previously was type instead of material, undefined
     else:
         typestring = name
     
@@ -697,7 +714,7 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
 
     lineType = dict(name=typestring, d_vol=d_vol, m=mass, EA=EA, w=w,
                     MBL=MBL, EAd=EAd, EAd_Lm=EAd_Lm, input_d=d,
-                    cost=cost, notes=notes, input_type=type, material=material)
+                    cost=cost, notes=notes, material=material, Cdn=Cd, Cdt=CdAx,Can=Ca,Cat=CaAx)
     
     lineType.update(kwargs)   # add any custom arguments provided in the call to the lineType's dictionary
           
@@ -758,6 +775,10 @@ def loadLineProps(source):
         output[mat]['EA_MBL'   ] = getFromDict(props, 'EA_MBL'   , default=0.0)
         output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
         output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
+        output[mat]['Cd'       ] = getFromDict(props, 'Cd'       , default=0.0)
+        output[mat]['CdAx'     ] = getFromDict(props, 'Cd_ax'    , default=0.0)
+        output[mat]['Ca'       ] = getFromDict(props, 'Ca'       , default=0.0)
+        output[mat]['CaAx'     ] = getFromDict(props, 'Ca_ax'    , default=0.0)
         
         output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
         output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
@@ -881,6 +902,24 @@ def addToDict(dict1, dict2, key1, key2, default=None):
     dict2[key2] = val
 
 
+def drawBox(ax, r1, r2, color=[0,0,0,0.2]):
+    '''Draw a box along the x-y-z axes between two provided corner points.'''
+    
+    
+    ax.plot([r1[0], r2[0]], [r1[1], r1[1]], [r1[2], r1[2]], color=color) # along x
+    ax.plot([r1[0], r2[0]], [r2[1], r2[1]], [r1[2], r1[2]], color=color)
+    ax.plot([r1[0], r2[0]], [r1[1], r1[1]], [r2[2], r2[2]], color=color)
+    ax.plot([r1[0], r2[0]], [r2[1], r2[1]], [r2[2], r2[2]], color=color)
+    ax.plot([r1[0], r1[0]], [r1[1], r2[1]], [r1[2], r1[2]], color=color) # along y
+    ax.plot([r2[0], r2[0]], [r1[1], r2[1]], [r1[2], r1[2]], color=color)
+    ax.plot([r1[0], r1[0]], [r1[1], r2[1]], [r2[2], r2[2]], color=color)
+    ax.plot([r2[0], r2[0]], [r1[1], r2[1]], [r2[2], r2[2]], color=color)
+    ax.plot([r1[0], r1[0]], [r1[1], r1[1]], [r1[2], r2[2]], color=color) # along z
+    ax.plot([r1[0], r1[0]], [r2[1], r2[1]], [r1[2], r2[2]], color=color)
+    ax.plot([r2[0], r2[0]], [r1[1], r1[1]], [r1[2], r2[2]], color=color)
+    ax.plot([r2[0], r2[0]], [r2[1], r2[1]], [r1[2], r2[2]], color=color)
+
+
 def makeTower(twrH, twrRad):
     '''Sets up mesh points for visualizing a cylindrical structure (should align with RAFT eventually.'''
     
@@ -911,8 +950,231 @@ def makeTower(twrH, twrRad):
     
     return Xs, Ys, Zs
 
+def lines2subsystem(lines,ms,span=None,case=0):
+    '''Takes a set of connected lines (in order from rA to rB) in a moorpy system and creates a subsystem equivalent.
+    The original set of lines are then removed from the moorpy system and replaced with the 
+    subsystem.
 
-def readBathymetryFile(self, filename):
+    Parameters
+    ----------
+    lines : list
+        List of indices in the ms.lineList to replace.
+    ms : object
+        MoorPy system object the lines are part of
+    span : float (optional)
+        Span of the total line (from start to end of subsystem)
+    case : int (optional)
+        0 = end A on seabed
+        1 = suspended line with end A at another floater
+        2 = suspended line is symmetric, end A is assumed the midpoint
+
+    Returns
+    -------
+    ms : object
+        MoorPy system object with new subsystem line
+
+    '''
+    from moorpy.subsystem import Subsystem
+    from copy import deepcopy
+    # save a deepcopy of the line list to delete
+    originalList = deepcopy(lines)
+    
+    # # check that all lines connect (all are sections of one full mooring line)
+    # for i in range(0,len(lines)):
+    #     if i>0:
+    #         if not all(b==0 for b in ms.lineList[lines[i]].rB == ms.lineList[lines[i-1]].rA):
+    #             raise Exception('Lines indices must be provided in order from rA to rB.')
+    # get the span of the subsystem line
+    if not span:
+        span = np.sqrt((ms.lineList[lines[0]].rA[0]-ms.lineList[lines[-1]].rB[0])**2+(ms.lineList[lines[0]].rA[1]-ms.lineList[lines[-1]].rB[1])**2)
+    # make a subsystem object
+    ss = Subsystem(depth=ms.depth, span=span,rBFair=ms.lineList[lines[-1]].rB)
+    lengths = []
+    types = []
+    pt = [] # list of points that 
+    # ptB = []
+
+    # go through each line
+    for i in lines:
+        # see which point is connected to end A and end B
+        for j in range(0,len(ms.pointList)):
+            for k in range(0,len(ms.pointList[j].attached)):
+                if ms.pointList[j].attached[k] == i+1: #and ms.pointList[j].attachedEndB[k] == 0:
+                    if not j in pt:
+                        pt.append(j)
+                # elif ms.pointList[j].attached[k] == i+1 and ms.pointList[j].attachedEndB[k] == 1:
+                #     ptB.append(j)
+
+        # collect line lengths and types                                          
+        lengths.append(ms.lineList[i].L)
+        types.append(ms.lineList[i].type['name'])
+        ss.lineTypes[types[-1]] = ms.lineTypes[types[-1]]
+        
+    # use makeGeneric to build the subsystem line
+    ss.makeGeneric(lengths,types,suspended=case)
+    ss.setEndPosition(ms.lineList[lines[0]].rA,endB=0)
+    ss.setEndPosition(ms.lineList[lines[-1]].rB,endB=1)
+    
+    # add in any info on the points connected to the lines
+    # currently, mass, volume, and diameter but others could be added
+    for i in range(0,len(pt)):
+        ss.pointList[i].m = ms.pointList[pt[i]].m
+        ss.pointList[i].v = ms.pointList[pt[i]].v
+        ss.pointList[i].d = ms.pointList[pt[i]].d
+        # ss.pointList[i].m = ms.pointList[ptB[i]].m
+        # ss.pointList[i].v = ms.pointList[ptB[i]].v
+        # ss.pointList[i].d = ms.pointList[ptB[i]].d
+    
+    from moorpy import helpers
+    # delete old line
+    for i in range(0,len(lines)):
+        decB = 0 # boolean to check if ptB has been decreased already for this line
+        decA = 0 # boolean to check if ptA has been decreased already for this line
+        if i == 0 and i < len(lines) - 1:
+            # first line of multiple (keep only point A)
+            delpts = 2
+            for j in range(0,len(ms.pointList)):
+                if lines[i]+1 in ms.pointList[j].attached:
+                    if pt[-1]>j and decB == 0:                    
+                        pt[-1] -= 1
+                        decB = 1
+                    if pt[0]>j and decA == 0:
+                        pt[0] -= 1 
+                        decA = 1
+        elif i == 0 and i == len(lines) - 1:
+            # first line, only line (keep point A and B)
+            delpts = 0 
+        elif i == len(lines) - 1:
+            # last line, keep point A because already been deleted, and keep point B (fairlead)
+            delpts = 0
+        else:
+            # not beginning or end line, point A (previous line pointB) will have already been deleted so don't delete point A
+            delpts = 2
+            # reduce index of last point B in ptB list and first point A in ptA list (only care about last ptB and first ptA now) by one
+            for j in range(0,len(ms.pointList)):
+                if lines[i]+1 in ms.pointList[j].attached:
+                    if pt[-1]>j and decB == 0:                    
+                        pt[-1] -= 1
+                        decB = 1
+                    if pt[0]>j and decA == 0:
+                        pt[0] -= 1 
+                        decA = 1
+        # adjust index of any lines that have a higher index than the line to delete
+        for j in range(0,len(lines)):
+            if lines[i]<lines[j]:
+                lines[j] -= 1
+        # delete old line and any necessary points
+        print('deleting line ',originalList[i])
+        helpers.deleteLine(ms,lines[i],delpts)
+    
+    # print('Replacing lines ',originalList,' with a subsystem appended to the end of the lineList ')
+    # append subsystem to ms
+    ms.lineList.append(ss)
+    ssNum = len(ms.lineList)
+    # attach subystem line to the end points
+    ms.pointList[pt[0]].attachLine(ssNum,0) # rA
+    ms.pointList[pt[-1]].attachLine(ssNum,1) # rB     
+        
+    return(ms)
+
+def deleteLine(ms,ln,delpts=0):
+    '''
+    Deletes a line from the linelist, and updates the points to have the correct line
+    index listed as attached. If delpts=True, also deletes all points associated with 
+    that line.
+
+    Parameters
+    ----------
+    ms : system object
+        MoorPy system object the line is within
+    ln : int
+        Line index number to delete from ms.lineList
+    delpts : int
+        Set to 0 to keep all points associated with deleted line, 1 to delete only the point A of the line,
+        2 to delete only point B of the line, and 3 to delete all points on the line
+
+    Returns
+    -------
+    None.
+
+    '''
+    # delete line
+    ms.lineList.pop(ln)
+    
+    # adjust attached line index number in any point that is attached to a line index after the deleted line index
+    numpts = len(ms.pointList)
+    i=0
+    reset = 0
+    while i < numpts:
+        j = 0
+        while j < len(ms.pointList[i].attached):
+            reset = 0 # turn off boolean to reset i
+            if ms.pointList[i].attached[j] > ln+1 :
+                ms.pointList[i].attached[j] = ms.pointList[i].attached[j] - 1 # new index will be one less
+            # delete points if wanted
+            elif ms.pointList[i].attached[j] == ln+1:
+                # remove line number from attached list
+                ms.pointList[i].attached.pop(j)
+                #ms.pointList[i].attachedEndB.pop(j)
+                if delpts == 1 or delpts == 3:
+                    if ms.pointList[i].attachedEndB[j] == 0:                     
+                        # reduce number of times through the loop
+                        numpts = numpts-1
+                        # lower index of any body attached points after deleted point, remove deleted point from body attached points
+                        for k in range(0,len(ms.bodyList)):
+                            for ii in range(0,len(ms.bodyList[k].attachedP)):
+                                if ms.bodyList[k].attachedP[ii] == i+1 :
+                                    # remove point
+                                    ms.bodyList[k].attachedP.pop(ii)
+                                    # remove relative points from list
+                                    ms.bodyList[k].rPointRel.pop(ii)
+                                elif ms.bodyList[k].attachedP[ii] > i+1 :
+
+                                    # reduce index by one
+                                    ms.bodyList[k].attachedP[ii] = ms.bodyList[k].attachedP[ii] - 1
+                        # remove point
+                        ms.pointList.pop(i)
+                        # trigger boolean to reset i and j back one (since now point x+1 will be point x)
+                        reset = 1
+                        
+                if delpts == 2 or delpts == 3:
+                    if ms.pointList[i].attachedEndB[j] == 1:
+                        # reduce number of times through the loop
+                        numpts = numpts-1
+                        # lower index of any body attached points after deleted point, remove deleted point from body attached points
+                        for k in range(0,len(ms.bodyList)):
+                            ii = 0
+                            while ii < len(ms.bodyList[k].attachedP):
+                                if ms.bodyList[k].attachedP[ii] == i+1 :
+                                    # remove relative points from list
+                                    ms.bodyList[k].rPointRel.pop(ii)
+                                    # remove point
+                                    ms.bodyList[k].attachedP.pop(ii)
+                                    ii = ii - 1 # reduce iter because attachedP[1] is now attachedP[0] so need to get that one
+                                elif ms.bodyList[k].attachedP[ii] > i+1 :
+                                    # reduce index by one
+                                    ms.bodyList[k].attachedP[ii] = ms.bodyList[k].attachedP[ii] - 1
+                                ii += 1
+                        # remove point
+                        ms.pointList.pop(i)
+                        # trigger boolean to reset i and j back one (since now point x+1 will be point x)
+                        reset = 1
+            j += 1
+            if reset:
+                j -= 1
+        # reset i if any points were removed
+        if reset:
+            i -= 1
+        # increment i
+        i += 1
+    return(ms)
+                    
+
+            
+    
+                
+
+def readBathymetryFile(filename):
     '''Read a MoorDyn-style bathymetry input file (rectangular grid of depths)
     and return the lists of x and y coordinates and the matrix of depths.
     '''

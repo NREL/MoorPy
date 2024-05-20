@@ -1066,8 +1066,8 @@ class System():
                 #L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e} {:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
                          #key, di['d_vol'], di['m'], di['EA'], di['cIntDamp'], di['EI'], di['Can'], di['Cat'], di['Cdn'], di['Cdt']))
                 L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e} {:7.3e}       {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
-                         key, di['d_vol'], di['m'], di['EA'], di['BA'], di['Can'], di['Cat'], di['Cdn'], di['Cdt']))
-            
+                         # key, di['d_vol'], di['m'], di['EA'], di['BA'], di['Can'], di['Cat'], di['Cdn'], di['Cdt']))
+                         key, di['d_vol'], di['m'], di['EA'], di['BA'], di['Ca'], di['CaAx'], di['Cd'], di['CdAx']))
             
             #L.append("---------------------- POINTS ---------------------------------------------------------")
             L.append("---------------------- NODE PROPERTIES ---------------------------------------------------------")
@@ -1177,14 +1177,42 @@ class System():
             
             # Figure out mooring line attachments (Create a ix2 array of connection points from a list of m points)
             connection_points = np.empty([len(self.lineList),2])                   #First column is Anchor Node, second is Fairlead node
+            rod_ends = np.empty([len(self.lineList),2])
             for point_ind,point in enumerate(self.pointList,start = 1):                    #Loop through all the points
                 for (line,line_pos) in zip(point.attached,point.attachedEndB):          #Loop through all the lines #s connected to this point
                     if line_pos == 0:                                                       #If the A side of this line is connected to the point
-                        connection_points[line -1,0] = point_ind                                #Save as as an Anchor Node
+                        if point.cable == True:
+                            connection_points[line -1,0] = -point_ind                                #Save as as an Anchor Node
+                            
+                            #determine which end of rod to connect to
+                            F = point.getForces(lines_only = True, xyz = True)
+                            if F[0] > 0:
+                                rod_ends[line - 1, 0] = 1
+                            else:
+                                rod_ends[line - 1, 0] = 0
+                        else:
+                            connection_points[line -1,0] = point_ind                                #Save as as an Anchor Node
                         #connection_points[line -1,0] = self.pointList.index(point) + 1
                     elif line_pos == 1:                                                     #If the B side of this line is connected to the point
-                        connection_points[line -1,1] = point_ind                                #Save as a Fairlead node
+                        if point.cable == True:
+                            connection_points[line -1,1] = -point_ind                                #Save as a Fairlead node
+                        
+                            #determine which end of rod to connect to
+                            F = point.getForces(lines_only = True, xyz = True)
+                            if F[0] > 0:
+                                rod_ends[line - 1, 1] = 0
+                            else:
+                                rod_ends[line - 1, 1] = 1
+                        else:
+                            connection_points[line -1,1] = point_ind                                #Save as a Fairlead node
                         #connection_points[line -1,1] = self.pointList.index(point) + 1
+            
+            #check if any points have cable = True, this determines if rods are needed
+            cable = False
+            for point in self.pointList:
+                if point.cable == True:
+                    cable = True
+                    break
             
             #Line Properties
             flag = "p" # "-" 
@@ -1233,12 +1261,18 @@ class System():
             L.append("TypeName      Diam     Mass/m    Cd     Ca      CdEnd    CaEnd")
             L.append("(name)        (m)      (kg/m)    (-)    (-)     (-)      (-)")
             
+            
             for key, rodType in self.rodTypes.items(): 
                 di = rodTypeDefaults.copy()
                 di.update(rodType)
                 L.append("{:<15} {:7.4f} {:8.2f} {:<7.3f} {:<7.3f} {:<7.3f} {:<7.3f}".format(
                          key, di['d_vol'], di['m'], di['Cd'], di['Ca'], di['CdEnd'], di['CaEnd']))
             
+            # add arbitrary rod for cable connections if cable is True
+            if cable:
+                L.append("{:<15} {:7.4f} {:8.2f} {:<7.3f} {:<7.3f} {:<7.3f} {:<7.3f}".format(
+                         'connector', 0.2, 0.0 , 0.0, 0.0, 0.0, 0.0))
+             
             
             L.append("----------------------- BODIES ------------------------------------------------------")
             L.append("ID   Attachment    X0     Y0     Z0     r0      p0     y0     Mass          CG*          I*      Volume   CdA*   Ca*")
@@ -1264,30 +1298,61 @@ class System():
             # Rod Properties Table TBD <<<
             
             
+            #add zero length rods for dynamic cables
+            rod_id = 0
+            for point in self.pointList:
+                point_pos = point.r
+                if point.cable == True:
+                    
+                    rod_id = rod_id + 1
+                    if point.type == 1:             # point is fixed or attached (anch, body, fix)
+                        point_type = 'Fixed'
+                        
+                        #Check if the point is attached to body
+                        for body in self.bodyList:
+                            for attached_Point in body.attachedP:
+                                if attached_Point == point.number:
+                                    point_type = "Body" + str(body.number)
+                                    point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
+                        
+                    elif point.type == 0:           # point is coupled externally (con, free)
+                        point_type = 'Free'
+                            
+                    elif point.type == -1:          # point is free to move (fair, ves)
+                        point_type = 'Coupled'
+                    
+                    f = point.getForces(lines_only = True, xyz = True)
+                    f_unit = f / np.linalg.norm(f)
+                    rA = [point_pos[0] - f_unit[0], point_pos[1] - f_unit[1], point_pos[2] - f_unit[2]]
+                    rB = [point_pos[0] + f_unit[0], point_pos[1] + f_unit[1], point_pos[2] + f_unit[2]]
+                    L.append("{:<4d} {:9} {:9} {:8.2f} {:8.2f} {:9.2f} {:6.2f} {:6.2f} {:6.2f} {} {}".format(
+                              rod_id, 'connector', point_type, rA[0], rA[1], rA[2], rB[0], rB[1], rB[2], 0, '-'))
+                    
             L.append("---------------------- POINTS -------------------------------------------------------")
             L.append("ID  Attachment     X       Y       Z           Mass  Volume  CdA    Ca")
             L.append("(#)   (-)         (m)     (m)     (m)          (kg)  (mˆ3)  (m^2)   (-)")
             
             for point in self.pointList:
-                point_pos = point.r             # get point position in global reference frame to start with
-                if point.type == 1:             # point is fixed or attached (anch, body, fix)
-                    point_type = 'Fixed'
-                    
-                    #Check if the point is attached to body
-                    for body in self.bodyList:
-                        for attached_Point in body.attachedP:
-                            if attached_Point == point.number:
-                                point_type = "Body" + str(body.number)
-                                point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
-                    
-                elif point.type == 0:           # point is coupled externally (con, free)
-                    point_type = 'Free'
+                if point.cable == False:
+                    point_pos = point.r             # get point position in global reference frame to start with
+                    if point.type == 1:             # point is fixed or attached (anch, body, fix)
+                        point_type = 'Fixed'
                         
-                elif point.type == -1:          # point is free to move (fair, ves)
-                    point_type = 'Coupled'
-                
-                L.append("{:<4d} {:9} {:8.2f} {:8.2f} {:8.2f} {:9.2f} {:6.2f} {:6.2f} {:6.2f}".format(
-                          point.number,point_type, point_pos[0],point_pos[1],point_pos[2], point.m, point.v, point.CdA, point.Ca))
+                        #Check if the point is attached to body
+                        for body in self.bodyList:
+                            for attached_Point in body.attachedP:
+                                if attached_Point == point.number:
+                                    point_type = "Body" + str(body.number)
+                                    point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
+                        
+                    elif point.type == 0:           # point is coupled externally (con, free)
+                        point_type = 'Free'
+                            
+                    elif point.type == -1:          # point is free to move (fair, ves)
+                        point_type = 'Coupled'
+                    
+                    L.append("{:<4d} {:9} {:8.2f} {:8.2f} {:8.2f} {:9.2f} {:6.2f} {:6.2f} {:6.2f}".format(
+                              point.number,point_type, point_pos[0],point_pos[1],point_pos[2], point.m, point.v, point.CdA, point.Ca))
                 
             
             L.append("---------------------- LINES --------------------------------------------------------")
@@ -1296,10 +1361,15 @@ class System():
             
             for i,line in enumerate(self.lineList):
                 nSegs = int(np.ceil(line.L/line_dL)) if line_dL>0 else line.nNodes-1  # if target dL given, set nSegs based on it instead of line.nNodes
-            
-                L.append("{:<4d} {:<15} {:^5d}   {:^5d}   {:8.3f}   {:4d}       {}".format(
-                         line.number, line.type['name'], int(connection_points[i,0]), int(connection_points[i,1]), line.L, nSegs, flag))
-            
+                if connection_points[i,0] < 0:
+                    attach = ['A', 'B']
+                    L.append("{:<4d} {:<15} {}   {}   {:8.3f}   {:4d}       {}".format(
+                        line.number, line.number - 1, 'R'+str(int(-connection_points[i,0]))+attach[int(rod_ends[i,0])], 'R' +str(int(-connection_points[i,1])) +attach[int(rod_ends[i,1])], line.L, nSegs, flag))
+                  
+                else:
+                    L.append("{:<4d} {:<15} {:^5d}   {:^5d}   {:8.3f}   {:4d}       {}".format(
+                             line.number, line.type['name'], int(connection_points[i,0]), int(connection_points[i,1]), line.L, nSegs, flag))
+                
             
             L.append("---------------------- OPTIONS ------------------------------------------------------")
 
@@ -1868,25 +1938,12 @@ class System():
         # create arrays for the initial positions of the objects that need to find equilibrium, and the max step sizes
         X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[30, 0.02])
         
-        # temporary for backwards compatibility <<<<<<<<<<
-        '''
-        if rmsTol != 0.0:
-            tols = np.zeros(len(X0)) + rmsTol
-            print("WHAT IS PASSING rmsTol in to solveEquilibrium?")
-            breakpoint()
-        elif np.isscalar(tol):
-            if tol < 0:
-                tols = -tol*db    # tolerances set relative to max step size
-                lineTol = 0.05*tols[0]  # hard coding a tolerance for catenary calcs <<<<<<<<<<<
-            else:
-                tols = 1.0*tol   # normal case, passing dsovle(2) a scalar for tol
-        else:
-            tols = np.array(tol)  # assuming tolerances are passed in for each free variable
-        '''
         
-        # store z indices for later seabed contact handling, and create vector of tolerances
+        # ----- Store z indices and create vector of tolerances -----
+        
         zInds = []
         tols = []
+        
         i = 0      # index to go through system DOF vector
         if DOFtype == "free":
             types = [0]
@@ -1894,20 +1951,23 @@ class System():
             types = [-1]
         elif DOFtype == "both":
             types = [0,-1]
-            
+        
+        # For bodies and points, only include active DOFs
         for body in self.bodyList:
             if body.type in types:
-                zInds.append(i+2)
-                i+=body.nDOF
+                if 2 in body.DOFs:  # note the z index if it's an active DOF
+                    zInds.append(i + body.DOFs.index(2))
+                i+=body.nDOF  # advance the index to the start of the next object
+                
                 rtol = tol/max([np.linalg.norm(rpr) for rpr in body.rPointRel])    # estimate appropriate body rotational tolerance based on attachment point radii
                 tols += [tol ] * sum(i in body.DOFs for i in [0,1,2])
                 tols += [rtol] * sum(i in body.DOFs for i in [3,4,5])
                 
         for point in self.pointList:
             if point.type in types:
-                if 2 in point.DOFs:
-                    zInds.append(i + point.DOFs.index(2))   # may need to check this bit <<<<
-                i+=point.nDOF                              # note: only including active DOFs of the point (z may not be one of them)                              
+                if 2 in point.DOFs:  # note the z index if it's an active DOF
+                    zInds.append(i + point.DOFs.index(2))
+                i+=point.nDOF  # advance the index to the start of the next object
         
                 tols += point.nDOF*[tol]
                 
@@ -1921,6 +1981,8 @@ class System():
             if display > 0:
                 print("There are no DOFs so solveEquilibrium is returning without adjustment.")
             return True
+        
+        # ----- Set up the equilibrium solver functions -----
         
         # clear some arrays to log iteration progress
         self.freeDOFs.clear()    # clear stored list of positions, so it can be refilled for this solve process
@@ -2613,7 +2675,7 @@ class System():
         # invert matrix
         K_inv_all = np.linalg.inv(K_all)
         
-        # remove free DOFs (this corresponds to saying that the same of forces on these DOFs will remain zero)
+        # remove free DOFs (this corresponds to saying that the sum of forces on these DOFs will remain zero)
         #indices = list(range(n))                # list of DOF indices that will remain active for this step
         mask = [True]*n                         # this is a mask to be applied to the array K indices
         
@@ -3281,11 +3343,12 @@ class System():
         if draw_seabed and self.seabedMod == 2:
 
             if rang=='hold':
-                rang = (np.min(-bathGrid), np.max(-bathGrid))
+                rang = (np.min(-self.bathGrid), np.max(-self.bathGrid))
             
             X, Y = np.meshgrid(self.bathGrid_Xs, self.bathGrid_Ys)
             
-            bath = ax.plot_surface(X,Y,-self.bathGrid, vmin=rang[0], vmax=rang[1], **args_bath)
+            bath = ax.plot_surface(X,Y,-self.bathGrid, vmin=rang[0], vmax=rang[1],
+                                   rstride=1, cstride=1, **args_bath)
             
             if cbar_bath_size!=1.0:    # make sure the colorbar is turned on just in case it isn't when the other colorbar inputs are used
                 cbar_bath=True

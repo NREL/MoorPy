@@ -29,6 +29,11 @@
 #    cost_mass :     # cost per mass [$/kg]
 #    cost_EA   :     # cost per stiffness [$/m/N]
 #    cost_MBL  :     # cost per MBL [$/m/N]
+#
+#    Cd        :     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+#    Cd_ax     :     # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+#    Ca        :     # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+#    Ca_ax     :     # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07 
 
 # Chain Notes
 # - The MBLs between studless and studlink chains are the same, for every grade
@@ -51,6 +56,10 @@ lineProps:
     MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
     dvol_dnom :   1.80     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
     cost_mass :   2.585    # cost per mass [$/kg]
+    Cd        :   1.333    # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Cd_ax     :   0.639    # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.0       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.5       # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07 
     
   chain_studlink :  # R4 grade studlink chain
     mass_d2   :  21.9e3    # linear mass density per diameter^2 [kg/m/m^2]    
@@ -59,7 +68,11 @@ lineProps:
     MBL_d2    :  1.21e9    # minimum breaking load per diameter^2 [N/m^2] 
     MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
     dvol_dnom :   1.89     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
-    cost_mass :   2.585    # cost per mass [$/kg]           
+    cost_mass :   2.585    # cost per mass [$/kg]
+    Cd        :   1.376    # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Cd_ax     :   0.741    # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.0       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.5       # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07      
             
 
   polyester   :     # polyester synthetic rope
@@ -70,6 +83,9 @@ lineProps:
     EAd_MBL_Lm :  40.0     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
     density   :  1380      # density of the polyester material [kg/m^3] (taken from specific gravity of 1.38, relative to 1000 kg/m^3)
     cost_MBL  :  1.65e-05  # cost per MBL [$/m/N]
+    Cd        :  2.021     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
 
   nylon       :     # nylon synthetic rope
     mass_d2   :  585       # linear mass density per diameter^2 [kg/m/m^2]
@@ -80,6 +96,9 @@ lineProps:
     EAd_MBL_Lm : 39.0      # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
     density   :  1140      # density of the nylon material [kg/m^3] (taken from specific gravity of 1.14, relative to 1000 kg/m^3)
     cost_MBL  :  4.29e-05  # cost per MBL [$/m/N]
+    Cd        :  1.979     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
   
   hmpe        :     # high modulus polyethylene synthetic rope
     mass_d2   :  496       # linear mass density per diameter^2 [kg/m/m^2]
@@ -89,9 +108,9 @@ lineProps:
     EAd_MBL   :  59        # dynamic stiffness per MBL [N/N]
     EAd_MBL_Lm : 54.0      # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
     density   :  975       # density of the hmpe/dyneema material [kg/m^3] (taken from specific gravity of 0.975, relative to 1000 kg/m^3
-
-
-
+    Cd        :  1.988     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
 
 
 

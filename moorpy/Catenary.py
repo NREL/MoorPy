@@ -59,7 +59,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         stiffnessBA - 2D stiffness matrix for force at B due to movement of A [N/m].
         LBot - length of line section laying on the seabed [m].
         ProfileType
-        Zextreme - extreme z coordinate of the line section (in direction of wet weight) [m].
+        Zextreme - extreme z coordinate of the line section (in direction of 
+        wet weight), relative to height of end A [m].
     
     '''
 
@@ -984,6 +985,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         info["stiffnessBA"][0,1] = -info["stiffnessBA"][0,1]  # for cross coupling matrix could also maybe transpose? but should be symmetrical so no need
         info["stiffnessBA"][1,0] = -info["stiffnessBA"][1,0]
         
+        info['Zextreme'] = info['Zextreme'] + ZF
+        
     else:
         FxA =  HA
         FzA =  VA
@@ -1006,6 +1009,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
         info["stiffnessB"][1,0] = -info["stiffnessB"][1,0]
         info["stiffnessBA"][0,1] = -info["stiffnessBA"][0,1]
         info["stiffnessBA"][1,0] = -info["stiffnessBA"][1,0]
+        
+        info['Zextreme'] = -info['Zextreme']
         
         # TODO <<< should add more info <<<
 

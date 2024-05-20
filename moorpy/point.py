@@ -68,6 +68,8 @@ class Point():
         
         self.attached     = []         # ID numbers of any Lines attached to the Point
         self.attachedEndB = []         # specifies which end of the line is attached (1: end B, 0: end A)
+        
+        self.cable = False             # specifies whether the point should be modeled as a Rod (for dynamic cables) or not
     
         if len(zSpan)==2:
             self.zSpan = np.array(zSpan, dtype=float)
