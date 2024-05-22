@@ -1100,6 +1100,10 @@ def deleteLine(ms,ln,delpts=0):
     '''
     # delete line
     ms.lineList.pop(ln)
+    # reduce line.number for any line after deleted line
+    for i in range(0,len(ms.lineList)):
+        if ms.lineList[i].number > ln + 1:
+            ms.lineList[i].number = ms.lineList[i].number - 1
     
     # adjust attached line index number in any point that is attached to a line index after the deleted line index
     numpts = len(ms.pointList)
@@ -1108,6 +1112,7 @@ def deleteLine(ms,ln,delpts=0):
     while i < numpts:
         j = 0
         while j < len(ms.pointList[i].attached):
+            Bbool = ms.pointList[i].attachedEndB[j]
             reset = 0 # turn off boolean to reset i
             if ms.pointList[i].attached[j] > ln+1 :
                 ms.pointList[i].attached[j] = ms.pointList[i].attached[j] - 1 # new index will be one less
@@ -1115,32 +1120,46 @@ def deleteLine(ms,ln,delpts=0):
             elif ms.pointList[i].attached[j] == ln+1:
                 # remove line number from attached list
                 ms.pointList[i].attached.pop(j)
-                #ms.pointList[i].attachedEndB.pop(j)
+                if delpts == 0:
+                    # keep the point but delete the line from the attachedEndB list
+                    ms.pointList[i].attachedEndB.pop(j)
                 if delpts == 1 or delpts == 3:
-                    if ms.pointList[i].attachedEndB[j] == 0:                     
+                    if Bbool == 0:
+                    # if ms.pointList[i].attachedEndB[j] == 0:  
                         # reduce number of times through the loop
                         numpts = numpts-1
+                        # reduce point.number for each point after deleted point
+                        for k in range(0,len(ms.pointList)):
+                            if ms.pointList[k].number > i + 1:
+                                ms.pointList[k].number = ms.pointList[k].number - 1
                         # lower index of any body attached points after deleted point, remove deleted point from body attached points
                         for k in range(0,len(ms.bodyList)):
-                            for ii in range(0,len(ms.bodyList[k].attachedP)):
+                            ii = 0
+                            while ii < len(ms.bodyList[k].attachedP):
                                 if ms.bodyList[k].attachedP[ii] == i+1 :
                                     # remove point
                                     ms.bodyList[k].attachedP.pop(ii)
                                     # remove relative points from list
                                     ms.bodyList[k].rPointRel.pop(ii)
+                                    ii = ii - 1 # reduce iter because attachedP[1] is now attachedP[0] so need to get that one
                                 elif ms.bodyList[k].attachedP[ii] > i+1 :
-
                                     # reduce index by one
                                     ms.bodyList[k].attachedP[ii] = ms.bodyList[k].attachedP[ii] - 1
+                                ii += 1
                         # remove point
                         ms.pointList.pop(i)
                         # trigger boolean to reset i and j back one (since now point x+1 will be point x)
                         reset = 1
                         
                 if delpts == 2 or delpts == 3:
-                    if ms.pointList[i].attachedEndB[j] == 1:
+                    if Bbool == 1:
+                    # if ms.pointList[i].attachedEndB[j] == 1:
                         # reduce number of times through the loop
                         numpts = numpts-1
+                        # reduce point.number for each point after deleted point
+                        for k in range(0,len(ms.pointList)):
+                            if ms.pointList[k].number > i + 1:
+                                ms.pointList[k].number = ms.pointList[k].number - 1
                         # lower index of any body attached points after deleted point, remove deleted point from body attached points
                         for k in range(0,len(ms.bodyList)):
                             ii = 0
@@ -1159,9 +1178,13 @@ def deleteLine(ms,ln,delpts=0):
                         ms.pointList.pop(i)
                         # trigger boolean to reset i and j back one (since now point x+1 will be point x)
                         reset = 1
+                        
             j += 1
             if reset:
                 j -= 1
+            # need to get out of inner loop if the last point in the list was deleted (for statement for inner loop would throw an error otherwise)
+            if i >= len(ms.pointList):
+                break
         # reset i if any points were removed
         if reset:
             i -= 1
@@ -1169,7 +1192,121 @@ def deleteLine(ms,ln,delpts=0):
         i += 1
     return(ms)
                     
+def subsystem2Line(ms,ssNum,nsegs=10):
+    '''Replace a subsystem with equivalent set of lines
 
+    Parameters
+    ----------
+    ms : system object
+        MoorPy system object that contains the subsystem
+    ssNum : int
+        index in the lineList of ms which points to the subsystem object to replace
+    nsegs : list OR int, optional
+        Number of segments per line for each line. Can be an integer (all line sections have the same # of segments)
+        OR can be a list (# of segments for each section of line in order from A to B)
+
+    Returns
+    -------
+    None.
+
+    '''
+    # get subsystem object
+    ss = ms.lineList[ssNum]   
+    types = []
+    lengths = []
+    points = []
+    # record line types, lines, and points in the subsystem
+    for i in range(0,len(ss.lineList)):
+        types.append(ss.lineList[i].type)
+        lengths.append(ss.lineList[i].L)
+        if not types[-1]['name'] in ms.lineTypes:
+            # add type to lineTypes list
+            ms.lineTypes[types[-1]['name']] = types[-1]
+    for i,spt in enumerate(ss.pointList):
+        # gather all info about the points in the subsystem
+        points.append({'r':spt.r,'m':spt.m,'v':spt.v,'CdA':spt.CdA,'d':spt.d,'type':spt.type,'Ca':spt.Ca})
+    points[0]['r'] = ss.rA
+    points[-1]['r'] = ss.rB
+        # if spt.attachedEndB[-1]:
+        #     endB = i
+        #     points[endB]['r'] = ss.rB
+        #     print('endB: ',endB)
+        # if spt.attachedEndB[0] == 0:
+        #     endA = i
+        #     points[endA]['r'] = ss.rA
+        #     print('endA: ',endA)
+    # get actual r of end points (r in subsystem is not true location)
+    for i in range(0,len(ms.pointList)):
+        # check if point is attached to the subsystem line
+        for j in range(0,len(ms.pointList[i].attached)):
+            if ms.pointList[i].attached[j] == ssNum+1:
+                if ms.pointList[i].attachedEndB[j]:
+                    for k in range(0,len(ms.bodyList)):
+                        if i+1 in ms.bodyList[k].attachedP:
+                            points[-1]['body'] = k    
+                #     # update end B r
+                #     points[endB]['r'] = ms.pointList[i].r
+                #     points[endB]['type'] = ms.pointList[i].type
+                #     # check if end points are attached to a body
+                #     for k in range(0,len(ms.bodyList)):
+                #         if i+1 in ms.bodyList[k].attachedP:
+                #             points[endB]['body'] = k
+                else:
+                #     # update end A r
+                #     points[endA]['r'] = ms.pointList[i].r
+                #     points[endA]['type'] = ms.pointList[i].type                   
+                #     # check if end points are attached to a body
+                    for k in range(0,len(ms.bodyList)):
+                        if i+1 in ms.bodyList[k].attachedP:
+                            points[0]['body'] = k
+    # approximate midpoint r with depth of subsystem point r and angle from two end points
+    aang = np.arctan2(points[0]['r'][1] - points[-1]['r'][1],points[0]['r'][0] - points[-1]['r'][0])
+    # update x-y location of any midpoints if they exist
+    if len(points)>2:
+        for i in range(1,len(points)-1):
+            ll = np.sqrt(points[i]['r'][0]**2+points[i]['r'][1]**2)
+            points[i]['r'][0] = (ll)*np.cos(aang)+points[-1]['r'][0]# poits[-1]['r][0]
+            points[i]['r'][1] = (ll)*np.sin(aang)+points[-1]['r'][1]
+            #points[i]['r'][0] = (ll+np.abs(points[-1]['r'][0]))*np.cos(aang)
+            #points[i]['r'][1] = (ll+np.abs(points[-1]['r'][1]))*np.sin(aang)
+
+    from moorpy import helpers
+    # remove subsystem line, delete all associated points
+    helpers.deleteLine(ms,ssNum,delpts=3)
+    # add in new lines to replace subsystem
+    for i in range(0,len(types)):
+        # determine # of segments for this line section
+        if isinstance(nsegs,list):
+            NSegs = nsegs[i]
+        elif isinstance(nsegs,int):
+            NSegs = nsegs
+        else:
+            raise Exception('Input nsegs must be either a list or an integer')
+        # add point A
+        ms.addPoint(points[i]['type'], points[i]['r'], points[i]['m'], points[i]['v'], d=points[i]['d'])
+        ms.pointList[-1].CdA = points[i]['CdA']
+        ms.pointList[-1].Ca = points[i]['Ca']
+        # add line
+        ms.addLine(lengths[i], types[i]['name'], nSegs=NSegs)
+        # attach new line to its point A
+        ms.pointList[-1].attachLine(len(ms.lineList),endB=0) # end A for line just created
+        # attach to any bodies the point was originally attached to
+        if 'body' in points[i]:
+            ms.bodyList[points[i]['body']].attachPoint(len(ms.pointList),[ms.pointList[-1].r[0]-ms.bodyList[points[i]['body']].r6[0],ms.pointList[-1].r[1]-ms.bodyList[points[i]['body']].r6[1],ms.pointList[-1].r[2]])
+        if i>0:
+            # new point is end B for previous line, attach as point B
+            ms.pointList[-1].attachLine(len(ms.lineList)-1,endB=1)
+    
+    # add last point (should be the fairlead)
+    ms.addPoint(points[-1]['type'], points[-1]['r'], points[-1]['m'], points[-1]['v'], d=points[-1]['d'])
+    ms.pointList[-1].CdA = points[-1]['CdA']
+    ms.pointList[-1].Ca = points[-1]['Ca']
+    # attach to last line as point B
+    ms.pointList[-1].attachLine(len(ms.lineList),endB=1)
+    # attach to a body if applicable
+    if 'body' in points[-1]:
+        ms.bodyList[points[-1]['body']].attachPoint(len(ms.pointList),[ms.pointList[-1].r[0]-ms.bodyList[points[-1]['body']].r6[0],ms.pointList[-1].r[1]-ms.bodyList[points[-1]['body']].r6[1],ms.pointList[-1].r[2]])
+   
             
     
                 
