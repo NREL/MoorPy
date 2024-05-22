@@ -6,7 +6,8 @@ from moorpy.Catenary import catenary
 from moorpy.nonlinear import nonlinear                                      
 from moorpy.helpers import (unitVector, LineError, CatenaryError, 
                      rotationMatrix, makeTower, read_mooring_file, 
-                     quiver_data_to_segments, printVec, printMat)
+                     quiver_data_to_segments, printVec, printMat,
+                     get_dynamic_matrices, get_dynamic_tension, get_modes)
 
 from os import path
 
@@ -1013,23 +1014,17 @@ class Line():
     
     def getDynamicMatrices(self, *args, **kwargs):
         '''Compute M,A,B,K matrices for Line. See get_dynamic_matrices().'''
-        from moorpy.dynamic_tension_functions import get_dynamic_matrices
-        
         return get_dynamic_matrices(self, *args, **kwargs)
 
 
     def dynamicSolve(self, *args, **kwargs):
         '''Compute complex amplitudes of line nodes. See get_dynamic_tension().'''
-        from moorpy.dynamic_tension_functions import get_dynamic_tension
-        
         return get_dynamic_tension(self, *args, **kwargs)
     
     
     def getModes(self,*args, **kwargs):
         '''Compute (and optionally plot) the line's mode shapes.
         See get_modes().'''
-        from moorpy.dynamic_tension_functions import get_modes
-        
         return get_modes(self, *args, **kwargs)
     
 

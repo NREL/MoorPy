@@ -18,7 +18,6 @@ from moorpy.body import Body
 from moorpy.point import Point
 from moorpy.line import Line
 from moorpy.lineType import LineType
-from moorpy.compositeLine import CompositeLine
 import matplotlib as mpl
 #import moorpy.MoorSolve as msolve
 from moorpy.helpers import (rotationMatrix, rotatePosition, getH, printVec, 
