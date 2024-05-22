@@ -1225,40 +1225,40 @@ def subsystem2Line(ms,ssNum,nsegs=10):
     for i,spt in enumerate(ss.pointList):
         # gather all info about the points in the subsystem
         points.append({'r':spt.r,'m':spt.m,'v':spt.v,'CdA':spt.CdA,'d':spt.d,'type':spt.type,'Ca':spt.Ca})
-    points[0]['r'] = ss.rA
-    points[-1]['r'] = ss.rB
-        # if spt.attachedEndB[-1]:
-        #     endB = i
-        #     points[endB]['r'] = ss.rB
-        #     print('endB: ',endB)
-        # if spt.attachedEndB[0] == 0:
-        #     endA = i
-        #     points[endA]['r'] = ss.rA
-        #     print('endA: ',endA)
+    # points[0]['r'] = ss.rA
+    # points[-1]['r'] = ss.rB
+        if spt.attachedEndB[-1]:
+            endB = i
+            points[endB]['r'] = ss.rB
+            print('endB: ',endB)
+        if spt.attachedEndB[0] == 0:
+            endA = i
+            points[endA]['r'] = ss.rA
+            print('endA: ',endA)
     # get actual r of end points (r in subsystem is not true location)
     for i in range(0,len(ms.pointList)):
         # check if point is attached to the subsystem line
         for j in range(0,len(ms.pointList[i].attached)):
             if ms.pointList[i].attached[j] == ssNum+1:
                 if ms.pointList[i].attachedEndB[j]:
+                    # for k in range(0,len(ms.bodyList)):
+                    #     if i+1 in ms.bodyList[k].attachedP:
+                    #         points[-1]['body'] = k    
+                    # update end B r
+                    points[endB]['r'] = ms.pointList[i].r
+                    points[endB]['type'] = ms.pointList[i].type
+                    # check if end points are attached to a body
                     for k in range(0,len(ms.bodyList)):
                         if i+1 in ms.bodyList[k].attachedP:
-                            points[-1]['body'] = k    
-                #     # update end B r
-                #     points[endB]['r'] = ms.pointList[i].r
-                #     points[endB]['type'] = ms.pointList[i].type
-                #     # check if end points are attached to a body
-                #     for k in range(0,len(ms.bodyList)):
-                #         if i+1 in ms.bodyList[k].attachedP:
-                #             points[endB]['body'] = k
+                            points[endB]['body'] = k
                 else:
-                #     # update end A r
-                #     points[endA]['r'] = ms.pointList[i].r
-                #     points[endA]['type'] = ms.pointList[i].type                   
-                #     # check if end points are attached to a body
+                    # update end A r
+                    points[endA]['r'] = ms.pointList[i].r
+                    points[endA]['type'] = ms.pointList[i].type                   
+                    # check if end points are attached to a body
                     for k in range(0,len(ms.bodyList)):
                         if i+1 in ms.bodyList[k].attachedP:
-                            points[0]['body'] = k
+                            points[endA]['body'] = k
     # approximate midpoint r with depth of subsystem point r and angle from two end points
     aang = np.arctan2(points[0]['r'][1] - points[-1]['r'][1],points[0]['r'][0] - points[-1]['r'][0])
     # update x-y location of any midpoints if they exist
