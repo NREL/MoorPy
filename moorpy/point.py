@@ -341,7 +341,7 @@ class Point():
         else:                       # otherwise only return rows/columns of active DOFs
             return K[:,self.DOFs][self.DOFs,:]
 
-    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic_init, depth, kbot, cbot, xyz=False):
+    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic_init, depth, kbot, cbot):
         '''Gets inertia, added mass, damping, and stiffness matrices of Point due only to mooring lines (with other objects fixed)
         using a lumped mass model.
 
@@ -355,15 +355,19 @@ class Point():
         #print("Getting Point "+str(self.number)+" analytic stiffness matrix...")
         
         def lump_matrix(matrix, endB):
-            if endB == 1:
-                matrix_woAnc = matrix[3:, 3:]
-                matrix_inv = np.linalg.inv(matrix_woAnc)
+            # The matrices should be symmetrical, but they can be slightly off due to numerical errors.
+            # Because we are going to invert them twice, we force them to be symmetrical to avoid amplifying the errors. 
+            matrix = (matrix + matrix.T)/2
+            if endB == 1:            
+                matrix_woAnc = matrix[3:, 3:] # For some reason that I don't know yet, we need to remove the elements in the opposite side of the matrix. Otherwise it doesn't work
+                matrix_inv = np.linalg.pinv(matrix_woAnc)
                 matrix_inv_coupled = matrix_inv[-3:, -3:]
             else:
                 matrix_woAnc = matrix[:-3, :-3]
-                matrix_inv = np.linalg.inv(matrix_woAnc)
+                matrix_inv = np.linalg.pinv(matrix_woAnc)
                 matrix_inv_coupled = matrix_inv[0:3, 0:3]
-            return np.linalg.inv(matrix_inv_coupled)
+            matrix_out = np.linalg.inv(matrix_inv_coupled)
+            return matrix_out 
 
         M = np.zeros([3,3])
         A = np.zeros([3,3])
@@ -382,11 +386,7 @@ class Point():
             B += lump_matrix(B_all, endB)
             K += lump_matrix(K_all, endB)
 
-        if sum(np.isnan(K).ravel()) > 0: breakpoint()
-        if xyz:                     # if asked to output all DOFs, do it
-            return M, A, B, K
-        else:                       # otherwise only return rows/columns of active DOFs            
-            return M[:,self.DOFs][self.DOFs,:], A[:,self.DOFs][self.DOFs,:], B[:,self.DOFs][self.DOFs,:], K[:,self.DOFs][self.DOFs,:]
+        return M, A, B, K
         
     
     def getCost(self):

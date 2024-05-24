@@ -3065,40 +3065,7 @@ class System():
                 A[i:i+n,i:i+n] += A1
                 B[i:i+n,i:i+n] += B1 
                 K[i:i+n,i:i+n] += K1
-                
-                # # go through attached lines and add cross-coupling terms
-                for lineID in point.attached:
-                    
-                    j = i + n
-                    
-                    # go through movable points to see if one is attached
-                    for point2 in self.pointList[self.pointList.index(point)+1: ]:
-                        if point2.type in d:
-                            if lineID in point2.attached:  # if this point is at the other end of the line
-
-                                # get cross-coupling stiffness of line: force on end attached to point1 due to motion of other end
-                                MB, AB, BB, KB = point2.getDynamicMatrices(omegas, S_zeta, r_dynamic_init, depth, kbot, cbot)
-                                if point.attachedEndB != 1:
-                                    MB = MB.T
-                                    AB = AB.T
-                                    BB = BB.T
-                                    KB = KB.T
-                                 
-                                # Trim stiffness matrix to only use the enabled DOFs of each point
-                                MB = MB[point.DOFs,:][:,point2.DOFs]
-                                AB = AB[point.DOFs,:][:,point2.DOFs]
-                                BB = BB[point.DOFs,:][:,point2.DOFs]
-                                KB = KB[point.DOFs,:][:,point2.DOFs]                                
-
-                                M[i:i+n          , j:j+point2.nDOF] += MB    # force on P1 due to movement of P2
-                                M[j:j+point2.nDOF, i:i+n          ] += MB.T  # mirror (f on P2 due to x of P1)
-                                A[i:i+n          , j:j+point2.nDOF] += AB  
-                                A[j:j+point2.nDOF, i:i+n          ] += AB.T
-                                B[i:i+n          , j:j+point2.nDOF] += BB  
-                                B[j:j+point2.nDOF, i:i+n          ] += BB.T
-                                K[i:i+n          , j:j+point2.nDOF] += KB  
-                                K[j:j+point2.nDOF, i:i+n          ] += KB.T                                
-                            j += point2.nDOF                  # if this point has DOFs we're considering, then count them                                
+                                             
                 i += n
         
         return M, A, B, K
