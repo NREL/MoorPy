@@ -1016,6 +1016,63 @@ class Line():
         '''Compute M,A,B,K matrices for Line. See get_dynamic_matrices().'''
         return get_dynamic_matrices(self, *args, **kwargs)
 
+    def getDynamicMatricesLumped(self, *args, **kwargs):
+        '''Lump M,A,B,K matrices for Line at its extremities, returning 6x6 matrices'''
+
+        def lump_matrix(matrix, nodes2remove=None):
+            # The matrices should be symmetrical, but they can be slightly off due to numerical errors.
+            # Because we are going to invert them twice, we force them to be symmetrical to avoid amplifying the errors. 
+            matrix = (matrix + matrix.T)/2
+            zeros = np.zeros((3,3))
+
+            # Remove rows and columns corresponding to the dofs of nodes2remove. Each node has 3 dofs
+            if nodes2remove.size==0:
+                nodes2remove = None
+
+            if nodes2remove is not None:
+                # Convert nodes2remove to dofs
+                dofs2remove = np.array([(node*3, node*3+1, node*3+2) for node in nodes2remove]).flatten()
+
+                # Create a mask for the dofs to keep
+                mask = np.ones(matrix.shape[0], dtype=bool)
+                mask[dofs2remove] = False
+                # Remove the rows and columns
+                matrix = matrix[mask][:, mask]
+
+            matrix_inv = np.linalg.pinv(matrix)
+
+            top_left     = matrix_inv[:3, :3]
+            top_right    = matrix_inv[:3, -3:]
+            bottom_left  = matrix_inv[-3:, :3]
+            bottom_right = matrix_inv[-3:, -3:]
+
+            # If we are not removing the extremities, we fill the whole 6x6 matrix_inv_coupled
+            if nodes2remove is None or (nodes2remove[0] !=0 and nodes2remove[-1] != self.nNodes-1):
+                matrix_inv_coupled = np.block([[top_left, top_right], [bottom_left, bottom_right]])
+            
+            # if we are removing the first node, we fill the bottom right 3x3 matrix
+            if nodes2remove is not None and nodes2remove[0] == 0:                
+                    matrix_inv_coupled = np.block([[np.zeros((3,3)), np.zeros((3,3))], [np.zeros((3,3)), bottom_right]])
+            
+            # if we are removing the last node, we fill the top left 3x3 matrix
+            if nodes2remove is not None and nodes2remove[-1] == self.nNodes-1:
+                matrix_inv_coupled = np.block([[top_left, np.zeros((3,3))], [np.zeros((3,3)), np.zeros((3,3))]])
+
+            return np.linalg.pinv(matrix_inv_coupled)
+
+        # Remove the nodes that are lying on the seabed
+        X_mean,Y_mean,Z_mean,T_mean = self.getLineCoords(0.0,n=self.nNodes) # coordinates of line nodes and tension values
+        idx2remove = np.where(Z_mean <= -self.sys.depth+1e-06)[0]
+        
+        M, A, B, K, _, _ = self.getDynamicMatrices(*args, **kwargs)
+        Ml = lump_matrix(M, nodes2remove=idx2remove)
+        Al = lump_matrix(A, nodes2remove=idx2remove)
+        Bl = lump_matrix(B, nodes2remove=idx2remove)
+        Kl = lump_matrix(K, nodes2remove=idx2remove)
+        return Ml, Al, Bl, Kl
+
+
+
 
     def dynamicSolve(self, *args, **kwargs):
         '''Compute complex amplitudes of line nodes. See get_dynamic_tension().'''

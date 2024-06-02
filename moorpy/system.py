@@ -2877,9 +2877,15 @@ class System():
         
         return K
     
-    def getCoupledDynamicMatrices(self, omegas, S_zeta, depth, kbot, cbot, r_dynamic_init=None, lines_only=False):
+    def getCoupledDynamicMatrices(self, omegas, S_zeta, depth, kbot=0, cbot=0, r_dynamic_init=None, lines_only=False):
         '''Write something here later
-        '''        
+        '''
+        # The methods used to get the coupled dynamic matrices do not work well if we treat each line section separately - I don't know why yet
+        # Hence, we group the lines into subsystems
+
+                        
+            
+
         self.nDOF, self.nCpldDOF, DOFtypes = self.getDOFs()
         
         n = self.nDOF + self.nCpldDOF
@@ -2888,13 +2894,13 @@ class System():
             print("Getting mooring system stiffness matrix...")
 
         # get full system stiffness matrix
-        M_all, A_all, B_all, K_all = self.getSystemDynamicMatrices(omegas, S_zeta, r_dynamic_init, depth, kbot, cbot, DOFtype="both", lines_only=lines_only)
+        M_all, A_all, B_all, K_all = self.getSystemDynamicMatrices(omegas, S_zeta, depth, kbot, cbot, DOFtype="both", lines_only=lines_only, r_dynamic_init=r_dynamic_init)
         
         # invert matrix
-        M_inv_all = np.linalg.inv(M_all)
-        A_inv_all = np.linalg.inv(A_all)
-        B_inv_all = np.linalg.inv(B_all)
-        K_inv_all = np.linalg.inv(K_all)
+        M_inv_all = np.linalg.pinv(M_all)
+        A_inv_all = np.linalg.pinv(A_all)
+        B_inv_all = np.linalg.pinv(B_all)
+        K_inv_all = np.linalg.pinv(K_all)
         
         # remove free DOFs (this corresponds to saying that the sum of forces on these DOFs will remain zero)
         #indices = list(range(n))                # list of DOF indices that will remain active for this step
@@ -2911,18 +2917,15 @@ class System():
         K_inv_coupled = K_inv_all[mask,:][:,mask]
         
         # invert reduced matrix to get coupled stiffness matrix (with free DOFs assumed to equilibrate linearly)
-        M_coupled = np.linalg.inv(M_inv_coupled)
-        A_coupled = np.linalg.inv(A_inv_coupled)
-        B_coupled = np.linalg.inv(B_inv_coupled)
-        K_coupled = np.linalg.inv(K_inv_coupled)
-        
-        #if tensions:
-        #    return K_coupled, J
-        #else:
+        M_coupled = np.linalg.pinv(M_inv_coupled)
+        A_coupled = np.linalg.pinv(A_inv_coupled)
+        B_coupled = np.linalg.pinv(B_inv_coupled)
+        K_coupled = np.linalg.pinv(K_inv_coupled)
+
         return M_coupled, A_coupled, B_coupled, K_coupled
         
     
-    def getSystemDynamicMatrices(self, omegas, S_zeta, r_dynamic_init, depth, kbot, cbot, DOFtype="free", lines_only=False, rho=1025, g=9.81):
+    def getSystemDynamicMatrices(self, omegas, S_zeta, depth, kbot=0, cbot=0, DOFtype="free", lines_only=False, r_dynamic_init=None, rho=1025, g=9.81):
         '''Write something here later        
         '''
         
@@ -2973,9 +2976,11 @@ class System():
                 #i = (body1.number-1)*6      # start counting index for body DOFs based on body number to keep indexing consistent
                 
                 # get body's self-stiffness matrix (now only cross-coupling terms will be handled on a line-by-line basis)
-                K6 = body1.getStiffnessA(lines_only=lines_only)
-                K[i:i+body1.nDOF, i:i+body1.nDOF] += K6
-                
+                M6, A6, B6, K6 = body1.getDynamicMatrices(omegas, S_zeta, depth, kbot=kbot, cbot=cbot, r_dynamic_init=r_dynamic_init, lines_only=lines_only)
+                M[i:i+body1.nDOF, i:i+body1.nDOF] += M6
+                A[i:i+body1.nDOF, i:i+body1.nDOF] += A6
+                B[i:i+body1.nDOF, i:i+body1.nDOF] += B6
+                K[i:i+body1.nDOF, i:i+body1.nDOF] += K6                            
                 
                 # go through each attached point
                 for pointID1,rPointRel1 in zip(body1.attachedP,body1.rPointRel):
@@ -2984,17 +2989,20 @@ class System():
                     r1 = rotatePosition(rPointRel1, body1.r6[3:])   # relative position of Point about body ref point in unrotated reference frame  
                     H1 = getH(r1)                                   # produce alternator matrix of current point's relative position to current body
                   
-
                     for lineID in point1.attached:      # go through each attached line to the Point, looking for when its other end is attached to something that moves
 
                         endFound = 0                    # simple flag to indicate when the other end's attachment has been found
                         j = i + body1.nDOF              # first index of the DOFs this line is attached to. Start it off at the next spot after body1's DOFs
                         
                         # get cross-coupling stiffness of line: force on end attached to body1 due to motion of other end
-                        if point1.attachedEndB == 1:    
-                            KB = self.lineList[lineID-1].KBA
-                        else:
-                            KB = self.lineList[lineID-1].KBA.T
+                        if r_dynamic_init == None:
+                            r_init = np.ones((len(omegas),self.lineList[lineID-1].nNodes,3))
+                        M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped(omegas,S_zeta,r_init,depth,kbot,cbot)
+                                             
+                        MB = M_all[-3:,:3] if point1.attachedEndB == 1 else M_all[:3,-3:]
+                        AB = A_all[-3:,:3] if point1.attachedEndB == 1 else A_all[:3,-3:]
+                        BB = B_all[-3:,:3] if point1.attachedEndB == 1 else B_all[:3,-3:]
+                        KB = K_all[-3:,:3] if point1.attachedEndB == 1 else K_all[:3,-3:]
                         
                         # look through Bodies further on in the list (coupling with earlier Bodies will already have been taken care of)
                         for body2 in self.bodyList[self.bodyList.index(body1)+1: ]:
@@ -3060,12 +3068,56 @@ class System():
                 # >>> TODO: handle case of free end point resting on seabed <<<
                 
                 # get point's self-stiffness matrix                    
-                M1, A1, B1, K1 = point.getDynamicMatrices(omegas, S_zeta, r_dynamic_init, depth, kbot, cbot)
+                M1, A1, B1, K1 = point.getDynamicMatrices(omegas, S_zeta, depth, kbot, cbot, r_dynamic_init=r_dynamic_init)
                 M[i:i+n,i:i+n] += M1
                 A[i:i+n,i:i+n] += A1
                 B[i:i+n,i:i+n] += B1 
                 K[i:i+n,i:i+n] += K1
+
+                for lineID in point.attached:
+                    
+                    j = i + n
+                    
+                    # go through movable points to see if one is attached
+                    for point2 in self.pointList[self.pointList.index(point)+1: ]:
+                        if point2.type in d:
+                            if lineID in point2.attached:  # if this point is at the other end of the line
+
+                                # get cross-coupling stiffness of line: force on end attached to point1 due to motion of other end
+                                # The names are somewhat confusing, but AB: Added mass matrix (A) at point B due to motions of the other extremity
+                                if r_dynamic_init == None:
+                                    r_init = np.ones((len(omegas), self.lineList[lineID-1].nNodes, 3))
+                                M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped(omegas,S_zeta,r_init,depth,kbot,cbot)
                                              
+                                MB = M_all[-3:,:3] if point.attachedEndB == 1 else M_all[:3,-3:]
+                                AB = A_all[-3:,:3] if point.attachedEndB == 1 else A_all[:3,-3:]
+                                BB = B_all[-3:,:3] if point.attachedEndB == 1 else B_all[:3,-3:]
+                                KB = K_all[-3:,:3] if point.attachedEndB == 1 else K_all[:3,-3:]
+                                 
+                                # Trim stiffness matrix to only use the enabled DOFs of each point
+                                MB = MB[point.DOFs,:][:,point2.DOFs]
+                                AB = AB[point.DOFs,:][:,point2.DOFs]
+                                BB = BB[point.DOFs,:][:,point2.DOFs]
+                                KB = KB[point.DOFs,:][:,point2.DOFs]                                
+                                
+                                # Include in total inertia matrix
+                                M[i:i+n          , j:j+point2.nDOF] += MB    # force on P1 due to movement of P2
+                                M[j:j+point2.nDOF, i:i+n          ] += MB.T  # mirror (f on P2 due to x of P1)
+
+                                # Include in total added mass matrix
+                                A[i:i+n          , j:j+point2.nDOF] += AB    # force on P1 due to movement of P2
+                                A[j:j+point2.nDOF, i:i+n          ] += AB.T  # mirror (f on P2 due to x of P1)
+
+                                # Include in total damping matrix
+                                B[i:i+n          , j:j+point2.nDOF] += BB    # force on P1 due to movement of P2
+                                B[j:j+point2.nDOF, i:i+n          ] += BB.T  # mirror (f on P2 due to x of P1)
+
+                                # Include in total stiffness matrix
+                                K[i:i+n          , j:j+point2.nDOF] += KB    # force on P1 due to movement of P2
+                                K[j:j+point2.nDOF, i:i+n          ] += KB.T  # mirror (f on P2 due to x of P1)
+                                
+                            j += point2.nDOF                  # if this point has DOFs we're considering, then count them
+                                
                 i += n
         
         return M, A, B, K

@@ -341,54 +341,33 @@ class Point():
         else:                       # otherwise only return rows/columns of active DOFs
             return K[:,self.DOFs][self.DOFs,:]
 
-    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic_init, depth, kbot, cbot):
+    def getDynamicMatrices(self, omegas, S_zeta, depth, kbot=0, cbot=0, r_dynamic_init=None):
         '''Gets inertia, added mass, damping, and stiffness matrices of Point due only to mooring lines (with other objects fixed)
         using a lumped mass model.
 
         Returns
         -------
-        K : matrix
-            3x3 analytic stiffness matrix.
-
         '''
-        
-        #print("Getting Point "+str(self.number)+" analytic stiffness matrix...")
-        
-        def lump_matrix(matrix, endB):
-            # The matrices should be symmetrical, but they can be slightly off due to numerical errors.
-            # Because we are going to invert them twice, we force them to be symmetrical to avoid amplifying the errors. 
-            matrix = (matrix + matrix.T)/2
-            if endB == 1:            
-                matrix_woAnc = matrix[3:, 3:] # For some reason that I don't know yet, we need to remove the elements in the opposite side of the matrix. Otherwise it doesn't work
-                matrix_inv = np.linalg.pinv(matrix_woAnc)
-                matrix_inv_coupled = matrix_inv[-3:, -3:]
-            else:
-                matrix_woAnc = matrix[:-3, :-3]
-                matrix_inv = np.linalg.pinv(matrix_woAnc)
-                matrix_inv_coupled = matrix_inv[0:3, 0:3]
-            matrix_out = np.linalg.inv(matrix_inv_coupled)
-            return matrix_out 
-
         M = np.zeros([3,3])
         A = np.zeros([3,3])
         B = np.zeros([3,3])
         K = np.zeros([3,3])
-        
+
         # append the stiffness matrix of each line attached to the point
         for lineID,endB in zip(self.attached,self.attachedEndB):            
             line = self.sys.lineList[lineID-1]
             if r_dynamic_init == None:
                 r_init = np.ones((len(omegas),line.nNodes,3))
-            M_all, A_all, B_all, K_all, _, _ = line.getDynamicMatrices(omegas,S_zeta,r_init,depth,kbot,cbot)
+
+            M_all, A_all, B_all, K_all = line.getDynamicMatricesLumped(omegas,S_zeta,r_init,depth,kbot,cbot) 
              
-            M += lump_matrix(M_all, endB)
-            A += lump_matrix(A_all, endB)
-            B += lump_matrix(B_all, endB)
-            K += lump_matrix(K_all, endB)
+            M += M_all[-3:,-3:] if endB == 1 else M_all[:3, :3]
+            A += A_all[-3:,-3:] if endB == 1 else A_all[:3, :3]
+            B += B_all[-3:,-3:] if endB == 1 else B_all[:3, :3]
+            K += K_all[-3:,-3:] if endB == 1 else K_all[:3, :3]
 
         return M, A, B, K
         
-    
     def getCost(self):
         '''Fill in and returns a cost dictionary for this Point object.
         So far it only applies for if the point is an anchor.'''
