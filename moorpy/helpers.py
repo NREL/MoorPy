@@ -479,7 +479,7 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
                 m,b = np.polyfit(Es[int(0.7*iter):iter,0], Xs[int(0.7*iter):iter,0], 1)            
                 X = np.array([b])
                 Y = np.array([0.0]) 
-                print(f"Using linaer fit to estimate solution at X={b}")
+                if display>0: print(f"dsolve is using linear fit to estimate solution at X={b}")
                 
             break
 
@@ -805,6 +805,73 @@ def loadLineProps(source):
         output[mat]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
 
     return output
+
+
+
+
+def getPointProps(weight, rho=1025.0, g=9.81, **kwargs):
+    '''for now this is just getClumpMV put in a place where it could grow 
+    into a fully versatile equivalent to getMoorProps.
+    '''
+    
+    '''A function to provide a consistent scheme for converting a clump weight/float magnitude to the 
+    mass and volume to use in a MoorPy Point.'''
+    
+    if weight >= 0:                          # if the top point of the intermediate line has a clump weight
+        pointvol = 0.0
+        pointmass = weight*1000.0           # input variables are in units of tons (1000 kg), convert to kg
+    else:
+        pointvol = -weight*1200.0/rho  # input variables are still in tons. Assume additional 20% of BM mass
+        pointmass = -weight*200.0
+
+    return dict(m=pointmass, v=pointvol)
+
+
+def loadPointProps(source):
+    '''Loads a set of MoorPy point property scaling coefficients from
+    a specified YAML file or passed dictionary. 
+    
+    Parameters
+    ----------
+    source : dict or filename
+        YAML file name or dictionary containing line property scaling coefficients
+    
+    Returns
+    -------
+    dictionary
+        PointProps dictionary listing each supported mooring line type and 
+        subdictionaries of scaling coefficients for each.
+    '''
+    
+    '''
+    if type(source) is dict:
+        source = source
+        
+    elif source is None or source=="default":
+        import os
+        mpdir = os.path.dirname(os.path.realpath(__file__))
+        with open(os.path.join(mpdir,"PointProps_default.yaml")) as file:
+            source = yaml.load(file, Loader=yaml.FullLoader)
+        
+    elif type(source) is str:
+        with open(source) as file:
+            source = yaml.load(file, Loader=yaml.FullLoader)
+
+    else:
+        raise Exception("loadLineProps supplied with invalid source")
+    
+    if 'lineProps' in source:
+        lineProps = source['lineProps']
+    else:
+        raise Exception("YAML file or dictionary must have a 'lineProps' field containing the data")
+    '''
+    
+    output = dict()  # output dictionary combining default values with loaded coefficients
+    
+    #output['generic'] = dict(rho = , m_v = , )
+    
+    return output
+
 
 
 def getFromDict(dict, key, shape=0, dtype=float, default=None):

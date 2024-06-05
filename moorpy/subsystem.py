@@ -1,4 +1,3 @@
-
 import numpy as np
 import yaml
 
@@ -80,6 +79,9 @@ class Subsystem(System, Line):
         self.rho   = rho    # water density [kg/m^3]
         self.g     = g      # gravitational acceleration [m/s^2]
         
+        # Set position tolerance to use in equilibrium solves [m]
+        self.eqtol = getFromDict(kwargs, 'eqtol', default=0.01)
+        
         # water current - currentMod 0 = no current; 1 = steady uniform current
         self.currentMod = 0         # flag for current model to use
         self.current = np.zeros(3)  # current velocity vector [m/s]
@@ -117,9 +119,36 @@ class Subsystem(System, Line):
         
         self.MDoptions = {} # dictionary that can hold any MoorDyn options read in from an input file, so they can be saved in a new MD file if need be
         self.qs = 1         # flag that it's a MoorPy analysis, so System methods don't complain. One day should replace this <<<
+        
     
     
-    def makeGeneric(self, lengths, types, suspended=0):
+    def initialize(self, daf_dict={}):
+        '''Initialize the Subsystem including DAFs.'''
+        
+        # Count number of line sections and total number of nodes
+        self.nLines = len(self.lineList)
+        self.nNodes = np.sum([l.nNodes for l in self.lineList]) - self.nLines + 1
+        
+        # Use the System initialize method
+        System.initialize(self)
+        
+        # dynamic amplication factor for each line section, and anchor forces 
+        # (DAFS[-2] is for vertical load, DAFS[-1] is for horizontal load)
+        self.DAFs = getFromDict(daf_dict, 'DAFs', shape=self.nLines+2, default=1.0)  
+        
+        # mean tension [N] of each line section end [section #, end A/B] for any given mean offset
+        self.Te0 = np.zeros([self.nLines,2])  # undispalced values
+        self.TeM = np.zeros([self.nLines,2])  # mean offset values
+        self.TeD = np.zeros([self.nLines,2])  # dynamic values
+        
+        # adjustment on laylength... positive means that the dynamic lay length is greater than linedesign laylength 
+        self.LayLen_adj = getFromDict(daf_dict, 'LayLen_adj', shape=0, default=0.0) 
+        
+        # Fatigue damage over all nodes (placeholder for now)
+        self.damage = np.zeros(self.nNodes)
+        
+    
+    def makeGeneric(self, lengths, types, connectors=[], suspended=0):
         '''Creates a cable of n components going between an anchor point and
         a floating body (or a bridle point). If shared, it goes between two
         floating bodies.
@@ -134,6 +163,9 @@ class Subsystem(System, Line):
             these names must match keys in the parent system lineTypes 
             dictionary or the subsystem's lineTypes dictionary. If dicts,
             these dicts are referred to for each lineType (by reference).
+        connectors : list of dicts
+            List of length nLines-1 with dicts of optional properties for
+            any interior points (between sections).
         suspended : int
             Selector shared/suspended cases: 
             - 0 (default): end A is on the seabed,
@@ -143,6 +175,10 @@ class Subsystem(System, Line):
         
         # some initialization steps.
         self.nLines = len(lengths)
+        if len(connectors) == 0:
+            connectors = [{}]*(self.nLines - 1)
+        elif not len(connectors) == self.nLines - 1:
+            raise Exception('Length of connectors must be nLines - 1')
         
         if not len(types)==self.nLines:
             raise Exception("The specified number of lengths and types is inconsistent.")
@@ -166,7 +202,7 @@ class Subsystem(System, Line):
             self.addPoint(-1, rA, DOFs=[2]) # add shared line point, free only to move in z
         else:
             self.addPoint(-1, rA, DOFs=[0,2])                # add anchor point
-
+        
         # Go through each line segment and add its upper point, add the line, and connect the line to the points
         for i in range(self.nLines):
 
@@ -189,19 +225,18 @@ class Subsystem(System, Line):
 
             # add the upper end point of the segment
             if i==self.nLines-1:                            # if this is the upper-most line
-                self.addPoint(-1, rB, DOFs=[0,2])                        # add the fairlead point (make it coupled)
+                self.addPoint(-1, rB, DOFs=[0,2])  # add the fairlead point (make it coupled)
                 #self.bodyList[0].attachPoint(i+2, rB)       # attach the fairlead point to the body (two points already created)
             else:                                           # if this is an intermediate line
+                m = connectors[i].get('m', 0)
+                v = connectors[i].get('v', 0)
                 # add the point, initializing linearly between anchor and fairlead/midpoint
-                self.addPoint(0, rA + (rB-rA)*Lcsum[i]/Lcsum[-1], DOFs=[0,2])
-
+                self.addPoint(0, rA + (rB-rA)*Lcsum[i]/Lcsum[-1], m=m, v=v, DOFs=[0,2])
 
             # attach the line to the points
             self.pointList[-2].attachLine(i+1, 0)       # attach end A of the line
             self.pointList[-1].attachLine(i+1, 1)       # attach end B of the line
-
-        # if a points list is provided, apply any mass or other properties it contains?
-    
+        
     
     def setEndPosition(self, r, endB, sink=False):
         '''Sets either end position of the subsystem in the global/system
@@ -235,7 +270,7 @@ class Subsystem(System, Line):
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
     
     
-    def staticSolve(self, reset=False, tol=0.01, profiles=0):
+    def staticSolve(self, reset=False, tol=0, profiles=0):
         '''Solve internal equilibrium of the Subsystem and saves the forces
         and stiffnesses at the ends in the global reference frame. All the 
         This method mimics the behavior of the Line.staticSolve method and 
@@ -243,6 +278,9 @@ class Subsystem(System, Line):
         equilibrium happens in the local 2D plane. Values in this local 
         frame are also saved. 
         '''
+        
+        if tol==0:
+            tol=self.eqtol
         
         # transform end positions to SubSystem internal coordinate system
         # inputs are self.rA, rB in global frame
@@ -401,10 +439,47 @@ class Subsystem(System, Line):
         rBFair setting. Optional argument z can be added for a z offset.
         '''
         
+        # Use static EA values and unstretched lengths
+        self.revertToStaticStiffness()
+
+        # Ensure end A position and set end B position to offset values
         self.rA = np.array([-self.span, 0, self.rA[2]])
         self.rB = np.array([-self.rBFair[0] + offset, 0, self.rBFair[2]+z]) 
         
-        # should we also do the static solve now?
+        self.staticSolve(tol=self.eqtol)  # solve the subsystem
+        
+        # Store some values at this offset position that may be used later
+        for i, line in enumerate(self.lineList):
+            self.TeM[i,0] = np.linalg.norm(line.fA)
+            self.TeM[i,1] = np.linalg.norm(line.fB)
+                
+        self.anchorFx0 = self.lineList[0].fA[0]
+        self.anchorFz0 = self.lineList[0].fA[2]
+    
+        self.TeD = np.copy(self.TeM)  # set the dynamic values as well, in case they get queried right away
+        
+    
+    def setDynamicOffset(self, offset, z=0):
+        '''Moves end B of the Subsystem to represent a dynamic offset from
+        the previous offset location. Uses dynamic stiffness values and also
+        applies dynamic amplification factors (DAFs) on the difference from
+        the mean tensions (which would have been calculated in getOffset).
+        End A is set based on the 'span' (shouldn't change), 
+        and B is set based on offset and the rBFair setting. 
+        Optional argument z can be added for a z offset.
+        '''
+        
+        self.activateDynamicStiffness()  # use dynamic EA values
+        
+        # adjust end B to the absolute offsets specified
+        self.rB = np.array([-self.rBFair[0] + offset, 0, self.rBFair[2]+z]) 
+        
+        self.staticSolve(tol=self.eqtol)  # solve the subsystem
+        
+        # Store dynamic values at this offset position that may be used later
+        for i, line in enumerate(self.lineList):
+            self.TeD[i,:] = self.TeM[i,:] + self.DAFs[i]*( np.array([line.TA, line.TB]) - self.TeM[i,:] )
+        
         
     
     def activateDynamicStiffness(self, display=0):
@@ -484,13 +559,16 @@ class Subsystem(System, Line):
     
     def getTen(self, iLine):
         '''Compute the end (maximum) tension for a specific line, including
-        a dynamic amplification factor.'''        
+        a dynamic amplification factor.'''
         line = self.lineList[iLine]
-        
+        '''
         dynamicTe = max([ self.Te0[iLine,0] + self.DAFs[iLine]*(np.linalg.norm(line.fA) - self.Te0[iLine,0]),
                           self.Te0[iLine,1] + self.DAFs[iLine]*(np.linalg.norm(line.fB) - self.Te0[iLine,1])])
+        '''
+        dynamicTe = max( self.TeD[iLine,:] )
         
         return dynamicTe 
+    
     
     def getTenSF(self, iLine):
         '''Compute MBL/tension for a specific line.'''
@@ -536,8 +614,6 @@ class Subsystem(System, Line):
         '''Get the curvature [1/m] at each node of a Subsystem. Should already 
         be in equilibrium. Also populates nodal values for S, X, Y, Z, T, and K
         along the full length.'''
-        
-        self.nNodes = np.sum([l.nNodes for l in self.lineList]) - self.nLines + 1
         
         n = self.nNodes
         
@@ -620,4 +696,4 @@ class Subsystem(System, Line):
         
         for i, line in enumerate(self.lineList):
             line.loadData(dirname, rootname, line_IDs[i])
-  
+
