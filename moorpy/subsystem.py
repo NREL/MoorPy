@@ -90,10 +90,13 @@ class Subsystem(System, Line):
             self.current = getFromDict(kwargs, 'current', shape=3)
             
         self.shared     = getFromDict(kwargs, 'shared', dtype=bool, default=False)  # flag to indicate shared line
-        self.span    = getFromDict(kwargs, 'span', default=0)                 # spacing (to rename as span<<<)
-        self.rBFair = getFromDict(kwargs, 'rBFair', shape=-1, default=[0,0,0])  # [m] end coordinates relative to attached body's ref point
-        self.rAFair = getFromDict(kwargs, 'rAFair', shape=-1, default=[0,0,0])  # [m] counterpart to rBFair for shared lines
-
+        self.span   = getFromDict(kwargs, 'span', default=0)  # horizontal end-end distance [m]
+        self.rad_fair = getFromDict(kwargs, 'rad_fair', default=0)  # [m] fairlead radius [m]
+        self.z_fair   = getFromDict(kwargs, 'z_fair'  , default=0)  # [m] fairlead z coord [m]
+        
+        # the old rAFair input for the position of a second fairlead of a shaerd mooring line is gone
+        # currently we assume rad_fair and z_fair are same for both ends of a shared line...
+        
         # seabed bathymetry - seabedMod 0 = flat; 1 = uniform slope, 2 = grid
         self.seabedMod = 0
         
@@ -188,12 +191,12 @@ class Subsystem(System, Line):
         
         # set end A location depending on whether configuration is suspended/symmetrical
         if suspended==2:  # symmetrical suspended case
-            rA = np.array([-0.5*self.span, 0, -1])  # shared line midpiont coordinates
+            rA = np.array([-0.5*self.span-self.rad_fair, 0, -1])  # shared line midpoint coordinates
         elif suspended==1:  # general suspended case
-            rA = np.array([-self.span + self.rAFair[0], 0, self.rAFair[2]])  # other suspended end
-        else:
-            rA = np.array([-self.span, 0, -self.depth])    # anchor coordinates
-        rB = np.array([-self.rBFair[0], 0, self.rBFair[2]])     # fairlead coordinates
+            rA = np.array([-self.span-self.self.ss + self.rad_fair, 0, self.z_fair])  # other suspended end
+        else:  # normal anchored line case
+            rA = np.array([-self.span-self.rad_fair, 0, -self.depth])  # anchor coordinates
+        rB = np.array([-self.rad_fair, 0, self.z_fair])     # fairlead coordinates
 
         self.rA = rA
         self.rB = rB
@@ -436,15 +439,15 @@ class Subsystem(System, Line):
         '''Moves end B of the Subsystem to represent an offset from the 
         undisplaced position of the endpoint. End A is set based on the 
         'span' (shouldn't change), and B is set based on offset and the
-        rBFair setting. Optional argument z can be added for a z offset.
+        rad_fair/z_fair setting. Optional argument z can be added for a z offset.
         '''
         
         # Use static EA values and unstretched lengths
         self.revertToStaticStiffness()
 
         # Ensure end A position and set end B position to offset values
-        self.rA = np.array([-self.span, 0, self.rA[2]])
-        self.rB = np.array([-self.rBFair[0] + offset, 0, self.rBFair[2]+z]) 
+        self.rA = np.array([-self.span-self.rad_fair, 0, self.rA[2]])
+        self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
         
         self.staticSolve(tol=self.eqtol)  # solve the subsystem
         
@@ -465,14 +468,14 @@ class Subsystem(System, Line):
         applies dynamic amplification factors (DAFs) on the difference from
         the mean tensions (which would have been calculated in getOffset).
         End A is set based on the 'span' (shouldn't change), 
-        and B is set based on offset and the rBFair setting. 
+        and B is set based on offset and the rad_fair/z_fair setting. 
         Optional argument z can be added for a z offset.
         '''
         
         self.activateDynamicStiffness()  # use dynamic EA values
         
         # adjust end B to the absolute offsets specified
-        self.rB = np.array([-self.rBFair[0] + offset, 0, self.rBFair[2]+z]) 
+        self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
         
         self.staticSolve(tol=self.eqtol)  # solve the subsystem
         
@@ -605,7 +608,7 @@ class Subsystem(System, Line):
         
         tau0 = -self.fB[0]  # horizontal tension component [N]
 
-        yaw_stiff = (tau0/l)*self.rBFair[0]**2 + tau0*self.rBFair[0]  # [N-m]
+        yaw_stiff = (tau0/l)*self.rad_fair**2 + tau0*self.rad_fair  # [N-m]
         
         return yaw_stiff
 
