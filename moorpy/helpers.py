@@ -1131,7 +1131,6 @@ def lines2subsystem(lines,ms,span=None,case=0):
             if lines[i]<lines[j]:
                 lines[j] -= 1
         # delete old line and any necessary points
-        print('deleting line ',originalList[i])
         helpers.deleteLine(ms,lines[i],delpts)
     
     # print('Replacing lines ',originalList,' with a subsystem appended to the end of the lineList ')
@@ -1297,11 +1296,9 @@ def subsystem2Line(ms,ssNum,nsegs=10):
         if spt.attachedEndB[-1]:
             endB = i
             points[endB]['r'] = ss.rB
-            print('endB: ',endB)
         if spt.attachedEndB[0] == 0:
             endA = i
             points[endA]['r'] = ss.rA
-            print('endA: ',endA)
     # get actual r of end points (r in subsystem is not true location)
     for i in range(0,len(ms.pointList)):
         # check if point is attached to the subsystem line
@@ -1321,7 +1318,7 @@ def subsystem2Line(ms,ssNum,nsegs=10):
                 else:
                     # update end A r
                     points[endA]['r'] = ms.pointList[i].r
-                    points[endA]['type'] = ms.pointList[i].type                   
+                    points[endA]['type'] = ms.pointList[i].type 
                     # check if end points are attached to a body
                     for k in range(0,len(ms.bodyList)):
                         if i+1 in ms.bodyList[k].attachedP:

@@ -124,7 +124,6 @@ class Subsystem(System, Line):
         self.qs = 1         # flag that it's a MoorPy analysis, so System methods don't complain. One day should replace this <<<
         
     
-    
     def initialize(self, daf_dict={}):
         '''Initialize the Subsystem including DAFs.'''
         
@@ -152,6 +151,7 @@ class Subsystem(System, Line):
         
     
     def makeGeneric(self, lengths, types, connectors=[], suspended=0):
+
         '''Creates a cable of n components going between an anchor point and
         a floating body (or a bridle point). If shared, it goes between two
         floating bodies.
@@ -193,7 +193,7 @@ class Subsystem(System, Line):
         if suspended==2:  # symmetrical suspended case
             rA = np.array([-0.5*self.span-self.rad_fair, 0, -1])  # shared line midpoint coordinates
         elif suspended==1:  # general suspended case
-            rA = np.array([-self.span-self.self.ss + self.rad_fair, 0, self.z_fair])  # other suspended end
+            rA = np.array([-self.span-self.rad_fair, 0, self.z_fair])  # other suspended end
         else:  # normal anchored line case
             rA = np.array([-self.span-self.rad_fair, 0, -self.depth])  # anchor coordinates
         rB = np.array([-self.rad_fair, 0, self.z_fair])     # fairlead coordinates
@@ -224,7 +224,7 @@ class Subsystem(System, Line):
                 raise Exception(f"Can't find lineType '{types[i]}' in the SubSystem.")
             
             # add the line segment using the reference to its lineType dict
-            self.addLine(lengths[i], self.lineTypes[i])
+            self.addLine(lengths[i],self.lineTypes[i])
 
             # add the upper end point of the segment
             if i==self.nLines-1:                            # if this is the upper-most line
