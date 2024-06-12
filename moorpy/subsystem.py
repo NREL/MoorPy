@@ -366,9 +366,9 @@ class Subsystem(System, Line):
             # get the Line's local coordinates
             Xs0, Ys0, Zs, tensions = line.getLineCoords(Time)
             
-            # transform to global coordinates
-            Xs = self.rA[0] + Xs0*self.cos_th - Ys0*self.sin_th
-            Ys = self.rA[1] + Xs0*self.sin_th + Ys0*self.cos_th
+            # transform to global coordinates (Ys0 should be zero for now)
+            Xs = self.rA[0] + (Xs0 + self.span)*self.cos_th - Ys0*self.sin_th
+            Ys = self.rA[1] + (Xs0 + self.span)*self.sin_th + Ys0*self.cos_th
             
             # apply 3D to 2D transformation to provide desired viewing angle
             Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] + Xoff
