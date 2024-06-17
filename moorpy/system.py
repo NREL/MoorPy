@@ -887,9 +887,10 @@ class System():
         for d in data['line_types']:
             name = d['name']
             dia = float(d['diameter']    )
-            w   = float(d['mass_density'])*self.g
+            m = float(d['mass_density'])
+            w = (m - np.pi/4*dia**2 *self.rho)*self.g
             EA  = float(d['stiffness']   )
-            self.lineTypes[name] = dict(name=name, d_vol=dia, w=w, EA=EA)
+            self.lineTypes[name] = dict(name=name, d_vol=dia, m=m, w=w, EA=EA)
             
             addToDict(d, self.lineTypes[name], 'breaking_load'        , 'MBL' , default=0)
             addToDict(d, self.lineTypes[name], 'cost'                 , 'cost', default=0)
