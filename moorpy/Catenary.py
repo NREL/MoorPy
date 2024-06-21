@@ -1054,10 +1054,15 @@ def eval_func_cat(X, args):
     s = np.sqrt(4*XF**2 + 16*ZF**2)  # some constanst
     lp = s/4 + XF**2/4/ZF*np.log((4*ZF + s)/2/ZF)  # length of parabola (slight underestimate vs lenght of catenary)
     d = np.linalg.norm([XF, ZF])  # distance from points 
+    
+    alpha_rad = np.radians(alpha)  # convert to radians for convenience
+    sin_alpha = np.sin(alpha_rad)
+    cos_alpha = np.cos(alpha_rad)
+    
     # this is a crude check that nothing should be laying along the seabed:ZF/HF >> 0 and L-d << (lp-d)
 
     # determine line profile type
-    if (hA > 0.0  or  W < 0.0  or  VFMinWL > np.tan(np.radians(alpha))
+    if (hA > 0.0  or  W < 0.0  or  VFMinWL > sin_alpha/cos_alpha
         or (ZF/XF > 0.1 and L-d < 0.001*(lp-d)) ): # no portion of the line rests on the seabed
         ProfileType = 1
     elif not alpha==0:              # a portion of line rests along a *sloped* seabed
@@ -1102,7 +1107,8 @@ def eval_func_cat(X, args):
             
             dZFdVF = ( VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA
             #dZFdVF = ( np.sign(VF)*VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA
-
+        
+            
     elif ProfileType==27:
         
         if (VF_HF + SQRT1VF_HF2 <= 0):
@@ -1154,6 +1160,8 @@ def eval_func_cat(X, args):
             dZFdHF = ( SQRT1VF_HF2 - 1.0 - VF_HF2 /SQRT1VF_HF2 )/ W
             
             dZFdVF = ( VF_HF /SQRT1VF_HF2 )/ W + VF_WEA
+            
+            
     ## Line Profile Type 7: Line partially on a sloped seabed        
     elif ProfileType==7: 
         
@@ -1168,17 +1176,22 @@ def eval_func_cat(X, args):
         
         else:
         
-        
-            LBot = L - (VF - HF * np.tan(np.pi*alpha/180))/W  # Lb on the seafloor
+            LBot = L - (VF - HF * sin_alpha/cos_alpha)/W  # Lb on the seafloor
             
-            VTD = VF - W*(L-LBot)  #Vertical Force at the touchdownpoint
+            # Practical limits on LBot, because the estimates can be way off
+            if LBot > XF/cos_alpha:  # if LBot is too large (if true, this would be profileType 4)
+                LBot = XF/cos_alpha  # limit it to stop under end B
+            elif LBot < 0:
+                LBot = max(LBot, 0)  # Ensure LBot is not less than zero 
             
-            TTD = np.sqrt(VTD * VTD + HF * HF) #Tension at the Touchdown Point
+            VTD = VF - W*(L-LBot)  # Vertical Force at the touchdownpoint
             
-            TA = TTD - W*(np.sin(np.pi*alpha/180)+CB)*LBot #Tension at the anchor
+            TTD = np.sqrt(VTD * VTD + HF * HF)  # Tension at the Touchdown Point
+            
+            TA = TTD - W*(sin_alpha+CB)*LBot  # Tension at the anchor
             
             if CB > 0:
-                xB = LBot - TTD/(W*(np.sin(np.pi*alpha/180)+CB))    # location of point at which line tension reaches zero (WWest Check this!!!!)
+                xB = LBot - TTD/(W*(sin_alpha+CB))  # location of point at which line tension reaches zero
             else:
                 xB = 0.0
             xBlim = max(xB, 0.0)
@@ -1186,8 +1199,8 @@ def eval_func_cat(X, args):
             TA = max(0,TA) #Anchor Tension Cannot be Negative
             
             #X and Z Excursions along the sloped seabed
-            X_TD = (LBot+(TA*LBot)/EA+(W*(np.sin(np.pi*alpha/180)+CB)*LBot*LBot)/(2*EA))*np.cos(np.pi*alpha/180)
-            Z_TD = (LBot+(TA*LBot)/EA+(W*(np.sin(np.pi*alpha/180)+CB)*LBot*LBot)/(2*EA))*np.sin(np.pi*alpha/180)
+            X_TD = (LBot+(TA*LBot)/EA+(W*(sin_alpha+CB)*LBot*LBot)/(2*EA))*cos_alpha
+            Z_TD = (LBot+(TA*LBot)/EA+(W*(sin_alpha+CB)*LBot*LBot)/(2*EA))*sin_alpha
 
             # WWest Comment: Could clean this up for readibility (Will do at somepoint)
             EXF = HF_W*(np.arcsinh((VTD+W*(L-LBot))/HF)-np.arcsinh(VTD/HF))+(HF*(L-LBot))/EA +  X_TD - XF # error in horizontal distance
@@ -1214,9 +1227,9 @@ def eval_func_cat(X, args):
             
             dZFdVF = ( VF_HF /SQRT1VF_HF2 - VFMinWL_HF /SQRT1VFMinWL_HF2 )/ W + L_EA    
             
-            #Ensure LBot is not less than zero 
-            LBot = max(LBot, 0)
-
+            
+            #print(f"\n{dXFdHF:10.3e}  {dXFdVF:10.3e}\n{dZFdHF:10.3e}  {dZFdVF:10.3e}")
+    
 
     # if there was an error, send the stop signal
     if info['error']==True:
@@ -1238,8 +1251,8 @@ def eval_func_cat(X, args):
         VA = 0.0
         
     elif ProfileType==7:        # A portion of the line must rest on the seabed and the anchor tension is zero or non-zero
-        HA = TA*np.cos(np.pi*alpha/180)
-        VA = TA*np.sin(np.pi*alpha/180)                                     
+        HA = TA*cos_alpha
+        VA = TA*sin_alpha                                     
 
 
     ## Step 3. group the outputs into objective function value and others
@@ -1410,9 +1423,13 @@ if __name__ == "__main__":
     # tricky near-taut case with starting point
     #catenary(119.3237383002058, 52.49668849178113, 130.36140355177318, 700000000.0, 34.91060469991227, CB=0.0, HF0=9298749.157482728, VF0=4096375.3052922436, Tol=2e-05, MaxIter=100, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(829.0695733253751, 2.014041774600628e-05, 829.0695771203765, 700000000.0, 34.91060469991227, CB=0.0, HF0=0.0, VF0=0.0, Tol=2e-05, MaxIter=100, plots=1)
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(829.0695733253751, 2.014041774600628e-05, 
-          829.0695771203765, 700000000.0, 34.91060469991227, Tol=2e-05, MaxIter=100, plots=1)
-    
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(829.0695733253751, 2.014041774600628e-05, 
+    #      829.0695771203765, 700000000.0, 34.91060469991227, Tol=2e-05, MaxIter=100, plots=1)
+          
+          
+    # Tricky case for sloped seabed (prone to overestimating LBot unless trapped corrected in the solve)      
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(121.5, 17.5, 138.5, 1232572089, 2456.8, CB=0.0, alpha=-2.6, HF0=428113, VF0=396408, Tol=0.0005, nNodes=41, plots=1)
+
     """
     Tol =2e-05
     
@@ -1460,7 +1477,6 @@ if __name__ == "__main__":
         
     """
     plt.plot(info1['X'], info1['Z'] )
-    #plt.plot(info1['s'], info1['X'] )
     #plt.axis('equal')
     
     plt.close('all')
