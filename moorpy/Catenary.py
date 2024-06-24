@@ -1428,7 +1428,8 @@ if __name__ == "__main__":
           
           
     # Tricky case for sloped seabed (prone to overestimating LBot unless trapped corrected in the solve)      
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(121.5, 17.5, 138.5, 1232572089, 2456.8, CB=0.0, alpha=-2.6, HF0=428113, VF0=396408, Tol=0.0005, nNodes=41, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(121.5, 17.5, 138.5, 1232572089, 2456.8, CB=0.0, alpha=-2.6, HF0=428113, VF0=396408, Tol=0.0005, nNodes=41, plots=1)
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(121.09772794232714, -1.8384100597014594, 101.50770310432262, 1232572089.6, 2456.820077481978, CB=0.0, alpha=-0.8659609923714943, HF0=20534.12538249187, VF0=53055.020668169294, Tol=0.0005, nNodes=41, plots=1)
 
     """
     Tol =2e-05

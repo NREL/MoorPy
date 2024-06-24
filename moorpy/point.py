@@ -88,11 +88,6 @@ class Point():
             The identifier ID number of a line
         endB : boolean
             Determines which end of the line is attached to the point
-
-        Returns
-        -------
-        None.
-
         '''
     
         self.attached.append(lineID)  
@@ -108,15 +103,16 @@ class Point():
             The identifier ID number of a line
         endB : boolean
             Determines which end of the line is to be detached from the point
-
-        Returns
-        -------
-        None.
-
         '''
         
-        self.attached.pop(self.attached.index(lineID))
-        self.attachedEndB.pop(self.attachedEndB.index(endB))
+        # get attachment index
+        i1 = self.attached.index(lineID)
+        i2 = self.attachedEndB.index(endB)
+        if not i1==i2:
+            raise Exception("issue with the right end of the line to detach...")
+        
+        self.attached.pop(i1)
+        self.attachedEndB.pop(i1)
         print("detached Line "+str(lineID)+" from Point "+str(self.number))
     
     

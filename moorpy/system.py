@@ -339,7 +339,36 @@ class System():
             raise Exception("Invalid line number")
             
     """    
+    
+    def disconnectLineEnd(self, lineID, endB):
+        '''Disconnects the specified end of a Line object from whatever point
+        it's attached to, and instead attaches it to a new free point.
+        '''
         
+        # for now assume the line is at the expected index
+        line = self.lineList[lineID-1]
+        
+        if not line.number == lineID:
+            raise Exception(f"Error lineID {lineID} isn't at the corresponding lineList index.")
+        
+        # detach line from whatever point it's attached to
+        for point in self.pointList:
+            if lineID in point.attached:
+                if point.attachedEndB[point.attached.index(lineID)] == endB:
+                    point.detachLine(lineID, endB)
+                    break
+        
+        # create new free point to attach the line end to
+        if endB:
+            r = line.rB
+        else:
+            r = line.rA
+            
+        self.addPoint(0, r)
+        
+        self.pointList[-1].attachLine(lineID, endB)
+        
+    
     def addLineType(self, type_string, d, mass, EA, name=""):
         '''Convenience function to add a LineType to a mooring system or adjust
         the values of an existing line type if it has the same name/key.
