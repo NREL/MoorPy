@@ -1813,16 +1813,16 @@ def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
     eps_segs = np.abs(dL_dynamic)/L_static
 
     T_segs = EA_segs * eps_segs
-    T_nodes = np.zeros((len(omegas),N))
-    T_nodes[:,0] = T_segs[:,0]
-    T_nodes[:,1:-1] = (T_segs[:,:-1] + T_segs[:,1:])/2
-    T_nodes[:,-1] = T_segs[:,-1]
+    T_nodes_amp = np.zeros((len(omegas),N))
+    T_nodes_amp[:,0] = T_segs[:,0]
+    T_nodes_amp[:,1:-1] = (T_segs[:,:-1] + T_segs[:,1:])/2
+    T_nodes_amp[:,-1] = T_segs[:,-1]
 
     # S_T = np.zeros((len(omegas),N))
     # S_T[:,1:] = T_e**2/dw[:,None]
     # S_T[:,0] = S_T[:,1]
 
-    T_nodes_psd = T_nodes**2/dw[:,None]
+    T_nodes_psd = T_nodes_amp**2/dw[:,None]
     T_nodes_std = np.sqrt(np.trapz(T_nodes_psd,omegas,axis=0))
 
 
@@ -1831,7 +1831,7 @@ def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
     s = np.zeros_like(T_nodes_std)
     s = np.cumsum(ds)
 
-    return T_nodes_psd,T_nodes_std,s,r_static,r_dynamic,r_total,X
+    return T_nodes_amp, T_nodes_psd,T_nodes_std, s,r_static,r_dynamic,r_total,X
 
 
 def get_modes(line,fix_A=True,fix_B=True,plot_modes=False,amp_factor=1,adj_view = False,kbot=3E+06,cbot=3E+05,seabed_tol=1E-04):

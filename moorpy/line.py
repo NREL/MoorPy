@@ -1034,6 +1034,9 @@ class Line():
                 dofs2remove = np.array([(node*3, node*3+1, node*3+2) for node in nodes2remove]).flatten()
 
                 # Create a mask for the dofs to keep
+                # dofs2remove = np.array([node*3 + 2 for node in nodes2remove])
+
+                # Create a mask for the dofs to keep
                 mask = np.ones(matrix.shape[0], dtype=bool)
                 mask[dofs2remove] = False
                 # Remove the rows and columns
@@ -1060,9 +1063,36 @@ class Line():
 
             return np.linalg.pinv(matrix_inv_coupled)
 
+
+        # # Get list of points
+        # pointList = self.pointList if hasattr(self, 'pointList') else self.sys.pointList # Difference between line and subsystem        
+        # rList = [p.r for p in pointList]
+        
+        # # Check if end A is fixed
+        # idxA = next((i for i, x in enumerate(rList) if np.allclose(x, self.rA, atol=1e-8)), -1) # Find the index of the point A in the point list
+        # removeA = False
+        # if pointList[idxA].type == 1:
+        #     removeA = True
+
+        # # Check if end B is fixed
+        # idxB = next((i for i, x in enumerate(rList) if np.allclose(x, self.rB, atol=1e-8)), -1)
+        # removeB = False
+        # if pointList[idxB].type == 1:
+        #     removeB = True
+
+        # # Cannot remove both ends. Return matrices with zeros if so.
+        # if removeA and removeB:
+        #     return M1, A1, B1, K1
+
         # Remove the nodes that are lying on the seabed
         X_mean,Y_mean,Z_mean,T_mean = self.getLineCoords(0.0,n=self.nNodes) # coordinates of line nodes and tension values
         idx2remove = np.where(Z_mean <= -self.sys.depth+1e-06)[0]
+        
+        # Keep one of the nodes to remove, which is the one in the interface with the nodes to keep
+        # is_seabed = Z_mean <= -self.sys.depth+1e-06        
+        # transition_indices = np.where(np.abs(np.diff(is_seabed.astype(int))) == 1)[0] # Find all indices where is_seabed changes from True to False        
+        # idx2remove_all = np.where(is_seabed)[0] # Get all indices where is_seabed is True        
+        # idx2remove = np.setdiff1d(idx2remove_all, transition_indices) # Remove transition_indices from idx2remove_all                
         
         M, A, B, K, _, _ = self.getDynamicMatrices(*args, **kwargs)
         Ml = lump_matrix(M, nodes2remove=idx2remove)

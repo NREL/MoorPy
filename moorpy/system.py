@@ -2879,13 +2879,7 @@ class System():
     
     def getCoupledDynamicMatrices(self, omegas, S_zeta, depth, kbot=0, cbot=0, r_dynamic_init=None, lines_only=False):
         '''Write something here later
-        '''
-        # The methods used to get the coupled dynamic matrices do not work well if we treat each line section separately - I don't know why yet
-        # Hence, we group the lines into subsystems
-
-                        
-            
-
+        '''                                    
         self.nDOF, self.nCpldDOF, DOFtypes = self.getDOFs()
         
         n = self.nDOF + self.nCpldDOF
@@ -2927,13 +2921,7 @@ class System():
     
     def getSystemDynamicMatrices(self, omegas, S_zeta, depth, kbot=0, cbot=0, DOFtype="free", lines_only=False, r_dynamic_init=None, rho=1025, g=9.81):
         '''Write something here later        
-        '''
-        
-        # note: This is missing some pieces, and needs to check more.
-        # So far this seems to not capture yaw stiffness for non-bridle configs... 
-        # it would require proper use of chain rule for the derivatives
-        
-        
+        '''                      
         # find the total number of free and coupled DOFs in case any object types changed
         self.nDOF, self.nCpldDOF, _ = self.getDOFs()
         
