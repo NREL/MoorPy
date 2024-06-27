@@ -8,7 +8,8 @@ from moorpy.helpers import CatenaryError, dsolve2
 
 
 
-def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes=20, MaxIter=100, plots=0):
+def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, 
+             nNodes=20, MaxIter=100, plots=0, depth=0):
     '''
     The quasi-static mooring line solver. Adapted from catenary subroutine in FAST v7 by J. Jonkman.
     Note: this version is updated Oct 7 2020 to use the dsolve solver.
@@ -69,7 +70,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
     # make info dict to contain any additional outputs
     info = dict(error=False)
     
-    info['call'] = f"catenary({XF}, {ZF}, {L}, {EA}, {W}, CB={CB}, alpha={alpha}, HF0={HF0}, VF0={VF0}, Tol={Tol}, MaxIter={MaxIter}, plots=1)"
+    info['call'] = f"catenary({XF}, {ZF}, {L}, {EA}, {W}, CB={CB}, alpha={alpha}, HF0={HF0}, VF0={VF0}, Tol={Tol}, MaxIter={MaxIter}, depth={depth}, plots=1)"
     
     
     # make some arrays if needed for plotting each node
@@ -96,7 +97,11 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
     if W < 0:
         W = -W
         ZF = -ZF
-        CB = 0 #-10000.   # <<< TODO: could set hA, hB to distances to sea surface <<<
+        CB = 0
+        # Set hA, hB to distances to sea surface
+        if depth > 0:
+            hB = depth - hB
+            hA = depth - hA
         flipFlag = True
     else:
         flipFlag = False
@@ -648,8 +653,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
             info["Sextreme"] = 0.0
             info["Zextreme"] = 0.0
             info["Xextreme"] = 0.0    
-           
-            
+        
+        
         # handle special case of a U-shaped line that has seabed contact (using 2 new catenary solves)
         if info['ProfileType']==1 and info["Zextreme"] < -hA:
         
@@ -725,8 +730,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001, nNodes
                     info['Te'] =      info['Te'][::-1]
                 '''
                     
-            if flipFlag:
-                raise Exception("flipFlag connot be True for the case of a U shaped line with seabed contact. Something must be wrong.")
+            #if flipFlag:
+            #    raise Exception("flipFlag connot be True for the case of a U shaped line with seabed contact. Something must be wrong.")
                             
                 
             
@@ -1429,7 +1434,32 @@ if __name__ == "__main__":
           
     # Tricky case for sloped seabed (prone to overestimating LBot unless trapped corrected in the solve)      
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(121.5, 17.5, 138.5, 1232572089, 2456.8, CB=0.0, alpha=-2.6, HF0=428113, VF0=396408, Tol=0.0005, nNodes=41, plots=1)
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(121.09772794232714, -1.8384100597014594, 101.50770310432262, 1232572089.6, 2456.820077481978, CB=0.0, alpha=-0.8659609923714943, HF0=20534.12538249187, VF0=53055.020668169294, Tol=0.0005, nNodes=41, plots=1)
+    
+    # case from Emma
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(0.006002402242302196, 52.088735921752004, 105, 440229677.8451713, 362.2187847407355, CB=0, HF0=0.0, VF0=30883.56235473299, Tol=5.000000000000001e-05, MaxIter=100, plots=1)
+    
+    # cable case
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(39., 3.675, 37., 528., -5152., 
+    #         CB=0.0, alpha=-0.0, HF0=0.0, VF0=0.0, Tol=2e-05, MaxIter=100, plots=1, depth=200)
+             
+             
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(274.9, 15.6, 328.5, 528887323., -121., 
+    #         CB=-48., alpha=0, Tol=2e-05, MaxIter=100, plots=1, depth=200)
+    
+    (fAH1, fAV1, fBH1, fBV1, info1) =  catenary(267.60271224572784, 11.629753388110558, 383.52733838297667, 528887323.6999998, -121.77472470613236, 
+        CB=-81.79782970374734, alpha=0, HF0=13369.512495199759, VF0=24221.869928543758, Tol=2e-05, 
+        MaxIter=100, depth=180, plots=1, nNodes=100)
+    
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(274.9, 15.6, 328.5, 528887323., -121., 
+    #         CB=-48., alpha=0, HF0=17939., VF0=20596., Tol=2e-05, MaxIter=100, plots=1)
+    
+    
+    # First attempt's iterations are as follows:
+    # Iteration 0: HF= 5.0000e-05, VF= 2.8450e+04, EX= 0.00e+00, EZ= 0.00e+00
+    # Second attempt's iterations are as follows:
+    # Iteration 0: HF= 5.0000e-05, VF= 2.8450e+04, EX= 0.00e+00, EZ= 0.00e+00
+    # Last attempt's iterations are as follows:
+    # Iteration 0: HF= 5.0000e-05, VF= 2.8450e+04, EX= 0.00e+00, EZ= 0.00e+00
 
     """
     Tol =2e-05
@@ -1480,5 +1510,5 @@ if __name__ == "__main__":
     plt.plot(info1['X'], info1['Z'] )
     #plt.axis('equal')
     
-    plt.close('all')
-    #plt.show()
+    #plt.close('all')
+    plt.show()
