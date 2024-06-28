@@ -1007,7 +1007,8 @@ class System():
             self.pointList[pointDict[d['endB']]].attachLine(num, 1)
 
 
-    def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', outputList=[], Lm = 0):
+    def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', 
+               outputList=[], Lm=0, T_half=42):
         '''Unloads a MoorPy system into a MoorDyn-style input file
 
         Parameters
@@ -1022,7 +1023,10 @@ class System():
             Optional list of additional requested output channels
         Lm : float
             Mean load on mooring line as FRACTION of MBL, used for dynamic stiffness calculation. Only used if line type has a nonzero EAd
-
+        T_half : float, optional
+            For tuning response of viscoelastic model, the period when EA is
+            half way between the static and dynamic values [s]. Default is 42.
+            
         Returns
         -------
         None.
@@ -1270,8 +1274,18 @@ class System():
                 if 'EAd' in di.keys() and di['EAd'] > 0:
                     if Lm > 0:
                         print('Calculating dynamic stiffness with Lm = ' + str(Lm)+'* MBL')
-                        L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e}|{:7.3e} 4E9|11e6 {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
-                             key, di['d_vol'], di['m'], di['EA'], di['EAd'] + di['EAd_Lm']*Lm*di['MBL'], di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
+                        # Get dynamic stiffness including mean load dependence
+                        EAd = di['EAd'] + di['EAd_Lm']*Lm*di['MBL']
+                        # This damping value is chosen for critical damping of a 10 m segment
+                        c1 = 10 * np.sqrt(di['EA'] * di['m'])
+                        # or use c1 = di['BA'] ?
+                        # This damping value is chosen to get the desired 
+                        # half-way period between static and dynamic stiffnesses
+                        c2 = (K1+K2)/(2*np.pi/T_half) * np.sqrt(((K1+frac*K2)**2 - K1**2)/((K1+K2)**2 - (K1+frac*K2)**2))
+                        
+                        
+                        L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e}|{:7.3e} {:7.3e}|{:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
+                             key, di['d_vol'], di['m'], di['EA'], EAd, c1, c1, di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
                     else:
                         print('No mean load provided!!! using the static EA value ONLY')
                         L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e} {:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
