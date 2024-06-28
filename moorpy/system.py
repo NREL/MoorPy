@@ -1281,11 +1281,17 @@ class System():
                         # or use c1 = di['BA'] ?
                         # This damping value is chosen to get the desired 
                         # half-way period between static and dynamic stiffnesses
+                        frac=0.5
+                        EAs = di['EA']
+                        K1 = EAs*EAd/(EAd-EAs)
+                        K1= EAs
+                        K2 = EAd
+
                         c2 = (K1+K2)/(2*np.pi/T_half) * np.sqrt(((K1+frac*K2)**2 - K1**2)/((K1+K2)**2 - (K1+frac*K2)**2))
                         
                         
                         L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e}|{:7.3e} {:7.3e}|{:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
-                             key, di['d_vol'], di['m'], di['EA'], EAd, c1, c1, di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
+                             key, di['d_vol'], di['m'], di['EA'], EAd, c1, c2, di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
                     else:
                         print('No mean load provided!!! using the static EA value ONLY')
                         L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e} {:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
