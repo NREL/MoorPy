@@ -107,6 +107,7 @@ class System():
         
         self.MDoptions = {} # dictionary that can hold any MoorDyn options read in from an input file, so they can be saved in a new MD file if need be
 
+        self.dynamic_stiffness_activated = False  # flag turned on when dynamic EA values are activate
         
         # read in data from an input file if a filename was provided
         if len(file) > 0:
@@ -1046,7 +1047,7 @@ class System():
 
             # Some default settings to fill in if coefficients aren't set
             #lineTypeDefaults = dict(BA=-1.0, EI=0.0, Cd=1.2, Ca=1.0, CdAx=0.2, CaAx=0.0)
-            lineTypeDefaults = dict(BA=-1.0, cIntDamp=-0.8, EI=0.0, Can=1.0, Cat=1.0, Cdn=1.0, Cdt=0.5)
+            lineTypeDefaults = dict(BA=-1.0, EI=0.0, Ca=1.0, CaAx=1.0, Cd=1.0, CdAx=0.5)
             rodTypeDefaults  = dict(Cd=1.2, Ca=1.0, CdEnd=1.0, CaEnd=1.0)
             
             # bodyDefaults = dict(IX=0, IY=0, IZ=0, CdA_xyz=[0,0,0], Ca_xyz=[0,0,0])
@@ -3045,13 +3046,16 @@ class System():
     
     
     def activateDynamicStiffness(self, display=0):
-        '''Switch mooring system model to dynamic line stiffness
-        values and adjust the unstretched line lengths to maintain the
-        same tensions. This only has an effect when dynamic line properties
-        are used.'''
+        '''Switch mooring system model to dynamic line stiffness values and 
+        adjust the unstretched line lengths to maintain the same tensions. 
+        If dynamic stiffnesses are already activated, it does nothing.
+        This only has an effect when dynamic line properties are used. '''
         
-        for line in self.lineList:
-            line.activateDynamicStiffness(display=display)
+        if not self.dynamic_stiffness_activated:
+            for line in self.lineList:
+                line.activateDynamicStiffness(display=display)
+        
+            self.dynamic_stiffness_activated = True
     
     
     def revertToStaticStiffness(self):
@@ -3060,6 +3064,8 @@ class System():
         
         for line in self.lineList:
             line.revertToStaticStiffness()
+        
+        self.dynamic_stiffness_activated = False
     
     
     def setBathymetry(self, x, y, depth):

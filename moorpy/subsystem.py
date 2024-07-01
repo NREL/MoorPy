@@ -472,7 +472,8 @@ class Subsystem(System, Line):
         Optional argument z can be added for a z offset.
         '''
         
-        self.activateDynamicStiffness()  # use dynamic EA values
+        if not self.dynamic_stiffness_activated: # if not already using them,
+            System.activateDynamicStiffness(self)  # switch to dynamic EA values
         
         # adjust end B to the absolute offsets specified
         self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
@@ -486,16 +487,12 @@ class Subsystem(System, Line):
         
     
     def activateDynamicStiffness(self, display=0):
-        '''Switch mooring system model to dynamic line stiffness
-        values and adjust the unstretched line lengths to maintain the
-        same tensions. This only has an effect when dynamic line properties
-        are used.'''
+        '''Calls the dynamic stiffness method from System rather than from Line.'''
         System.activateDynamicStiffness(self, display=display)
     
     
     def revertToStaticStiffness(self):
-        '''Revert mooring system model back to the static stiffness
-        values and the original unstretched lenths.'''
+        '''Calls the static stiffness method from System rather than from Line.'''
         System.revertToStaticStiffness(self)
     
     

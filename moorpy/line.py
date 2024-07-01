@@ -977,10 +977,10 @@ class Line():
 
 
     def activateDynamicStiffness(self, display=0):
-        '''Switch mooring line model to dynamic line stiffness
-        value, including potential unstretched line length
-        adjustment. This only works when dynamic line properties
-        are used.'''
+        '''Switch mooring line model to dynamic line stiffness value, 
+        including potential unstretched line length adjustment, taking the 
+        current state as the mean/static offset position to work from. 
+        This only works when dynamic line properties are used.'''
         
         if self.type['EAd'] > 0:
             # switch to dynamic stiffness value

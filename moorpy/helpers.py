@@ -714,7 +714,8 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
 
     lineType = dict(name=typestring, d_vol=d_vol, m=mass, EA=EA, w=w,
                     MBL=MBL, EAd=EAd, EAd_Lm=EAd_Lm, input_d=d,
-                    cost=cost, notes=notes, material=material, Cdn=Cd, Cdt=CdAx,Can=Ca,Cat=CaAx)
+                    cost=cost, notes=notes, material=material, 
+                    Cd=Cd, CdAx=CdAx, Ca=Ca, CaAx=CaAx)
     
     lineType.update(kwargs)   # add any custom arguments provided in the call to the lineType's dictionary
           
@@ -776,9 +777,9 @@ def loadLineProps(source):
         output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
         output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
         output[mat]['Cd'       ] = getFromDict(props, 'Cd'       , default=0.0)
-        output[mat]['CdAx'     ] = getFromDict(props, 'Cd_ax'    , default=0.0)
+        output[mat]['Cd_ax'    ] = getFromDict(props, 'Cd_ax'    , default=0.0)
         output[mat]['Ca'       ] = getFromDict(props, 'Ca'       , default=0.0)
-        output[mat]['CaAx'     ] = getFromDict(props, 'Ca_ax'    , default=0.0)
+        output[mat]['Ca_ax'    ] = getFromDict(props, 'Ca_ax'    , default=0.0)
         
         output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
         output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
