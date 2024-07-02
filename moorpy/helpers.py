@@ -479,7 +479,7 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
                 m,b = np.polyfit(Es[int(0.7*iter):iter,0], Xs[int(0.7*iter):iter,0], 1)            
                 X = np.array([b])
                 Y = np.array([0.0]) 
-                print(f"Using linaer fit to estimate solution at X={b}")
+                if display>0: print(f"dsolve is using linear fit to estimate solution at X={b}")
                 
             break
 
@@ -714,7 +714,8 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
 
     lineType = dict(name=typestring, d_vol=d_vol, m=mass, EA=EA, w=w,
                     MBL=MBL, EAd=EAd, EAd_Lm=EAd_Lm, input_d=d,
-                    cost=cost, notes=notes, material=material, Cdn=Cd, Cdt=CdAx,Can=Ca,Cat=CaAx)
+                    cost=cost, notes=notes, material=material, 
+                    Cd=Cd, CdAx=CdAx, Ca=Ca, CaAx=CaAx)
     
     lineType.update(kwargs)   # add any custom arguments provided in the call to the lineType's dictionary
           
@@ -776,9 +777,9 @@ def loadLineProps(source):
         output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
         output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
         output[mat]['Cd'       ] = getFromDict(props, 'Cd'       , default=0.0)
-        output[mat]['CdAx'     ] = getFromDict(props, 'Cd_ax'    , default=0.0)
+        output[mat]['Cd_ax'    ] = getFromDict(props, 'Cd_ax'    , default=0.0)
         output[mat]['Ca'       ] = getFromDict(props, 'Ca'       , default=0.0)
-        output[mat]['CaAx'     ] = getFromDict(props, 'Ca_ax'    , default=0.0)
+        output[mat]['Ca_ax'    ] = getFromDict(props, 'Ca_ax'    , default=0.0)
         
         output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
         output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
@@ -805,6 +806,73 @@ def loadLineProps(source):
         output[mat]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
 
     return output
+
+
+
+
+def getPointProps(weight, rho=1025.0, g=9.81, **kwargs):
+    '''for now this is just getClumpMV put in a place where it could grow 
+    into a fully versatile equivalent to getMoorProps.
+    '''
+    
+    '''A function to provide a consistent scheme for converting a clump weight/float magnitude to the 
+    mass and volume to use in a MoorPy Point.'''
+    
+    if weight >= 0:                          # if the top point of the intermediate line has a clump weight
+        pointvol = 0.0
+        pointmass = weight*1000.0           # input variables are in units of tons (1000 kg), convert to kg
+    else:
+        pointvol = -weight*1200.0/rho  # input variables are still in tons. Assume additional 20% of BM mass
+        pointmass = -weight*200.0
+
+    return dict(m=pointmass, v=pointvol)
+
+
+def loadPointProps(source):
+    '''Loads a set of MoorPy point property scaling coefficients from
+    a specified YAML file or passed dictionary. 
+    
+    Parameters
+    ----------
+    source : dict or filename
+        YAML file name or dictionary containing line property scaling coefficients
+    
+    Returns
+    -------
+    dictionary
+        PointProps dictionary listing each supported mooring line type and 
+        subdictionaries of scaling coefficients for each.
+    '''
+    
+    '''
+    if type(source) is dict:
+        source = source
+        
+    elif source is None or source=="default":
+        import os
+        mpdir = os.path.dirname(os.path.realpath(__file__))
+        with open(os.path.join(mpdir,"PointProps_default.yaml")) as file:
+            source = yaml.load(file, Loader=yaml.FullLoader)
+        
+    elif type(source) is str:
+        with open(source) as file:
+            source = yaml.load(file, Loader=yaml.FullLoader)
+
+    else:
+        raise Exception("loadLineProps supplied with invalid source")
+    
+    if 'lineProps' in source:
+        lineProps = source['lineProps']
+    else:
+        raise Exception("YAML file or dictionary must have a 'lineProps' field containing the data")
+    '''
+    
+    output = dict()  # output dictionary combining default values with loaded coefficients
+    
+    #output['generic'] = dict(rho = , m_v = , )
+    
+    return output
+
 
 
 def getFromDict(dict, key, shape=0, dtype=float, default=None):
@@ -1065,7 +1133,6 @@ def lines2subsystem(lines,ms,span=None,case=0):
             if lines[i]<lines[j]:
                 lines[j] -= 1
         # delete old line and any necessary points
-        print('deleting line ',originalList[i])
         helpers.deleteLine(ms,lines[i],delpts)
     
     # print('Replacing lines ',originalList,' with a subsystem appended to the end of the lineList ')
@@ -1231,11 +1298,9 @@ def subsystem2Line(ms,ssNum,nsegs=10):
         if spt.attachedEndB[-1]:
             endB = i
             points[endB]['r'] = ss.rB
-            print('endB: ',endB)
         if spt.attachedEndB[0] == 0:
             endA = i
             points[endA]['r'] = ss.rA
-            print('endA: ',endA)
     # get actual r of end points (r in subsystem is not true location)
     for i in range(0,len(ms.pointList)):
         # check if point is attached to the subsystem line
@@ -1255,7 +1320,7 @@ def subsystem2Line(ms,ssNum,nsegs=10):
                 else:
                     # update end A r
                     points[endA]['r'] = ms.pointList[i].r
-                    points[endA]['type'] = ms.pointList[i].type                   
+                    points[endA]['type'] = ms.pointList[i].type 
                     # check if end points are attached to a body
                     for k in range(0,len(ms.bodyList)):
                         if i+1 in ms.bodyList[k].attachedP:

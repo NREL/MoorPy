@@ -107,6 +107,7 @@ class System():
         
         self.MDoptions = {} # dictionary that can hold any MoorDyn options read in from an input file, so they can be saved in a new MD file if need be
 
+        self.dynamic_stiffness_activated = False  # flag turned on when dynamic EA values are activate
         
         # read in data from an input file if a filename was provided
         if len(file) > 0:
@@ -339,7 +340,36 @@ class System():
             raise Exception("Invalid line number")
             
     """    
+    
+    def disconnectLineEnd(self, lineID, endB):
+        '''Disconnects the specified end of a Line object from whatever point
+        it's attached to, and instead attaches it to a new free point.
+        '''
         
+        # for now assume the line is at the expected index
+        line = self.lineList[lineID-1]
+        
+        if not line.number == lineID:
+            raise Exception(f"Error lineID {lineID} isn't at the corresponding lineList index.")
+        
+        # detach line from whatever point it's attached to
+        for point in self.pointList:
+            if lineID in point.attached:
+                if point.attachedEndB[point.attached.index(lineID)] == endB:
+                    point.detachLine(lineID, endB)
+                    break
+        
+        # create new free point to attach the line end to
+        if endB:
+            r = line.rB
+        else:
+            r = line.rA
+            
+        self.addPoint(0, r)
+        
+        self.pointList[-1].attachLine(lineID, endB)
+        
+    
     def addLineType(self, type_string, d, mass, EA, name=""):
         '''Convenience function to add a LineType to a mooring system or adjust
         the values of an existing line type if it has the same name/key.
@@ -892,9 +922,10 @@ class System():
         for d in data['line_types']:
             name = d['name']
             dia = float(d['diameter']    )
-            w   = float(d['mass_density'])*self.g
+            m = float(d['mass_density'])
+            w = (m - np.pi/4*dia**2 *self.rho)*self.g
             EA  = float(d['stiffness']   )
-            self.lineTypes[name] = dict(name=name, d_vol=dia, w=w, EA=EA)
+            self.lineTypes[name] = dict(name=name, d_vol=dia, m=m, w=w, EA=EA)
             
             addToDict(d, self.lineTypes[name], 'breaking_load'        , 'MBL' , default=0)
             addToDict(d, self.lineTypes[name], 'cost'                 , 'cost', default=0)
@@ -982,7 +1013,8 @@ class System():
             self.pointList[pointDict[d['endB']]].attachLine(num, 1)
 
 
-    def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', outputList=[], Lm = 0):
+    def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', 
+               outputList=[], Lm=0, T_half=42):
         '''Unloads a MoorPy system into a MoorDyn-style input file
 
         Parameters
@@ -997,7 +1029,10 @@ class System():
             Optional list of additional requested output channels
         Lm : float
             Mean load on mooring line as FRACTION of MBL, used for dynamic stiffness calculation. Only used if line type has a nonzero EAd
-
+        T_half : float, optional
+            For tuning response of viscoelastic model, the period when EA is
+            half way between the static and dynamic values [s]. Default is 42.
+            
         Returns
         -------
         None.
@@ -1017,7 +1052,7 @@ class System():
 
             # Some default settings to fill in if coefficients aren't set
             #lineTypeDefaults = dict(BA=-1.0, EI=0.0, Cd=1.2, Ca=1.0, CdAx=0.2, CaAx=0.0)
-            lineTypeDefaults = dict(BA=-1.0, cIntDamp=-0.8, EI=0.0, Can=1.0, Cat=1.0, Cdn=1.0, Cdt=0.5)
+            lineTypeDefaults = dict(BA=-1.0, EI=0.0, Ca=1.0, CaAx=1.0, Cd=1.0, CdAx=0.5)
             rodTypeDefaults  = dict(Cd=1.2, Ca=1.0, CdEnd=1.0, CaEnd=1.0)
             
             # bodyDefaults = dict(IX=0, IY=0, IZ=0, CdA_xyz=[0,0,0], Ca_xyz=[0,0,0])
@@ -1245,8 +1280,24 @@ class System():
                 if 'EAd' in di.keys() and di['EAd'] > 0:
                     if Lm > 0:
                         print('Calculating dynamic stiffness with Lm = ' + str(Lm)+'* MBL')
-                        L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e}|{:7.3e} 4E9|11e6 {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
-                             key, di['d_vol'], di['m'], di['EA'], di['EAd'] + di['EAd_Lm']*Lm*di['MBL'], di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
+                        # Get dynamic stiffness including mean load dependence
+                        EAd = di['EAd'] + di['EAd_Lm']*Lm*di['MBL']
+                        # This damping value is chosen for critical damping of a 10 m segment
+                        c1 = 10 * np.sqrt(di['EA'] * di['m'])
+                        # or use c1 = di['BA'] ?
+                        # This damping value is chosen to get the desired 
+                        # half-way period between static and dynamic stiffnesses
+                        frac=0.5
+                        EAs = di['EA']
+                        K1 = EAs*EAd/(EAd-EAs)
+                        K1= EAs
+                        K2 = EAd
+
+                        c2 = (K1+K2)/(2*np.pi/T_half) * np.sqrt(((K1+frac*K2)**2 - K1**2)/((K1+K2)**2 - (K1+frac*K2)**2))
+                        
+                        
+                        L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e}|{:7.3e} {:7.3e}|{:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
+                             key, di['d_vol'], di['m'], di['EA'], EAd, c1, c2, di['EI'], di['Cd'], di['Ca'], di['CdAx'], di['CaAx']))
                     else:
                         print('No mean load provided!!! using the static EA value ONLY')
                         L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e} {:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
@@ -3232,13 +3283,16 @@ class System():
     
     
     def activateDynamicStiffness(self, display=0):
-        '''Switch mooring system model to dynamic line stiffness
-        values and adjust the unstretched line lengths to maintain the
-        same tensions. This only has an effect when dynamic line properties
-        are used.'''
+        '''Switch mooring system model to dynamic line stiffness values and 
+        adjust the unstretched line lengths to maintain the same tensions. 
+        If dynamic stiffnesses are already activated, it does nothing.
+        This only has an effect when dynamic line properties are used. '''
         
-        for line in self.lineList:
-            line.activateDynamicStiffness(display=display)
+        if not self.dynamic_stiffness_activated:
+            for line in self.lineList:
+                line.activateDynamicStiffness(display=display)
+        
+            self.dynamic_stiffness_activated = True
     
     
     def revertToStaticStiffness(self):
@@ -3247,6 +3301,8 @@ class System():
         
         for line in self.lineList:
             line.revertToStaticStiffness()
+        
+        self.dynamic_stiffness_activated = False
     
     
     def setBathymetry(self, x, y, depth):

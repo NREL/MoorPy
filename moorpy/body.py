@@ -105,11 +105,6 @@ class Body():
             The identifier ID number of a point
         rAttach : array
             The position of the point relative to the body's frame [m]
-
-        Returns
-        -------
-        None.
-
         '''
     
         self.attachedP.append(pointID)
@@ -118,6 +113,23 @@ class Body():
         if self.sys.display > 1:
             print("attached Point "+str(pointID)+" to Body "+str(self.number))
     
+    """
+    def dettachPoint(self, pointID):
+        '''Removes a Point from the Body.
+        
+        Parameters
+        ----------
+        pointID : int
+            The identifier ID number of a point
+        rAttach : array
+            The position of the point relative to the body's frame [m]
+        '''
+    
+        find pointID index in self.attachedP
+        delete entry from self.attachedP and rPointRel
+        
+        set point type to free
+    """
     
     def attachRod(self, rodID, endCoords):
         '''Adds a Point to the Body, at the specified relative position on the body.

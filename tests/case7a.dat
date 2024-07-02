@@ -1,0 +1,48 @@
+MoorDyn Input File
+Case 7: Single catenary line attached to body to test 6DOF stifness
+----------------------- LINE TYPES ------------------------------------------        
+Name  Diam  MassDen  EA       BA/-zeta   EI    Cd    Ca   CdAx   CaAx 
+(-)   (m)   (kg/m)   (N)      (N-s/-)   (-)   (-)   (-)   (-)   (-)     
+main   0.2   200.00  2.0E+09      -1        0     4    0.27  4      0.20     
+----------------------- BODIES ------------------------------------------------------
+ID   Attachment    X0     Y0     Z0     r0      p0     y0     Mass   CG*     I*      Volume   CdA*   Ca*
+(#)     (-)        (m)    (m)    (m)   (deg)   (deg)  (deg)   (kg)   (m)   (kg-m^2)  (m^3)   (m^2)  (-)
+1     coupled      0.00   0.00   0.00   0.00   0.00   0.00     0.0    0.0   0.000e+00   0.0   0.00  0.00   
+---------------------- POINTS --------------------------------                                       
+Node Type      X     Y      Z     M    V     CdA   CA
+(-)  (-)      (m)   (m)    (m)   (kg) (m^3) (m^2) (-)
+1   Fixed    100.0  0.0   -50.0    0    0     0    0
+2   Body1      0.0   0.0   -10.0    0    0     0    0
+---------------------- LINES --------------------------------------       
+Line  LineType EndA     EndB    UnstrLen  NumSegs    Flags/Outputs                   
+(-)   (-)      (-)       (-)      (m)       (-)        (-)                 
+1     main      1         2       112.00    80         pt                  
+---------------------- SOLVER OPTIONS ---------------------------------------    
+50      WtrDpth                                       
+0.0002    dtM       - time step to use in mooring integration (s)
+3.0e6    kbot      - bottom stiffness (Pa/m)
+3.0e5    cbot      - bottom damping (Pa-s/m)
+1.0      dtIC      - time interval for analyzing convergence during IC gen (s)
+60.0     TmaxIC    - max time for ic gen (s)
+4.0      CdScaleIC - factor by which to scale drag coefficients during dynamic relaxation (-)
+0.001    threshIC  - threshold for IC convergence (-)                                          
+------------------------ OUTPUTS --------------------------------------------                                           
+FairTen1                                         
+AnchTen1   
+Con1fx    
+Con1fy                                         
+Con1fz    
+Con2fx     
+Con2fy                                         
+Con2fz  
+Con2px     
+Con2py                                         
+Con2pz   
+Body1fx   
+Body1fy 
+Body1fz 
+Body1mx
+Body1my
+Body1mz                                
+------------------------- need this line --------------------------------------                                                                                     
+                                            

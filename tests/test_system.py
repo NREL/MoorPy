@@ -11,6 +11,8 @@ from moorpy.helpers import getLineProps
 
 import matplotlib.pyplot as plt
 
+import os.path
+
 
 inCBs = [0, 1.0, 10.0]  # friction coefficients as inputs for test_seabed
 
@@ -344,8 +346,11 @@ def test_seabed(CB):
 def test_6DOF_stiffness():
     '''Tests 6x6 stiffness matrix of a complex system to check off diagonals.'''
     
+    dir = os.path.abspath(os.path.dirname(__file__))
+    file = os.path.join(dir, 'case8.dat')
+    
     # Create new MoorPy System and set its depth
-    ms = mp.System(file='tests/case8.dat')
+    ms = mp.System(file=file)
 
     # ----- run the model to demonstrate -----
 

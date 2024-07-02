@@ -1,4 +1,3 @@
-
 import numpy as np
 import yaml
 
@@ -80,6 +79,9 @@ class Subsystem(System, Line):
         self.rho   = rho    # water density [kg/m^3]
         self.g     = g      # gravitational acceleration [m/s^2]
         
+        # Set position tolerance to use in equilibrium solves [m]
+        self.eqtol = getFromDict(kwargs, 'eqtol', default=0.01)
+        
         # water current - currentMod 0 = no current; 1 = steady uniform current
         self.currentMod = 0         # flag for current model to use
         self.current = np.zeros(3)  # current velocity vector [m/s]
@@ -88,10 +90,13 @@ class Subsystem(System, Line):
             self.current = getFromDict(kwargs, 'current', shape=3)
             
         self.shared     = getFromDict(kwargs, 'shared', dtype=bool, default=False)  # flag to indicate shared line
-        self.span    = getFromDict(kwargs, 'span', default=0)                 # spacing (to rename as span<<<)
-        self.rBFair = getFromDict(kwargs, 'rBFair', shape=-1, default=[0,0,0])  # [m] end coordinates relative to attached body's ref point
-        self.rAFair = getFromDict(kwargs, 'rAFair', shape=-1, default=[0,0,0])  # [m] counterpart to rBFair for shared lines
-
+        self.span   = getFromDict(kwargs, 'span', default=0)  # horizontal end-end distance [m]
+        self.rad_fair = getFromDict(kwargs, 'rad_fair', default=0)  # [m] fairlead radius [m]
+        self.z_fair   = getFromDict(kwargs, 'z_fair'  , default=0)  # [m] fairlead z coord [m]
+        
+        # the old rAFair input for the position of a second fairlead of a shaerd mooring line is gone
+        # currently we assume rad_fair and z_fair are same for both ends of a shared line...
+        
         # seabed bathymetry - seabedMod 0 = flat; 1 = uniform slope, 2 = grid
         self.seabedMod = 0
         
@@ -117,9 +122,36 @@ class Subsystem(System, Line):
         
         self.MDoptions = {} # dictionary that can hold any MoorDyn options read in from an input file, so they can be saved in a new MD file if need be
         self.qs = 1         # flag that it's a MoorPy analysis, so System methods don't complain. One day should replace this <<<
+        
     
+    def initialize(self, daf_dict={}):
+        '''Initialize the Subsystem including DAFs.'''
+        
+        # Count number of line sections and total number of nodes
+        self.nLines = len(self.lineList)
+        self.nNodes = np.sum([l.nNodes for l in self.lineList]) - self.nLines + 1
+        
+        # Use the System initialize method
+        System.initialize(self)
+        
+        # dynamic amplication factor for each line section, and anchor forces 
+        # (DAFS[-2] is for vertical load, DAFS[-1] is for horizontal load)
+        self.DAFs = getFromDict(daf_dict, 'DAFs', shape=self.nLines+2, default=1.0)  
+        
+        # mean tension [N] of each line section end [section #, end A/B] for any given mean offset
+        self.Te0 = np.zeros([self.nLines,2])  # undispalced values
+        self.TeM = np.zeros([self.nLines,2])  # mean offset values
+        self.TeD = np.zeros([self.nLines,2])  # dynamic values
+        
+        # adjustment on laylength... positive means that the dynamic lay length is greater than linedesign laylength 
+        self.LayLen_adj = getFromDict(daf_dict, 'LayLen_adj', shape=0, default=0.0) 
+        
+        # Fatigue damage over all nodes (placeholder for now)
+        self.damage = np.zeros(self.nNodes)
+        
     
-    def makeGeneric(self, lengths, types, suspended=0, nSegs=40):
+    def makeGeneric(self, lengths, types, connectors=[], suspended=0):
+
         '''Creates a cable of n components going between an anchor point and
         a floating body (or a bridle point). If shared, it goes between two
         floating bodies.
@@ -134,6 +166,9 @@ class Subsystem(System, Line):
             these names must match keys in the parent system lineTypes 
             dictionary or the subsystem's lineTypes dictionary. If dicts,
             these dicts are referred to for each lineType (by reference).
+        connectors : list of dicts
+            List of length nLines-1 with dicts of optional properties for
+            any interior points (between sections).
         suspended : int
             Selector shared/suspended cases: 
             - 0 (default): end A is on the seabed,
@@ -143,6 +178,10 @@ class Subsystem(System, Line):
         
         # some initialization steps.
         self.nLines = len(lengths)
+        if len(connectors) == 0:
+            connectors = [{}]*(self.nLines - 1)
+        elif not len(connectors) == self.nLines - 1:
+            raise Exception('Length of connectors must be nLines - 1')
         
         if not len(types)==self.nLines:
             raise Exception("The specified number of lengths and types is inconsistent.")
@@ -152,12 +191,12 @@ class Subsystem(System, Line):
         
         # set end A location depending on whether configuration is suspended/symmetrical
         if suspended==2:  # symmetrical suspended case
-            rA = np.array([-0.5*self.span, 0, -1])  # shared line midpiont coordinates
+            rA = np.array([-0.5*self.span-self.rad_fair, 0, -1])  # shared line midpoint coordinates
         elif suspended==1:  # general suspended case
-            rA = np.array([-self.span + self.rAFair[0], 0, self.rAFair[2]])  # other suspended end
-        else:
-            rA = np.array([-self.span, 0, -self.depth])    # anchor coordinates
-        rB = np.array([-self.rBFair[0], 0, self.rBFair[2]])     # fairlead coordinates
+            rA = np.array([-self.span-self.rad_fair, 0, self.z_fair])  # other suspended end
+        else:  # normal anchored line case
+            rA = np.array([-self.span-self.rad_fair, 0, -self.depth])  # anchor coordinates
+        rB = np.array([-self.rad_fair, 0, self.z_fair])     # fairlead coordinates
 
         self.rA = rA
         self.rB = rB
@@ -165,8 +204,8 @@ class Subsystem(System, Line):
         if suspended==2:
             self.addPoint(-1, rA, DOFs=[2]) # add shared line point, free only to move in z
         else:
-            self.addPoint(-1, rA, DOFs=[0,2])  # add anchor point
-
+            self.addPoint(-1, rA, DOFs=[0,2])                # add anchor point
+        
         # Go through each line segment and add its upper point, add the line, and connect the line to the points
         for i in range(self.nLines):
 
@@ -186,112 +225,22 @@ class Subsystem(System, Line):
             
             # add the line segment using the reference to its lineType dict            
             # add the line segment using the reference to its lineType dict
-            if nSegs is None:
-                self.addLine(lengths[i], self.lineTypes[i])
-            elif isinstance(nSegs, (int, float)):
-                self.addLine(lengths[i], self.lineTypes[i], nSegs=nSegs)
-            elif isinstance(nSegs, list):
-                self.addLine(lengths[i], self.lineTypes[i], nSegs=nSegs[i])
-            else:
-                raise ValueError("Invalid type for nSegs. Expected None, a number, or a list.")
+            self.addLine(lengths[i],self.lineTypes[i])
 
             # add the upper end point of the segment
             if i==self.nLines-1:                            # if this is the upper-most line
-                self.addPoint(-1, rB, DOFs=[0,2])                        # add the fairlead point (make it coupled)
+                self.addPoint(-1, rB, DOFs=[0,2])  # add the fairlead point (make it coupled)
                 #self.bodyList[0].attachPoint(i+2, rB)       # attach the fairlead point to the body (two points already created)
             else:                                           # if this is an intermediate line
+                m = connectors[i].get('m', 0)
+                v = connectors[i].get('v', 0)
                 # add the point, initializing linearly between anchor and fairlead/midpoint
-                self.addPoint(0, rA + (rB-rA)*Lcsum[i]/Lcsum[-1], DOFs=[0,2])
-
+                self.addPoint(0, rA + (rB-rA)*Lcsum[i]/Lcsum[-1], m=m, v=v, DOFs=[0,2])
 
             # attach the line to the points
             self.pointList[-2].attachLine(i+1, 0)       # attach end A of the line
             self.pointList[-1].attachLine(i+1, 1)       # attach end B of the line
-
-        # if a points list is provided, apply any mass or other properties it contains?
-    
-        self.nLines = len(self.lineList)
-        self.nNodes = np.sum([line.nNodes for line in self.lineList]) - self.nLines + 1
-    
-    
-    def makeFromSystem(self, sys, point_id):
-        '''Populate a Subsystem based on a series of mooring lines in an
-        existing system (sys), starting at an end point (point_id).
-        Taken from Serag's CompositeLine class.
-        In this version, the subsystem still needs to be added to a system
-        afterward.
-        '''
         
-        if len(self.pointList)+len(self.lineList) > 0:
-            raise Exception('makeFromSystem can only be called for an empty Subsystem.')
-        
-        point = sys.pointList[point_id-1] # Starting point id
-
-        # check starting point to make sure it is either coupled or fixed and that it is not connected to more than 1 line.
-        if point.type == 0:
-            raise Exception(f'Starting point ({point.number}) must not be free (change point type to -1 or 1).')
-        elif len(point.attached)>1:
-            raise Exception(f'Starting point ({point.number}) cannot be connected to more than 1 line')
-
-        # Save point A info
-        self.rA = np.array(point.r)
-        self.addPoint(1, self.rA)  # add anchor point
-
-        # Move through the points along the composite
-        while True:
-            # make sure that the point is free
-            if len(point.attached) > 2:
-                raise Exception(f'Point {point.number} is attached to more than two lines.')
-            
-            # get the line id and line object
-            line_id = point.attached[-1] # get next line's id
-            line = sys.lineList[line_id - 1] # get line object
-            self.lineTypes[line.type['name']] = dict(line.type)  # copy the lineType dict
-            self.addLine(line.L0, self.lineTypes[line.type['name']], nSegs=line.nNodes-1) # add the line
-            
-
-            # get the next point
-            attached_points = line.attached.copy() # get the IDs of the points attached to the line
-            pointA_id = point.number # get first point ID
-            attached_points.remove(pointA_id) # remove first point from attached point list
-            pointB_id = attached_points[0] # get second point id
-            point = sys.pointList[pointB_id-1] # get second point object
-
-            if len(point.attached) == 1:  # must be the endpoint
-                self.addPoint(-1, point.r)
-            else:  # intermediate point along line
-                self.addPoint(0, point.r, DOFs=[0,2]) # may need to ensure there's no y component
-                
-            # Attach the line ends to the points
-            self.pointList[-2].attachLine(len(self.lineList), 0)
-            self.pointList[-1].attachLine(len(self.lineList), 1)
-             
-            # break from the loop when a point with a single attachment is reached
-            if len(point.attached) == 1:
-                break
-        
-        # make sure that the last point is not a free point
-        if point.type == 0:
-            raise Exception(f'Last point ({point.number}) is a free point.')
-        
-        self.rB = np.array(point.r)
-        self.nLines = len(self.lineList)
-        self.nNodes = np.sum([line.nNodes for line in self.lineList]) - self.nLines + 1
-    
-        
-    def initialize(self):
-        '''Initializes the subsystem objects to their initial positions, and
-        counts number of nodes.'''
-        
-        self.nDOF, self.nCpldDOF, _ = self.getDOFs()
-        
-        self.nNodes = np.sum([line.nNodes for line in self.lineList]) - self.nLines + 1
-        
-        for point in self.pointList:
-            point.setPosition(point.r)
-            
-        self.staticSolve()
-    
     
     def setEndPosition(self, r, endB, sink=False):
         '''Sets either end position of the subsystem in the global/system
@@ -325,7 +274,7 @@ class Subsystem(System, Line):
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
     
     
-    def staticSolve(self, reset=False, tol=0.01, profiles=0):
+    def staticSolve(self, reset=False, tol=0, profiles=0):
         '''Solve internal equilibrium of the Subsystem and saves the forces
         and stiffnesses at the ends in the global reference frame. All the 
         This method mimics the behavior of the Line.staticSolve method and 
@@ -333,6 +282,9 @@ class Subsystem(System, Line):
         equilibrium happens in the local 2D plane. Values in this local 
         frame are also saved. 
         '''
+        
+        if tol==0:
+            tol=self.eqtol
         
         # transform end positions to SubSystem internal coordinate system
         # inputs are self.rA, rB in global frame
@@ -415,9 +367,9 @@ class Subsystem(System, Line):
             # get the Line's local coordinates
             Xs0, Ys0, Zs, tensions = line.getLineCoords(Time)
             
-            # transform to global coordinates
-            Xs = self.rA[0] + Xs0*self.cos_th - Ys0*self.sin_th
-            Ys = self.rA[1] + Xs0*self.sin_th + Ys0*self.cos_th
+            # transform to global coordinates (Ys0 should be zero for now)
+            Xs = self.rA[0] + (Xs0 + self.span)*self.cos_th - Ys0*self.sin_th
+            Ys = self.rA[1] + (Xs0 + self.span)*self.sin_th + Ys0*self.cos_th
             
             # apply 3D to 2D transformation to provide desired viewing angle
             Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] + Xoff
@@ -488,26 +440,60 @@ class Subsystem(System, Line):
         '''Moves end B of the Subsystem to represent an offset from the 
         undisplaced position of the endpoint. End A is set based on the 
         'span' (shouldn't change), and B is set based on offset and the
-        rBFair setting. Optional argument z can be added for a z offset.
+        rad_fair/z_fair setting. Optional argument z can be added for a z offset.
         '''
         
-        self.rA = np.array([-self.span, 0, self.rA[2]])
-        self.rB = np.array([-self.rBFair[0] + offset, 0, self.rBFair[2]+z]) 
+        # Use static EA values and unstretched lengths
+        self.revertToStaticStiffness()
+
+        # Ensure end A position and set end B position to offset values
+        self.rA = np.array([-self.span-self.rad_fair, 0, self.rA[2]])
+        self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
         
-        # should we also do the static solve now?
+        self.staticSolve(tol=self.eqtol)  # solve the subsystem
+        
+        # Store some values at this offset position that may be used later
+        for i, line in enumerate(self.lineList):
+            self.TeM[i,0] = np.linalg.norm(line.fA)
+            self.TeM[i,1] = np.linalg.norm(line.fB)
+                
+        self.anchorFx0 = self.lineList[0].fA[0]
+        self.anchorFz0 = self.lineList[0].fA[2]
+    
+        self.TeD = np.copy(self.TeM)  # set the dynamic values as well, in case they get queried right away
+        
+    
+    def setDynamicOffset(self, offset, z=0):
+        '''Moves end B of the Subsystem to represent a dynamic offset from
+        the previous offset location. Uses dynamic stiffness values and also
+        applies dynamic amplification factors (DAFs) on the difference from
+        the mean tensions (which would have been calculated in getOffset).
+        End A is set based on the 'span' (shouldn't change), 
+        and B is set based on offset and the rad_fair/z_fair setting. 
+        Optional argument z can be added for a z offset.
+        '''
+        
+        if not self.dynamic_stiffness_activated: # if not already using them,
+            System.activateDynamicStiffness(self)  # switch to dynamic EA values
+        
+        # adjust end B to the absolute offsets specified
+        self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
+        
+        self.staticSolve(tol=self.eqtol)  # solve the subsystem
+        
+        # Store dynamic values at this offset position that may be used later
+        for i, line in enumerate(self.lineList):
+            self.TeD[i,:] = self.TeM[i,:] + self.DAFs[i]*( np.array([line.TA, line.TB]) - self.TeM[i,:] )
+        
         
     
     def activateDynamicStiffness(self, display=0):
-        '''Switch mooring system model to dynamic line stiffness
-        values and adjust the unstretched line lengths to maintain the
-        same tensions. This only has an effect when dynamic line properties
-        are used.'''
+        '''Calls the dynamic stiffness method from System rather than from Line.'''
         System.activateDynamicStiffness(self, display=display)
     
     
     def revertToStaticStiffness(self):
-        '''Revert mooring system model back to the static stiffness
-        values and the original unstretched lenths.'''
+        '''Calls the static stiffness method from System rather than from Line.'''
         System.revertToStaticStiffness(self)
     
     
@@ -627,13 +613,16 @@ class Subsystem(System, Line):
     
     def getTen(self, iLine):
         '''Compute the end (maximum) tension for a specific line, including
-        a dynamic amplification factor.'''        
+        a dynamic amplification factor.'''
         line = self.lineList[iLine]
-        
+        '''
         dynamicTe = max([ self.Te0[iLine,0] + self.DAFs[iLine]*(np.linalg.norm(line.fA) - self.Te0[iLine,0]),
                           self.Te0[iLine,1] + self.DAFs[iLine]*(np.linalg.norm(line.fB) - self.Te0[iLine,1])])
+        '''
+        dynamicTe = max( self.TeD[iLine,:] )
         
         return dynamicTe 
+    
     
     def getTenSF(self, iLine):
         '''Compute MBL/tension for a specific line.'''
@@ -670,7 +659,7 @@ class Subsystem(System, Line):
         
         tau0 = -self.fB[0]  # horizontal tension component [N]
 
-        yaw_stiff = (tau0/l)*self.rBFair[0]**2 + tau0*self.rBFair[0]  # [N-m]
+        yaw_stiff = (tau0/l)*self.rad_fair**2 + tau0*self.rad_fair  # [N-m]
         
         return yaw_stiff
 
@@ -679,8 +668,6 @@ class Subsystem(System, Line):
         '''Get the curvature [1/m] at each node of a Subsystem. Should already 
         be in equilibrium. Also populates nodal values for S, X, Y, Z, T, and K
         along the full length.'''
-        
-        self.nNodes = np.sum([l.nNodes for l in self.lineList]) - self.nLines + 1
         
         n = self.nNodes
         
@@ -763,4 +750,4 @@ class Subsystem(System, Line):
         
         for i, line in enumerate(self.lineList):
             line.loadData(dirname, rootname, line_IDs[i])
-  
+

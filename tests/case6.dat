@@ -1,0 +1,39 @@
+MoorDyn Input File                                        
+W shape with seabed contact
+----------------------- LINE TYPES ------------------------------------------        
+Name  Diam  MassDen  EA       BA/-zeta   EI    Cd    Ca   CdAx   CaAx 
+(-)   (m)   (kg/m)   (N)      (N-s/-)   (-)   (-)   (-)   (-)   (-)      
+main  0.2  500.00  2.0E+09  -1        0     1    0.27  1      0.20        
+---------------------- POINTS --------------------------------                                       
+Node Type      X     Y      Z     M    V   CdA   CA
+(-)  (-)      (m)   (m)    (m)   (kg) (m^3)  (m^2) (-)
+1   Fixed  -400.0   0.0     0.0    0    0    0    0
+2   Free      0.0   0.0  -100.0    0   200   0    0
+3   Free      0.0 200.0  -200.0    0    0    0    0
+4   Fixed     0.0 400.0     0.0    0    0    0    0
+---------------------- LINES --------------------------------------       
+Line  LineType NodeAnch  NodeFair UnstrLen  NumSegs    Flags/Outputs                   
+(-)   (-)      (-)       (-)      (m)       (-)        (-)                 
+1     main      1         2       660.00    20          pt                  
+2     main      2         3       330.00    10          pt                  
+3     main      3         4       330.00    10          pt                  
+---------------------- SOLVER OPTIONS ---------------------------------------    
+300      WtrDpth                                       
+0.001    dtM       - time step to use in mooring integration (s)
+3.0e6    kbot      - bottom stiffness (Pa/m)
+3.0e5    cbot      - bottom damping (Pa-s/m)
+1.0      dtIC      - time interval for analyzing convergence during IC gen (s)
+50.0     TmaxIC    - max time for ic gen (s)
+4.0      CdScaleIC - factor by which to scale drag coefficients during dynamic relaxation (-)
+0.001    threshIC  - threshold for IC convergence (-)                                          
+------------------------ OUTPUTS --------------------------------------------                                           
+FairTen1                                         
+AnchTen1   
+Con1fx    
+Con1fy                                         
+Con1fz    
+Con2fx     
+Con2fy                                         
+Con2fz                                     
+------------------------- need this line --------------------------------------                                                                                     
+                                            
