@@ -1,0 +1,58 @@
+MoorDyn v2 Input File 
+Simple two turbine shared mooring demo
+---------------------- LINE TYPES --------------------------------------------------
+TypeName      Diam     Mass/m     EA     BA/-zeta     EI        Cd      Ca      CdAx    CaAx
+(name)        (m)      (kg/m)     (N)    (N-s/-)    (N-m^2)     (-)     (-)     (-)     (-)
+rope          0.1797    34.85  4.761e+07 -1.000e+00 0.000e+00   2.0    0.8    0.40     0.25  
+--------------------- ROD TYPES -----------------------------------------------------
+TypeName      Diam     Mass/m    Cd     Ca      CdEnd    CaEnd
+(name)        (m)      (kg/m)    (-)    (-)     (-)      (-)
+----------------------- BODIES ------------------------------------------------------
+ID   Attachment    X0     Y0     Z0     r0      p0     y0     Mass          CG*          I*      Volume   CdA*   Ca*
+(#)     (-)        (m)    (m)    (m)   (deg)   (deg)  (deg)   (kg)          (m)         (kg-m^2)  (m^3)   (m^2)  (-)
+---------------------- RODS ---------------------------------------------------------
+ID   RodType  Attachment  Xa    Ya    Za    Xb    Yb    Zb   NumSegs  RodOutputs
+(#)  (name)    (#/key)    (m)   (m)   (m)   (m)   (m)   (m)  (-)       (-)
+---------------------- POINTS -------------------------------------------------------
+ID  Attachment     X       Y       Z           Mass  Volume  CdA    Ca
+(#)   (-)         (m)     (m)     (m)          (kg)  (m^3)  (m^2)   (-)
+1    Turbine1     40.0      0.0    -20.00      0.00   0.00   0.00   0.00   # shared line
+2    Free        200.0      0.0    -65.0   80000.00   0.00   0.00   0.00
+3    Free       1400.0      0.0    -65.0   80000.00   0.00   0.00   0.00
+4    Turbine2    -40.0      0.0    -20.00      0.00   0.00   0.00   0.00
+5    Fixed      -800.0    800.0   -600.00      0.00   0.00   0.00   0.00  # 
+6    Turbine1    -30.5     30.0    -20.00      0.00   0.00   0.00   0.00
+7    Fixed      -800.0   -800.0   -600.00      0.00   0.00   0.00   0.00  # 
+8    Turbine1    -30.5    -30.0    -20.00      0.00   0.00   0.00   0.00
+9    Fixed      2400.0    800.0   -600.00      0.00   0.00   0.00   0.00  # 
+10   Turbine2     30.5     30.0    -20.00      0.00   0.00   0.00   0.00
+11   Fixed      2400.0   -800.0   -600.00      0.00   0.00   0.00   0.00  # 
+12   Turbine2     30.5    -30.0    -20.00      0.00   0.00   0.00   0.00
+---------------------- LINES --------------------------------------------------------
+ID    LineType      AttachA  AttachB  UnstrLen  NumSegs  LineOutputs
+(#)    (name)        (#)      (#)       (m)       (-)     (-)
+1       rope          1       2       150.0        3       -   # shared line
+2       rope          2       3      1172.0       11       -
+3       rope          3       4       150.0        3       -
+4       rope          5       6      1190.0       11       -   # anchor lines
+5       rope          7       8      1190.0       11       -
+6       rope          9      10      1190.0       11       -
+7       rope         11      12      1190.0       11       -
+---------------------- OPTIONS ------------------------------------------------------
+0.001    dtM          - time step to use in mooring integration (s)
+600.0    WtrDpth        - water depth (m) <<< must be specified for farm-level mooring
+3.0e+06  kbot         - bottom stiffness (Pa/m)
+3.0e+05  cbot         - bottom damping (Pa-s/m)
+2.0      dtIC         - time interval for analyzing convergence during IC gen (s)
+100.0    TmaxIC       - max time for ic gen (s)
+4.0      CdScaleIC    - factor by which to scale drag coefficients during dynamic relaxation (-)
+0.00     threshIC     - threshold for IC convergence (-)
+0.01     dtOut     - Output time step (-)
+----------------------- OUTPUTS -----------------------------------------------------
+AnchTen1
+FairTen3
+FairTen4
+FairTen5
+FairTen6
+FairTen7
+--------------------- need this line ------------------------------------------------
