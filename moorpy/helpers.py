@@ -1020,22 +1020,23 @@ def makeTower(twrH, twrRad):
 def lines2ss(ms):
     """
     This function automatically detects multi-segmented 
-    mooring lines in the mooring system object, convert 
-    them into subsystem, and updates the mooring system. 
+    mooring lines in the MoorPy system object, convert 
+    them into subsystems, and updates the MoorPy system. 
     It detects whether the line is suspended or anchored,
     as well as whether it is in the right order (if not
     it will re-oreder).
 
-    Args:
-        ms (object): The mooring system object
+    Parameters
+    ----------
+    ms (object): 
+        MoorPy system object
 
-    Raises:
-        ValueError: in case one point has more than 2 connections,
-        (a branch out), an error will show up.
-
-    Returns:
-        object: an updated mooring system object with the replaced 
+    Returns
+    ----------
+    ms : object
+        an updated MoorPy system object with the replaced 
         multi-segmented mooring lines with subsystems.
+
     """
     
     i = 0 
