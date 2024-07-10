@@ -1018,7 +1018,7 @@ def makeTower(twrH, twrRad):
     return Xs, Ys, Zs
 
 def lines2ss(ms):
-    """
+    '''
     This function automatically detects multi-segmented 
     mooring lines in the MoorPy system object, convert 
     them into subsystems, and updates the MoorPy system. 
@@ -1037,7 +1037,7 @@ def lines2ss(ms):
         an updated MoorPy system object with the replaced 
         multi-segmented mooring lines with subsystems.
 
-    """
+    '''
     
     i = 0 
     while True:
