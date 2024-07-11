@@ -1026,8 +1026,8 @@ class Line():
             matrix = (matrix + matrix.T)/2
             zeros = np.zeros((3,3))
 
-            # Remove rows and columns corresponding to the dofs of nodes2remove. Each node has 3 dofs
-            if nodes2remove.size==0:
+            # Empty nodes2remove is the same thing as not removing any nodes
+            if nodes2remove is not None and nodes2remove.size==0:
                 nodes2remove = None
 
             if nodes2remove is not None:
@@ -1086,8 +1086,32 @@ class Line():
         #     return M1, A1, B1, K1
 
         # Remove the nodes that are lying on the seabed
-        X_mean,Y_mean,Z_mean,T_mean = self.getLineCoords(0.0,n=self.nNodes) # coordinates of line nodes and tension values
-        idx2remove = np.where(Z_mean <= -self.sys.depth+1e-06)[0]
+        # X_mean,Y_mean,Z_mean,T_mean = self.getLineCoords(0.0,n=self.nNodes) # coordinates of line nodes and tension values
+        # idx2remove = np.where(Z_mean <= -self.sys.depth+1e-06)[0]
+
+        if not hasattr(self, 'lineList'):
+            X_mean,Y_mean,Z_mean,T_mean = self.getLineCoords(0.0,n=self.nNodes) # coordinates of line nodes and tension values
+            depth = self.sys.depth
+        else:
+            X_mean, Y_mean, Z_mean = [np.zeros(self.nNodes) for _ in range(3)]
+            depth = self.depth
+            idxNodeA = 0
+            for iline, line in enumerate(self.lineList):
+                x, y, z, _ = line.getLineCoords(0.0)
+                n = len(x)                
+                if iline == 0:  # For the first line, include all nodes
+                    X_mean[idxNodeA:idxNodeA+n] = x
+                    Y_mean[idxNodeA:idxNodeA+n] = y
+                    Z_mean[idxNodeA:idxNodeA+n] = z
+                    idxNodeA += n
+                else:  # For subsequent lines, exclude the first node to avoid repetition
+                    X_mean[idxNodeA:idxNodeA+n-1] = x[1:]
+                    Y_mean[idxNodeA:idxNodeA+n-1] = y[1:]
+                    Z_mean[idxNodeA:idxNodeA+n-1] = z[1:]
+                    idxNodeA += (n - 1)
+        idx2remove = np.where(Z_mean <= -depth+1e-06)[0]
+        # idx2remove=None
+
         
         # Keep one of the nodes to remove, which is the one in the interface with the nodes to keep
         # is_seabed = Z_mean <= -self.sys.depth+1e-06        
