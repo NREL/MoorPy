@@ -144,7 +144,8 @@ class System():
                         rod.loadData(dirname, rootname, sep='_')  
     
     
-    def addBody(self, mytype, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), f6Ext=np.zeros(6)):
+    def addBody(self, mytype, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, 
+                rM=np.zeros(3), f6Ext=np.zeros(6), DOFs=[0,1,2,3,4,5]):
         '''Convenience function to add a Body to a mooring system
 
         Parameters
@@ -172,7 +173,8 @@ class System():
 
         '''
         
-        self.bodyList.append( Body(self, len(self.bodyList)+1, mytype, r6, m=m, v=v, rCG=rCG, AWP=AWP, rM=rM, f6Ext=f6Ext) )
+        self.bodyList.append( Body(self, len(self.bodyList)+1, mytype, r6, m=m,
+            v=v, rCG=rCG, AWP=AWP, rM=rM, f6Ext=f6Ext, DOFs=DOFs) )
         
         # handle display message if/when MoorPy is reorganized by classes
         
