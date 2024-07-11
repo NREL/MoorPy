@@ -150,7 +150,7 @@ class Subsystem(System, Line):
         self.damage = np.zeros(self.nNodes)
         
     
-    def makeGeneric(self, lengths, types, connectors=[], suspended=0):
+    def makeGeneric(self, lengths, types, connectors=[], suspended=0, nSegs=40):
 
         '''Creates a cable of n components going between an anchor point and
         a floating body (or a bridle point). If shared, it goes between two
@@ -223,9 +223,15 @@ class Subsystem(System, Line):
             else:
                 raise Exception(f"Can't find lineType '{types[i]}' in the SubSystem.")
             
-            # add the line segment using the reference to its lineType dict            
             # add the line segment using the reference to its lineType dict
-            self.addLine(lengths[i],self.lineTypes[i])
+            if nSegs is None:
+                self.addLine(lengths[i], self.lineTypes[i])
+            elif isinstance(nSegs, (int, float)):
+                self.addLine(lengths[i], self.lineTypes[i], nSegs=nSegs)
+            elif isinstance(nSegs, list):
+                self.addLine(lengths[i], self.lineTypes[i], nSegs=nSegs[i])
+            else:
+                raise ValueError("Invalid type for nSegs. Expected None, a number, or a list.")
 
             # add the upper end point of the segment
             if i==self.nLines-1:                            # if this is the upper-most line

@@ -1510,6 +1510,8 @@ class System():
             
         for line in self.lineList:
             line.staticSolve(profiles=1)  # flag to enable additional line outputs used for plotting, tension results, etc.
+            if hasattr(line, 'lineList'):
+                line.initialize()
             
         for point in self.pointList:
             point.getForces()
