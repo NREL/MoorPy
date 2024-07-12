@@ -415,7 +415,7 @@ class Line():
         
     
     
-    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, cmap='rainbow', plotnodes=[], plotnodesline=[], label="", alpha=1.0):
+    def drawLine2d(self, Time, ax, color="k", Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, cmap='rainbow', plotnodes=[], plotnodesline=[], label="", alpha=1.0,linewidth=1):
         '''Draw the line on 2D plot (ax must be 2D)
 
         Parameters
@@ -434,6 +434,8 @@ class Line():
             toggle to plot the lines in a colormap based on node tensions. The default is False
         cmap : string, optional
             colormap string type to plot tensions when colortension=True. The default is 'rainbow'
+        linewidth: float, optional
+            sets the mooring lines linewidth in matplotlib. default is 1
 
         Returns
         -------
@@ -475,7 +477,7 @@ class Line():
                     rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
                     linebit.append(ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba))
             else:
-                linebit.append(ax.plot(Xs2d, Ys2d, lw=1, color=color, label=label, alpha=alpha)) # previously had lw=1 (linewidth)
+                linebit.append(ax.plot(Xs2d, Ys2d, lw=linewidth, color=color, label=label, alpha=alpha)) # previously had lw=1 (linewidth)
             
             if len(plotnodes) > 0:
                 for i,node in enumerate(plotnodes):
