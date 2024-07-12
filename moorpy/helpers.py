@@ -1018,6 +1018,114 @@ def makeTower(twrH, twrRad):
     
     return Xs, Ys, Zs
 
+def lines2ss(ms):
+    '''
+    This function automatically detects multi-segmented 
+    mooring lines in the MoorPy system object, convert 
+    them into subsystems, and updates the MoorPy system. 
+    It detects whether the line is suspended or anchored,
+    as well as whether it is in the right order (if not
+    it will re-oreder).
+
+    Parameters
+    ----------
+    ms (object): 
+        MoorPy system object
+
+    Returns
+    ----------
+    ms : object
+        an updated MoorPy system object with the replaced 
+        multi-segmented mooring lines with subsystems.
+
+    '''
+    
+    i = 0 
+    while True:
+        subsys_line_id = []
+        subsys_point_id = []
+        line_ID_of_interest = []
+        point_ID_of_interest = []
+        pointi = ms.pointList[i]
+        if len(pointi.attached) > 2:
+            raise ValueError("f point number {pointi.number} branches out.")
+        # 1) define the connected lines if any
+        subsys_line_id.append(pointi.attached[0])
+        subsys_point_id.append(pointi.number)
+        # 2) check where the line with line_ID has been repeated in other points
+        while True:
+            for line_id in subsys_line_id:
+                for pointj in ms.pointList:
+                    if line_id in pointj.attached:
+                        line_ID_of_interest.append(pointj.attached)
+                        point_ID_of_interest.append(pointj.number)
+                        # if len(pointj.attached) > 2:  # this is the case where we end the subsystem chain if the subsystem line is branching
+                            # continue
+            old_subsys_line = subsys_line_id
+            old_subsys_point = subsys_point_id
+            # 3) get the unique values
+            subsys_line_id = np.unique(np.concatenate(line_ID_of_interest))
+            subsys_point_id = np.unique(point_ID_of_interest)
+            if len(subsys_line_id) == len(old_subsys_line) and len(subsys_point_id) == len(old_subsys_point):
+                break
+
+        # 4) check if the subsystem is at its lowest state (line and two points), in that case, move to the next point.
+        if len(subsys_line_id) == 1 and len(subsys_point_id) == 2:
+            i += 1
+            if i >= len(ms.pointList):
+                break
+            continue
+        # 5) define the case for this subsys: (case=0: anchored, case=1: suspended)
+        ends_z = []
+        for pointk in subsys_point_id:
+            ends_z.append(ms.pointList[pointk - 1].r[-1])
+
+        dist_to_seabed = np.abs(np.min(ends_z)) - ms.depth  # distance from the lowest point to the seabed
+        # if the abs(distance) is below 20%, and it is of fixed type, we consider it anchored (seabed can be variant and anchor might not be at exact ms.seabed)
+        if np.abs(dist_to_seabed) < 0.2 * ms.depth and ms.pointList[np.argmin(ends_z)].type == 1:  
+            case = 0
+        else:
+            case = 1  # suspended
+
+        # 6) rearrange lines.
+        if case==0:
+            anchored_point = ms.pointList[subsys_point_id[np.argmin(ends_z)]-1].r
+            # find the distance between the anchored point and the middle of each line:
+            dist_to_anchor = []
+
+            for line_id in subsys_line_id:
+                rA = ms.lineList[line_id-1].rA
+                rB = ms.lineList[line_id-1].rB
+                rAdist_to_anchor = np.linalg.norm(rA - anchored_point)
+                rBdist_to_anchor = np.linalg.norm(rB - anchored_point)
+                dist_to_anchor.append(np.mean([rAdist_to_anchor, rBdist_to_anchor]))
+                if rAdist_to_anchor > rBdist_to_anchor:  # Find a way to switch rA and rB so that rA is the point closer to the anchor
+                    pass
+
+            subsys_lines = subsys_line_id[np.argsort(dist_to_anchor)] - 1
+
+            # find the distance between the anchored point and the mooring points
+            pdist_to_anchor = []
+            for point_id in subsys_point_id:
+                pdist_to_anchor.append(np.linalg.norm(ms.pointList[point_id - 1].r - anchored_point))
+
+            subsys_points = subsys_point_id[np.argsort(pdist_to_anchor)] - 1
+        else:
+            subsys_lines = subsys_line_id - 1 # no need to rearrange because it could work from either end
+            subsys_points = subsys_point_id - 1
+
+        
+        lines = list(subsys_lines)
+        points = list(subsys_points)
+        ms = lines2subsystem(lines, ms, span=None, case=case)
+        ms.initialize()
+        ms.solveEquilibrium()
+        i += 1
+        if i >= len(ms.pointList):
+            break
+
+    return ms
+
 def lines2subsystem(lines,ms,span=None,case=0):
     '''Takes a set of connected lines (in order from rA to rB) in a moorpy system and creates a subsystem equivalent.
     The original set of lines are then removed from the moorpy system and replaced with the 

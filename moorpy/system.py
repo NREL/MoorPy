@@ -1377,7 +1377,7 @@ class System():
                     
             L.append("---------------------- POINTS -------------------------------------------------------")
             L.append("ID  Attachment     X       Y       Z           Mass  Volume  CdA    Ca")
-            L.append("(#)   (-)         (m)     (m)     (m)          (kg)  (mˆ3)  (m^2)   (-)")
+            L.append("(#)   (-)         (m)     (m)     (m)          (kg)  (m^3)  (m^2)   (-)")
             
             for point in self.pointList:
                 if point.cable == False:
