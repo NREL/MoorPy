@@ -305,7 +305,7 @@ class Subsystem(System, Line):
         self.solveEquilibrium(tol=tol)
         
         # get 2D stiffness matrices of end points
-        K = self.getCoupledStiffness()
+        K = self.getCoupledStiffnessA()
         
         # transform coordinates and forces back into global frame
         if LH > 0:

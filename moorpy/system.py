@@ -144,7 +144,8 @@ class System():
                         rod.loadData(dirname, rootname, sep='_')  
     
     
-    def addBody(self, mytype, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, rM=np.zeros(3), f6Ext=np.zeros(6)):
+    def addBody(self, mytype, r6, m=0, v=0, rCG=np.zeros(3), AWP=0, 
+                rM=np.zeros(3), f6Ext=np.zeros(6), DOFs=[0,1,2,3,4,5]):
         '''Convenience function to add a Body to a mooring system
 
         Parameters
@@ -172,7 +173,8 @@ class System():
 
         '''
         
-        self.bodyList.append( Body(self, len(self.bodyList)+1, mytype, r6, m=m, v=v, rCG=rCG, AWP=AWP, rM=rM, f6Ext=f6Ext) )
+        self.bodyList.append( Body(self, len(self.bodyList)+1, mytype, r6, m=m,
+            v=v, rCG=rCG, AWP=AWP, rM=rM, f6Ext=f6Ext, DOFs=DOFs) )
         
         # handle display message if/when MoorPy is reorganized by classes
         
@@ -1380,7 +1382,7 @@ class System():
                     
             L.append("---------------------- POINTS -------------------------------------------------------")
             L.append("ID  Attachment     X       Y       Z           Mass  Volume  CdA    Ca")
-            L.append("(#)   (-)         (m)     (m)     (m)          (kg)  (mˆ3)  (m^2)   (-)")
+            L.append("(#)   (-)         (m)     (m)     (m)          (kg)  (m^3)  (m^2)   (-)")
             
             for point in self.pointList:
                 if point.cable == False:
@@ -3713,6 +3715,8 @@ class System():
         plotnodesline    = kwargs.get('plotnodesline'   , []        )   # the list of line numbers that match up with the desired node to be plotted
         label            = kwargs.get('label'           , ""        )   # the label/marker name of a line in the System
         draw_fairlead    = kwargs.get('draw_fairlead'   , False     )   # toggle to draw large points for the fairleads
+        line_width       = kwargs.get('linewidth'       , 1         )   # toggle to set the mooring line width in "drawLine2d
+
         
         
         
@@ -3769,13 +3773,13 @@ class System():
             j = j + 1
             if color==None and 'material' in line.type:
                 if 'chain' in line.type['material']:
-                    line.drawLine2d(time, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha)
+                    line.drawLine2d(time, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
                 elif 'rope' in line.type['material'] or 'polyester' in line.type['material']:
-                    line.drawLine2d(time, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha)
+                    line.drawLine2d(time, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
                 else:
-                    line.drawLine2d(time, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha)
+                    line.drawLine2d(time, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
             else:
-                line.drawLine2d(time, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha)
+                line.drawLine2d(time, ax, color=color, Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
 
             # Add Line labels
             if linelabels == True:
