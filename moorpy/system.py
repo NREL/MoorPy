@@ -2719,8 +2719,15 @@ class System():
         # get full system stiffness matrix
         K_all = self.getSystemStiffnessA(DOFtype="both", lines_only=lines_only)
         
+        # If there are no free DOFs, then K_all is K_coupled, so return it
+        if self.nDOF == 0:
+            return K_all
+        
         # invert matrix
-        K_inv_all = np.linalg.inv(K_all)
+        try:
+            K_inv_all = np.linalg.inv(K_all)
+        except:
+            K_inv_all = np.linalg.pinv(K_all)
         
         # remove free DOFs (this corresponds to saying that the sum of forces on these DOFs will remain zero)
         #indices = list(range(n))                # list of DOF indices that will remain active for this step

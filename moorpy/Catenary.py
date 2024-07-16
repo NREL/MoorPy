@@ -67,6 +67,12 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
 
     vertical_threshold = 0.0001  # the XF/ZF ratio below which the line will be approximated as vertical to avoid catenary errors (this could become an input parameter)
     
+    # Set a very small value to use as the horizontal stiffness in slack cases
+    # instead of to avoid indeterminant stiffness matrices and to allow the
+    # solver to move toward equilibrium even when all mooring lines may be
+    # slack.  Set as a fraction of W, which is roughly kz for slack cases.
+    slack_kx = 0.01*abs(W)  
+    
     # make info dict to contain any additional outputs
     info = dict(error=False)
     
@@ -248,8 +254,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
             
             info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
             info["VF"] = VF
-            info["stiffnessB"]  = np.array([[0.0, 0.0], [0.0, dVF_dZF]])
-            info["stiffnessA"]  = np.array([[0.0, 0.0], [0.0, W]]) 
+            info["stiffnessB"]  = np.array([[slack_kx, 0.0], [0.0, dVF_dZF]])
+            info["stiffnessA"]  = np.array([[slack_kx, 0.0], [0.0, W]]) 
             info["stiffnessBA"] = np.array([[0.0, 0.0], [0.0, 0.0]])
             info["LBot"] = L - LHanging
             info['ProfileType'] = 4
@@ -290,8 +296,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
             
             info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
             info["VF"] = VF
-            info["stiffnessB"]  = np.array([[0.0, 0.0], [0.0, W / np.sqrt(2.0*hB/EA_W + 1.0)]])
-            info["stiffnessA"]  = np.array([[0.0, 0.0], [0.0, W / np.sqrt(2.0*hA/EA_W + 1.0)]])
+            info["stiffnessB"]  = np.array([[slack_kx, 0.0], [0.0, W / np.sqrt(2.0*hB/EA_W + 1.0)]])
+            info["stiffnessA"]  = np.array([[slack_kx, 0.0], [0.0, W / np.sqrt(2.0*hA/EA_W + 1.0)]])
             info["stiffnessBA"] = np.array([[0.0, 0.0], [0.0, 0.0]])
             info["LBot"] = L - LHanging
             info['ProfileType'] = 5
