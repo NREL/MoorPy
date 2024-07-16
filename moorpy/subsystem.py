@@ -503,10 +503,7 @@ class Subsystem(System, Line):
         System.revertToStaticStiffness(self)
     
     
-    # ----- Function for dynamic frequency-domain tensions -----
-    
-    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot,
-                           seabed_tol=1e-4):
+    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=1e-4):
         '''Compute M,A,B,K matrices for the Subsystem. This calls 
         get_dynamic_matrices() for each Line in the Subsystem then combines
         the results. Note that this method overrides the Line method. Other

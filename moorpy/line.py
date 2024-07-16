@@ -1015,11 +1015,11 @@ class Line():
         self.L = self.L0
     
     
-    def getDynamicMatrices(self, *args, **kwargs):
+    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic, depth, kbot=0, cbot=0, seabed_tol=1e-4):
         '''Compute M,A,B,K matrices for Line. See get_dynamic_matrices().'''
-        return get_dynamic_matrices(self, *args, **kwargs)
+        return get_dynamic_matrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=1e-4)
 
-    def getDynamicMatricesLumped(self, *args, **kwargs):
+    def getDynamicMatricesLumped(self, omegas, S_zeta, r_dynamic, depth, kbot=0, cbot=0, seabed_tol=1e-4):
         '''Lump M,A,B,K matrices for Line at its extremities, returning 6x6 matrices'''
 
         def lump_matrix(matrix, nodes2remove=None):
@@ -1065,32 +1065,8 @@ class Line():
                 matrix_inv_coupled = np.block([[top_left, np.zeros((3,3))], [np.zeros((3,3)), np.zeros((3,3))]])
 
             return np.linalg.pinv(matrix_inv_coupled)
-
-
-        # # Get list of points
-        # pointList = self.pointList if hasattr(self, 'pointList') else self.sys.pointList # Difference between line and subsystem        
-        # rList = [p.r for p in pointList]
-        
-        # # Check if end A is fixed
-        # idxA = next((i for i, x in enumerate(rList) if np.allclose(x, self.rA, atol=1e-8)), -1) # Find the index of the point A in the point list
-        # removeA = False
-        # if pointList[idxA].type == 1:
-        #     removeA = True
-
-        # # Check if end B is fixed
-        # idxB = next((i for i, x in enumerate(rList) if np.allclose(x, self.rB, atol=1e-8)), -1)
-        # removeB = False
-        # if pointList[idxB].type == 1:
-        #     removeB = True
-
-        # # Cannot remove both ends. Return matrices with zeros if so.
-        # if removeA and removeB:
-        #     return M1, A1, B1, K1
-
+       
         # Remove the nodes that are lying on the seabed
-        # X_mean,Y_mean,Z_mean,T_mean = self.getLineCoords(0.0,n=self.nNodes) # coordinates of line nodes and tension values
-        # idx2remove = np.where(Z_mean <= -self.sys.depth+1e-06)[0]
-
         if not hasattr(self, 'lineList'):
             X_mean,Y_mean,Z_mean,T_mean = self.getLineCoords(0.0,n=self.nNodes) # coordinates of line nodes and tension values
             depth = self.sys.depth
@@ -1112,8 +1088,7 @@ class Line():
                     Z_mean[idxNodeA:idxNodeA+n-1] = z[1:]
                     idxNodeA += (n - 1)
         idx2remove = np.where(Z_mean <= -depth+1e-06)[0]
-        # idx2remove=None
-
+        # idx2remove = None
         
         # Keep one of the nodes to remove, which is the one in the interface with the nodes to keep
         # is_seabed = Z_mean <= -self.sys.depth+1e-06        
@@ -1121,7 +1096,7 @@ class Line():
         # idx2remove_all = np.where(is_seabed)[0] # Get all indices where is_seabed is True        
         # idx2remove = np.setdiff1d(idx2remove_all, transition_indices) # Remove transition_indices from idx2remove_all                
         
-        M, A, B, K, _, _ = self.getDynamicMatrices(*args, **kwargs)
+        M, A, B, K, _, _ = self.getDynamicMatrices(omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=seabed_tol)
         Ml = lump_matrix(M, nodes2remove=idx2remove)
         Al = lump_matrix(A, nodes2remove=idx2remove)
         Bl = lump_matrix(B, nodes2remove=idx2remove)

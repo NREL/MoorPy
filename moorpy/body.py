@@ -397,8 +397,7 @@ class Body():
 
         Returns
         -------
-        K : matrix
-            6x6 analytic stiffness matrix.
+        M, A, B, K: 6x6 inertia, added mass, damping, and stiffness matrices.
         '''
                 
         M, A, B, K = (np.zeros([6,6]) for _ in range(4))
