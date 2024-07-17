@@ -2932,7 +2932,7 @@ class System():
         
         return K
     
-    def getCoupledDynamicMatrices(self, omegas, S_zeta, depth, kbot=0, cbot=0, r_dynamic_init=None, lines_only=False):
+    def getCoupledDynamicMatrices(self, lines_only=False):
         '''Write something here later
         '''                                    
         self.nDOF, self.nCpldDOF, DOFtypes = self.getDOFs()
@@ -2943,7 +2943,7 @@ class System():
             print("Getting mooring system stiffness matrix...")
 
         # get full system stiffness matrix
-        M_all, A_all, B_all, K_all = self.getSystemDynamicMatrices(omegas, S_zeta, depth, kbot, cbot, DOFtype="both", lines_only=lines_only, r_dynamic_init=r_dynamic_init)
+        M_all, A_all, B_all, K_all = self.getSystemDynamicMatrices(DOFtype="both", lines_only=lines_only)
         
         # invert matrix
         M_inv_all = np.linalg.pinv(M_all)
@@ -2974,7 +2974,7 @@ class System():
         return M_coupled, A_coupled, B_coupled, K_coupled
         
     
-    def getSystemDynamicMatrices(self, omegas, S_zeta, depth, kbot=0, cbot=0, DOFtype="free", lines_only=False, r_dynamic_init=None, rho=1025, g=9.81):
+    def getSystemDynamicMatrices(self, DOFtype="free", lines_only=False):
         '''Write something here later        
         '''                      
         # find the total number of free and coupled DOFs in case any object types changed
@@ -3019,7 +3019,7 @@ class System():
                 #i = (body1.number-1)*6      # start counting index for body DOFs based on body number to keep indexing consistent
                 
                 # get body's self-stiffness matrix (now only cross-coupling terms will be handled on a line-by-line basis)
-                M6, A6, B6, K6 = body1.getDynamicMatrices(omegas, S_zeta, depth, kbot=kbot, cbot=cbot, r_dynamic_init=r_dynamic_init, lines_only=lines_only)
+                M6, A6, B6, K6 = body1.getDynamicMatrices(lines_only=lines_only)
                 M[i:i+body1.nDOF, i:i+body1.nDOF] += M6
                 A[i:i+body1.nDOF, i:i+body1.nDOF] += A6
                 B[i:i+body1.nDOF, i:i+body1.nDOF] += B6
@@ -3038,9 +3038,7 @@ class System():
                         j = i + body1.nDOF              # first index of the DOFs this line is attached to. Start it off at the next spot after body1's DOFs
                         
                         # get cross-coupling stiffness of line: force on end attached to body1 due to motion of other end
-                        if r_dynamic_init == None:
-                            r_init = np.ones((len(omegas),self.lineList[lineID-1].nNodes,3))
-                        M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped(omegas,S_zeta,r_init,depth,kbot,cbot)
+                        M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped()
                                              
                         MB = M_all[-3:,:3] if point1.attachedEndB == 1 else M_all[:3,-3:]
                         AB = A_all[-3:,:3] if point1.attachedEndB == 1 else A_all[:3,-3:]
@@ -3111,7 +3109,7 @@ class System():
                 # >>> TODO: handle case of free end point resting on seabed <<<
                 
                 # get point's self-stiffness matrix                    
-                M1, A1, B1, K1 = point.getDynamicMatrices(omegas, S_zeta, depth, kbot, cbot, r_dynamic_init=r_dynamic_init)
+                M1, A1, B1, K1 = point.getDynamicMatrices()
                 M[i:i+n,i:i+n] += M1
                 A[i:i+n,i:i+n] += A1
                 B[i:i+n,i:i+n] += B1 
@@ -3128,9 +3126,7 @@ class System():
 
                                 # get cross-coupling stiffness of line: force on end attached to point1 due to motion of other end
                                 # The names are somewhat confusing, but AB: Added mass matrix (A) at point B due to motions of the other extremity
-                                if r_dynamic_init == None:
-                                    r_init = np.ones((len(omegas), self.lineList[lineID-1].nNodes, 3))
-                                M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped(omegas,S_zeta,r_init,depth,kbot,cbot)
+                                M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped()
                                              
                                 MB = M_all[-3:,:3] if point.attachedEndB == 1 else M_all[:3,-3:]
                                 AB = A_all[-3:,:3] if point.attachedEndB == 1 else A_all[:3,-3:]
@@ -3164,7 +3160,27 @@ class System():
                 i += n
         
         return M, A, B, K
-    
+
+
+    def updateSystemDynamicMatrices(self, omegas=np.array([0.0]), S_zeta=np.array([0.0]), seabed_tol=1e-4):
+        '''Updates the dynamic matrices of all the lines in the system. Works only with lumped mass approach (MoorDyn input file)
+        This function can only properly update/compute the inertia, added mass, and stiffness matrices of each line in the system.        
+        
+        This function also updates the damping matrix, but this is done considering unitary amplitude motions of the nodes, which
+        is not correct.
+        If `omegas` and `S_zeta` are provided, the damping matrix will account for wave kinematics as well, but that would still
+        be wrong
+
+        To properly compute the damping matrix, you should call line.updateLumpedMass externally providing the motion RAOs of the
+        line ends.
+        '''
+        kbot=0 # Should read those from the input file
+        cbot=0
+        
+        for line in self.lineList:
+            line.updateLumpedMass(omegas, S_zeta, self.depth, kbot=kbot, cbot=cbot, seabed_tol=seabed_tol)
+
+
     def getAnchorLoads(self, sfx, sfy, sfz, N):
         ''' Calculates anchor loads
         Parameters

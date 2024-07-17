@@ -1879,14 +1879,14 @@ def get_dynamic_matrices(Line, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_t
     return M,A,B,K,r_mean,EA_segs
 
 
-def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_tol=1e-4,tol = 0.01,iters=100, w = 0.8, conv_time=True):
+def get_dynamic_tension(line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_tol=1e-4,tol = 0.01,iters=100, w = 0.8, conv_time=False, returnMatrices=False):
     """
-    Evaluates dynamic tension at all the nodes for an instance of MoorPy's Line or CompositeLine classes.
+    Evaluates dynamic tension at all the nodes for an instance of MoorPy's line or CompositeLine classes.
 
     Parameters
     ----------
-    Line : Line/CompositeLine
-        An instance of MoorPy's Line or CompositeLine classes.
+    line : line/CompositeLine
+        An instance of MoorPy's line or CompositeLine classes.
     omegas : ndarray
         Array of frequencies in rad/s.
     S_zeta : ndarray
@@ -1910,8 +1910,10 @@ def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
     w : float, optional
         Succesive relaxation coefficient, by default 0.8
 
-    Returns
+    Returns (if returnMatrices = False)
     -------
+    T_nodes_psd: ndarray
+        Tension amplitude at nodes given as (m,n) array where m is the number of frequencies and n is the number of nodes.
     T_nodes_psd: ndarray
         Tension spectra at nodes given as (m,n) array where m is the number of frequencies and n is the number of nodes.
     T_nodes_std: ndarray
@@ -1926,8 +1928,15 @@ def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
         Combined static and dynamic positions.
     X: ndarray
         Solution of the dynamic problem.
+
+    Returns (if returnMatrices = True)
+    -------
+    M: (n,n) inertia matrix, where n is the number of nodes
+    A: (n,n) added mass matrix
+    B: (n,n) damping matrix
+    K: (n,n) stiffness matrix
     """
-    N = Line.nNodes
+    N = line.nNodes
     n_dofs = 3*N
 
     if np.all(RAO_A == 0):
@@ -1937,7 +1946,7 @@ def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
 
     # intialize iteration matrices
     r_dynamic_init = np.ones((len(omegas),N,3))
-    M,A,B,K,r_static,EA_segs = Line.getDynamicMatrices(omegas,S_zeta,r_dynamic_init,depth,kbot,cbot,seabed_tol=seabed_tol) # TODO: return EA_segs
+    M,A,B,K,r_static,EA_segs = line.getDynamicMatrices(omegas,S_zeta,r_dynamic_init,depth,kbot,cbot,seabed_tol=seabed_tol) # TODO: return EA_segs
     X = np.zeros((len(omegas),n_dofs),dtype = 'complex')
     r_dynamic = np.zeros(((len(omegas),int(n_dofs/3),3)),dtype = 'complex')
     S_Xd = np.zeros((len(omegas),n_dofs),dtype = 'float')
@@ -1965,7 +1974,7 @@ def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
             break
         else:
             sigma_Xd0[:] = w * sigma_Xd + (1.-w) * sigma_Xd0
-            _,_,B[:],_,_,_ = Line.getDynamicMatrices(omegas,S_zeta,r_dynamic,depth,kbot,cbot,seabed_tol=seabed_tol)
+            _,_,B[:],_,_,_ = line.getDynamicMatrices(omegas,S_zeta,r_dynamic,depth,kbot,cbot,seabed_tol=seabed_tol)
     if conv_time:
         print(f'Finished {ni} dynamic tension iterations in {time.time()-start} seconds (w = {w}).')
 
@@ -2004,7 +2013,10 @@ def get_dynamic_tension(Line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
     s = np.zeros_like(T_nodes_std)
     s = np.cumsum(ds)
 
-    return T_nodes_amp, T_nodes_psd,T_nodes_std, s,r_static,r_dynamic,r_total,X
+    if returnMatrices:
+        return M, A, B, K
+    else:
+        return T_nodes_amp, T_nodes_psd, T_nodes_std, s, r_static, r_dynamic, r_total, X
 
 
 def get_modes(line,fix_A=True,fix_B=True,plot_modes=False,amp_factor=1,adj_view = False,kbot=3E+06,cbot=3E+05,seabed_tol=1E-04):

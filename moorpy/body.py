@@ -384,7 +384,7 @@ class Body():
             return K[:,self.DOFs][self.DOFs,:]
 
 
-    def getDynamicMatrices(self, omegas, S_zeta, depth, kbot=0, cbot=0, r_dynamic_init=None, lines_only=False, all_DOFs=False):
+    def getDynamicMatrices(self, lines_only=False, all_DOFs=False):
         '''Gets the dynamic matrices of the Body with other objects fixed
         using a lumped mass approach.
 
@@ -407,7 +407,7 @@ class Body():
             r = rotatePosition(rPointRel, self.r6[3:])          # relative position of Point about body ref point in unrotated reference frame  
             f3 = self.sys.pointList[PointID-1].getForces()      # total force on point (for additional rotational stiffness term due to change in moment arm)
 
-            M3, A3, B3, K3 = self.sys.pointList[PointID-1].getDynamicMatrices(omegas, S_zeta, depth, kbot, cbot, r_dynamic_init=r_dynamic_init)  # local 3D dynamic matrices of the point
+            M3, A3, B3, K3 = self.sys.pointList[PointID-1].getDynamicMatrices()  # local 3D dynamic matrices of the point
             
             # following are from functions translateMatrix3to6            
             H = getH(r)

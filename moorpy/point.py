@@ -337,7 +337,7 @@ class Point():
         else:                       # otherwise only return rows/columns of active DOFs
             return K[:,self.DOFs][self.DOFs,:]
 
-    def getDynamicMatrices(self, omegas, S_zeta, depth, kbot=0, cbot=0, r_dynamic_init=None):
+    def getDynamicMatrices(self):
         '''Gets inertia, added mass, damping, and stiffness matrices of Point due only to mooring lines (with other objects fixed)
         using a lumped mass model.
 
@@ -351,11 +351,9 @@ class Point():
 
         # append the stiffness matrix of each line attached to the point
         for lineID,endB in zip(self.attached,self.attachedEndB):            
-            line = self.sys.lineList[lineID-1]
-            if r_dynamic_init == None:
-                r_init = np.ones((len(omegas),line.nNodes,3))
+            line = self.sys.lineList[lineID-1]     
 
-            M_all, A_all, B_all, K_all = line.getDynamicMatricesLumped(omegas,S_zeta,r_init,depth,kbot,cbot) 
+            M_all, A_all, B_all, K_all = line.getDynamicMatricesLumped()
              
             M += M_all[-3:,-3:] if endB == 1 else M_all[:3, :3]
             A += A_all[-3:,-3:] if endB == 1 else A_all[:3, :3]

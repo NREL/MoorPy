@@ -80,7 +80,6 @@ class Line():
         
         self.fCurrent = np.zeros(3)  # total current force vector on the line [N]
 
-    
     def loadData(self, dirname, rootname, sep='.MD.', id=0):
         '''Loads line-specific time series data from a MoorDyn output file'''
         
@@ -1013,14 +1012,40 @@ class Line():
         
         # revert to original line length
         self.L = self.L0
-    
-    
-    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic, depth, kbot=0, cbot=0, seabed_tol=1e-4):
-        '''Compute M,A,B,K matrices for Line. See get_dynamic_matrices().'''
-        return get_dynamic_matrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=1e-4)
+  
 
-    def getDynamicMatricesLumped(self, omegas, S_zeta, r_dynamic, depth, kbot=0, cbot=0, seabed_tol=1e-4):
-        '''Lump M,A,B,K matrices for Line at its extremities, returning 6x6 matrices'''
+
+    def updateLumpedMass(self, omegas, S_zeta, depth, kbot=0, cbot=0, seabed_tol=1e-4, RAO_A=None, RAO_B=None):
+        '''Updates the inertia, added mass, damping, and stiffness matrices for the line using a lumped mass approach.
+
+        The updated values are stored in:
+        - self.Ml_allNodes, self.Al_allNodes, self.Bl_allNodes, and self.Kl_allNodes: 3N x 3N matrices, where N is the number of nodes (3 dofs for each line node)
+        - self.Ml, self.Al, self.Bl, and self.Kl: 6 x 6 matrices that lump the matrices _allNodes at the extremities of the line. For example,
+                self.Kl[:3, :3] is analogous to self.KA, self.Kl[3:, 3:] is analogous to self.KB, and self.Kl[:3, 3:] is analogous to self.KBA.
+
+        Only the damping matrix depends on sea state and RAOs. Hence, this function can be called without the RAOs to compute the inertia, added mass, and 
+        stiffness matrices. But do NOT trust the values of the damping matrix if the RAOs are not provided!!!
+
+        Inputs
+        ----------        
+        omegas : ndarray
+            Array of frequencies in rad/s.
+        S_zeta : ndarray
+            Wave spectrum array in m^2/(rad/s), must be of the same length as omegas.
+        depth : float
+            Water depth.
+        kbot : float
+            Vertical stiffness for points lying on the seabed.
+        cbot : float
+            Vertical damping for points lying on the seabed.
+        seabed_tol : float, optional
+            Distance from seabed within which a node is considered to be lying on the seabed, by default 1e-4 m.
+        RAO_A : ndarray
+            Translational RAOs for end node A given as a (m,3) array where m is the number of frequencies (must be equal to the length of omegas) .
+        RAO_B : ndarray
+            Translational RAOs for end node B given as a (m,3) array where m is the number of frequencies (must be equal to the length of omegas) .
+
+        '''
 
         def lump_matrix(matrix, nodes2remove=None):
             # The matrices should be symmetrical, but they can be slightly off due to numerical errors.
@@ -1090,25 +1115,54 @@ class Line():
         idx2remove = np.where(Z_mean <= -depth+1e-06)[0]
         # idx2remove = None
         
-        # Keep one of the nodes to remove, which is the one in the interface with the nodes to keep
-        # is_seabed = Z_mean <= -self.sys.depth+1e-06        
-        # transition_indices = np.where(np.abs(np.diff(is_seabed.astype(int))) == 1)[0] # Find all indices where is_seabed changes from True to False        
-        # idx2remove_all = np.where(is_seabed)[0] # Get all indices where is_seabed is True        
-        # idx2remove = np.setdiff1d(idx2remove_all, transition_indices) # Remove transition_indices from idx2remove_all                
+        # # Keep two of the nodes to remove, which are the ones in the interface with the nodes to keep
+        # is_seabed = Z_mean <= -depth + 1e-06
+        # transition_indices = np.where(np.abs(np.diff(is_seabed.astype(int))) == 1)[0]
         
-        M, A, B, K, _, _ = self.getDynamicMatrices(omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=seabed_tol)
-        Ml = lump_matrix(M, nodes2remove=idx2remove)
-        Al = lump_matrix(A, nodes2remove=idx2remove)
-        Bl = lump_matrix(B, nodes2remove=idx2remove)
-        Kl = lump_matrix(K, nodes2remove=idx2remove)
-        return Ml, Al, Bl, Kl
+        # # # Adjust to keep an additional node at each transition
+        # # # For True to False transitions, keep the transition index and the one before it
+        # # # For False to True transitions, keep the transition index and the one after it
+        # additional_indices = []
+        # for idx in transition_indices:
+        #     if is_seabed[idx]:  # True to False transition
+        #         additional_indices.append(idx - 1 if idx > 0 else idx)  # Ensure idx-1 is not negative
+        #     else:  # False to True transition
+        #         additional_indices.append(idx + 1 if idx + 1 < len(is_seabed) else idx)  # Ensure idx+1 is within bounds        
+        # transition_and_additional_indices = np.unique(transition_indices.tolist() + additional_indices) # Combine transition indices with their additional indices
+        # idx2remove_all = np.where(is_seabed)[0]  # Get all indices where is_seabed is True
+        # idx2remove = np.setdiff1d(idx2remove_all, transition_and_additional_indices)  # Remove transition and additional indices from idx2remove_all
+        
+        # If we have the motions of the extremities of the lines, we can iterate the quadratic drag to compute the damping matrix.
+        # Otherwise, we use the default values for the motion amplitude (unitary displacement for all nodes) to linearize the quadratic drag. This is clearly wrong, but affects only drag.
+        if RAO_A is None and RAO_B is None:
+            r_dynamic = np.ones((len(omegas), self.nNodes, 3))
+            self.Ml_allNodes, self.Al_allNodes, self.Bl_allNodes, self.Kl_allNodes, _, _ = self.getDynamicMatrices(omegas, S_zeta, r_dynamic, depth, kbot=kbot, cbot=cbot, seabed_tol=seabed_tol)
+        else:
+            if RAO_A is None:
+                RAO_A = np.zeros([len(omegas), 3])
+            if RAO_B is None:
+                RAO_B = np.zeros([len(omegas), 3])
+            self.Ml_allNodes, self.Al_allNodes, self.Bl_allNodes, self.Kl_allNodes = self.dynamicSolve(omegas, S_zeta, RAO_A, RAO_B, depth, kbot, cbot, seabed_tol=seabed_tol, returnMatrices=True) # Dynamic solve calls get_dynamic_matrices internally
 
+        self.Ml = lump_matrix(self.Ml_allNodes, nodes2remove=idx2remove)
+        self.Al = lump_matrix(self.Al_allNodes, nodes2remove=idx2remove)
+        self.Bl = lump_matrix(self.Bl_allNodes, nodes2remove=idx2remove)
+        self.Kl = lump_matrix(self.Kl_allNodes, nodes2remove=idx2remove)
+        
 
+    def getDynamicMatricesLumped(self):
+        '''Return the lumped M,A,B,K matrices for the Line object.'''
+        if not hasattr(self, 'Ml'):
+            raise LineError("Call updateLumpedMass first")
+        return self.Ml, self.Al, self.Bl, self.Kl
 
+    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic, depth, kbot=0, cbot=0, seabed_tol=1e-4):
+        '''Compute M,A,B,K matrices for Line. See get_dynamic_matrices().'''
+        return get_dynamic_matrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=seabed_tol)    
 
-    def dynamicSolve(self, *args, **kwargs):
+    def dynamicSolve(self, omegas, S_zeta, RAO_A, RAO_B, depth, kbot, cbot, seabed_tol=1e-4, tol = 0.01, iters=100, w = 0.8, conv_time=False, returnMatrices=False):
         '''Compute complex amplitudes of line nodes. See get_dynamic_tension().'''
-        return get_dynamic_tension(self, *args, **kwargs)
+        return get_dynamic_tension(self, omegas, S_zeta, RAO_A, RAO_B, depth, kbot, cbot, seabed_tol=seabed_tol, tol=tol, iters=iters, w=w, conv_time=conv_time, returnMatrices=returnMatrices)
     
     
     def getModes(self,*args, **kwargs):
