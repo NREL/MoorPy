@@ -504,7 +504,7 @@ class Subsystem(System, Line):
            Finds the total LBot of the whole Mooring looking at all lines in the Mooring
         '''
 
-        uplift_ang = np.degrees(np.arctan(self.lineList[iLine].fA[2]/self.lineList[iLine].fA[0]))
+        uplift_ang = np.degrees(np.arctan2(self.lineList[iLine].fA[2], self.lineList[iLine].fA[0]))
 
         LBot = sum([line.LBot for line in self.lineList if line.number <= self.nLines])
 

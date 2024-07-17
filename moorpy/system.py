@@ -2741,7 +2741,10 @@ class System():
         K_inv_coupled = K_inv_all[mask,:][:,mask]
         
         # invert reduced matrix to get coupled stiffness matrix (with free DOFs assumed to equilibrate linearly)
-        K_coupled = np.linalg.inv(K_inv_coupled)
+        try:
+            K_coupled = np.linalg.inv(K_inv_coupled)
+        except:
+            K_coupled = np.linalg.pinv(K_inv_coupled)
         
         #if tensions:
         #    return K_coupled, J
