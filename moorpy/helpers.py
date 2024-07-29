@@ -357,7 +357,7 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     start_time = time.time()
     # process inputs and format as arrays in case they aren't already
     
-    X = np.array(np.atleast_1d(X0), dtype=np.float_)         # start off design variable
+    X = np.array(np.atleast_1d(X0), dtype=float)         # start off design variable
     N = len(X)
     
     Xs = np.zeros([maxIter,N]) # make arrays to store X and error results of the solve
@@ -370,9 +370,9 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     
     # check the target Y value input
     if len(Ytarget)==N:
-        Ytarget = np.array(Ytarget, dtype=np.float_)
+        Ytarget = np.array(Ytarget, dtype=float)
     elif len(Ytarget)==0:
-        Ytarget = np.zeros(N, dtype=np.float_)
+        Ytarget = np.zeros(N, dtype=float)
     else:
         raise TypeError("Ytarget must be of same length as X0")
         
@@ -419,14 +419,14 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     if len(Xmin)==0:
         Xmin = np.zeros(N)-np.inf
     elif len(Xmin)==N:
-        Xmin = np.array(Xmin, dtype=np.float_)
+        Xmin = np.array(Xmin, dtype=float)
     else:
         raise TypeError("Xmin must be of same length as X0")
         
     if len(Xmax)==0:
         Xmax = np.zeros(N)+np.inf
     elif len(Xmax)==N:
-        Xmax = np.array(Xmax, dtype=np.float_)
+        Xmax = np.array(Xmax, dtype=float)
     else:
         raise TypeError("Xmax must be of same length as X0")
     
@@ -435,7 +435,7 @@ def dsolve2(eval_func, X0, Ytarget=[], step_func=None, args=[], tol=0.0001, ytol
     if len(dX_last)==0:
         dX_last = np.zeros(N)
     else:
-        dX_last = np.array(dX_last, dtype=np.float_)
+        dX_last = np.array(dX_last, dtype=float)
 
     if display>0:
         print(f"Starting dsolve iterations>>>   aiming for Y={Ytarget}")
@@ -660,9 +660,9 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     
     # deal with the source (is it a dictionary, or reading in a new yaml?)
     if not source==None:
-        lineProps = loadLineProps(source)
         if not lineProps==None:
             print('Warning: both lineProps and source arguments were passed to getLineProps. lineProps will be ignored.')
+        lineProps = loadLineProps(source)
         
     # raise an error if the material isn't in the source dictionary
     if not material in lineProps:

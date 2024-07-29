@@ -294,7 +294,7 @@ class Line():
         '''Get the time step to use for showing time series data'''
         
         if Time < 0: 
-            ts = np.int_(-Time)  # negative value indicates passing a time step index
+            ts = int(-Time)  # negative value indicates passing a time step index
         else:           # otherwise it's a time in s, so find closest time step
             if len(self.Tdata) > 0:
                 for index, item in enumerate(self.Tdata):                
@@ -682,9 +682,9 @@ class Line():
         '''
         
         if endB == 1:
-            self.rB = np.array(r, dtype=np.float_)
+            self.rB = np.array(r, dtype=float)
         elif endB == 0:
-            self.rA = np.array(r, dtype=np.float_)
+            self.rA = np.array(r, dtype=float)
         else:
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
         

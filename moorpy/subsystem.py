@@ -266,9 +266,9 @@ class Subsystem(System, Line):
         
         # set end coordinates in global frame just like for a Line
         if endB == 1:
-            self.rB = np.array(r, dtype=np.float_)
+            self.rB = np.array(r, dtype=float)
         elif endB == 0:
-            self.rA = np.array(r, dtype=np.float_)
+            self.rA = np.array(r, dtype=float)
         else:
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
     

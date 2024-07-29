@@ -625,7 +625,6 @@ class System():
                         entries = line.split()  # entries: ID   Attachment  X0  Y0  Z0  r0  p0  y0    M  CG*  I*    V  CdA*  Ca*            
                         num = int(entries[0])
                         entry0 = entries[1].lower()                         
-                        #num = np.int_("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Body #
                         
                         if ("fair" in entry0) or ("coupled" in entry0) or ("ves" in entry0):       # coupled case
                             bodyType = -1                        
@@ -641,8 +640,8 @@ class System():
                         r6  = np.array(entries[2:8], dtype=float)   # initial position and orientation [m, rad]
                         r6[3:] = r6[3:]*np.pi/180.0                 # convert from deg to rad
                         #rCG = np.array(entries[7:10], dtype=float)  # location of body CG in body reference frame [m]
-                        m = np.float_(entries[8])                   # mass, centered at CG [kg]
-                        v = np.float_(entries[11])                   # volume, assumed centered at reference point [m^3]
+                        m = float(entries[8])                   # mass, centered at CG [kg]
+                        v = float(entries[11])                   # volume, assumed centered at reference point [m^3]
                         
                         # process CG
                         strings_rCG = entries[ 9].split("|")                   # split by braces, if any
@@ -735,7 +734,7 @@ class System():
                         entry1 = entries[1].lower() 
                         
                         
-                        num = np.int_("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Point #
+                        num = int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Point #
                         
                         
                         if ("anch" in entry1) or ("fix" in entry1):
@@ -793,10 +792,10 @@ class System():
                     while line.count('---') == 0:
                         entries = line.split()  # entries: ID  LineType  AttachA  AttachB  UnstrLen  NumSegs   Outputs
                                                 
-                        num    = np.int_(entries[0])
-                        lUnstr = np.float_(entries[4])
+                        num    = int(entries[0])
+                        lUnstr = float(entries[4])
                         lineType = self.lineTypes[entries[1]]
-                        nSegs  = np.int_(entries[5])         
+                        nSegs  = int(entries[5])         
                         
                         #lineList.append( Line(dirName, num, lUnstr, dia, nSegs) )
                         self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs)) #attachments = [int(entries[4]), int(entries[5])]) )
@@ -949,7 +948,7 @@ class System():
             entry0 = d['name'].lower()          
             entry1 = d['type'].lower()
             
-            #num = np.int_("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Point #
+            #num = int("".join(c for c in entry0 if not c.isalpha()))  # remove alpha characters to identify Point #
             num = i+1   # not counting on things being numbered in YAML files
             
             if ("anch" in entry1) or ("fix" in entry1):
@@ -984,12 +983,12 @@ class System():
             r = np.array(d['location'], dtype=float)
             
             if 'mass' in d:
-                m = np.float_(d['mass'])
+                m = float(d['mass'])
             else:
                 m = 0.0
             
             if 'volume' in d:
-                v = np.float_(d['volume'])
+                v = float(d['volume'])
             else:
                 v = 0.0
                                 
@@ -1001,7 +1000,7 @@ class System():
         
             num = i+1
             
-            lUnstr = np.float_(d['length'])      
+            lUnstr = float(d['length'])      
             
             self.lineList.append( Line(self, num, lUnstr, self.lineTypes[d['type']]) )
             
@@ -1600,7 +1599,7 @@ class System():
         else:
             raise ValueError("getPositions called with invalid DOFtype input. Must be free, coupled, or both")
         
-        X = np.array([], dtype=np.float_)
+        X = np.array([], dtype=float)
         if len(dXvals)>0: dX = []
         
         # gather DOFs from bodies
@@ -1618,7 +1617,7 @@ class System():
                 if len(dXvals)>0: dX += point.nDOF*[dXvals[0]]
 
         if len(dXvals)>0:
-            dX = np.array(dX, dtype=np.float_)
+            dX = np.array(dX, dtype=float)
             return X, dX
         else:
             return X
@@ -1841,8 +1840,8 @@ class System():
                 X0  += [*Point.r ]               # add free Point position to vector
                 db  += [ 5., 5., 5.]                # specify maximum step size for point positions
             
-        X0 = np.array(X0, dtype=np.float_)
-        db = np.array(db, dtype=np.float_)
+        X0 = np.array(X0, dtype=float)
+        db = np.array(db, dtype=float)
         '''
         X0, db = self.getPositions(DOFtype=DOFtype, dXvals=[5.0, 0.3])
         
@@ -2216,7 +2215,7 @@ class System():
                     # check sign for backward result (potentially a result of bad numerics?) and strengthen diagonals if so to straighten it out
                     for iTry in range(10):
                         if sum(dX2*Y2) < 0:
-                            print("sum(dX2*Y2) is negative so enlarging the diagonals")
+                            #print("sum(dX2*Y2) is negative so enlarging the diagonals")
                             for i in range(n2):
                                 K2[i,i] += 0.1*abs(K2[i,i]) # double the diagonal entries as a hack
                         
@@ -2454,7 +2453,7 @@ class System():
             
             for i in range(n):                                # loop through each DOF
                 
-                X2 = np.array(X1, dtype=np.float_)  
+                X2 = np.array(X1, dtype=float)  
                 X2[i] += dX[i]                                # perturb positions by dx in each DOF in turn            
                 F2p = self.mooringEq(X2, DOFtype=DOFtype, lines_only=lines_only, tol=lineTol)     # system net force/moment vector from positive perturbation
                 
@@ -2477,7 +2476,7 @@ class System():
                 # potentially iterate with smaller step sizes if we're at a taut-slack transition (but don't get too small, or else numerical errors)
                 for j in range(nTries):
                     if self.display > 2: print(" ")
-                    X2 = np.array(X1, dtype=np.float_)  
+                    X2 = np.array(X1, dtype=float)  
                     X2[i] += dXi                               # perturb positions by dx in each DOF in turn            
                     F2p = self.mooringEq(X2, DOFtype=DOFtype, lines_only=lines_only, tol=lineTol)  # system net force/moment vector from positive perturbation
                     if self.display > 2: 
@@ -2594,7 +2593,7 @@ class System():
         
             for i in range(self.nCpldDOF):                    # loop through each DOF
                 
-                X2 = np.array(X1, dtype=np.float_)  
+                X2 = np.array(X1, dtype=float)  
                 X2[i] += dX[i]                                # perturb positions by dx in each DOF in turn            
                 self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
                 self.solveEquilibrium()                       # let the system settle into equilibrium  (note that this might prompt a warning if there are no free DOFs)
@@ -2621,7 +2620,7 @@ class System():
                 for j in range(nTries):
                     
                     #print(f'-------- nTries = {j+1} --------')
-                    X2 = np.array(X1, dtype=np.float_)  
+                    X2 = np.array(X1, dtype=float)  
                     X2[i] += dXi                                  # perturb positions by dx in each DOF in turn            
                     self.setPositions(X2, DOFtype="coupled")      # set the perturbed coupled DOFs
                     #print(f'solving equilibrium {i+1}+_{self.nCpldDOF}')

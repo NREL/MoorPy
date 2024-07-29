@@ -55,15 +55,15 @@ class Body():
         
         self.number = num
         self.type   = type                          # 0 free to move, or -1 coupled externally
-        self.r6     = np.array(r6, dtype=np.float_)     # 6DOF position and orientation vector [m, rad]
+        self.r6     = np.array(r6, dtype=float)     # 6DOF position and orientation vector [m, rad]
         self.m      = m                             # mass, centered at CG [kg]
         self.v      = v                             # volume, assumed centered at reference point [m^3]
-        self.rCG    = np.array(rCG, dtype=np.float_)    # center of gravity position in body reference frame [m]
+        self.rCG    = np.array(rCG, dtype=float)    # center of gravity position in body reference frame [m]
         self.AWP    = AWP                           # waterplane area - used for hydrostatic heave stiffness if nonzero [m^2]
         if np.isscalar(rM):
-            self.rM = np.array([0,0,rM], dtype=np.float_) # coordinates of body metacenter relative to body reference frame [m]
+            self.rM = np.array([0,0,rM], dtype=float) # coordinates of body metacenter relative to body reference frame [m]
         else:
-            self.rM = np.array(rM, dtype=np.float_)       
+            self.rM = np.array(rM, dtype=float)       
 
         # >>> should streamline the below <<<
         if np.isscalar(I):
@@ -176,7 +176,7 @@ class Body():
         
         # update the position/orientation of the body
         if len(r6)==6:
-            self.r6 = np.array(r6, dtype=np.float_)  # update the position of the Body itself
+            self.r6 = np.array(r6, dtype=float)  # update the position of the Body itself
         elif len(r6) == self.nDOF:
             self.r6[self.DOFs] = r6  # mapping to use only some DOFs
         else:

@@ -47,7 +47,7 @@ class Point():
     
         self.number = num
         self.type = type                # 1: fixed/attached to something, 0 free to move, or -1 coupled externally
-        self.r = np.array(r, dtype=np.float_)
+        self.r = np.array(r, dtype=float)
         self.entity = {type:''}         # dict for entity (e.g. anchor) info
         self.cost = {}                  # empty dictionary to contain cost info
         self.loads = {}                 # empty dictionary to contain load info

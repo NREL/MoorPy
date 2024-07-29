@@ -122,6 +122,12 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
     else:
         reverseFlag = False
     
+    # If an end is "below the bottom" (likely it means a buoyant line cross
+    # the sea surface), ignore the crossing.
+    if hA < 0:
+        hB = hB - hA
+        hA = 0
+    
     # avoid issue with tolerance on the margin of full seabed contact
     if abs(ZF <= Tol) and alpha==0:
         ZF = 0
@@ -140,6 +146,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
     # There are many "ProfileTypes" of a mooring line and each must be analyzed separately (1-3 are consistent with FAST v7)
     # ProfileType=0: Entire line is on seabed
     # ProfileType=1: No portion of the line rests on the seabed
+    # ProfileType=-1: Approximation for a taut line if the normal catenary algorithm failed.
     # ProfileType=2: A portion of the line rests on the seabed and the anchor tension is nonzero
     # ProfileType=3: A portion of the line must rest on the seabed and the anchor tension is zero
     # ProfileType=4: The line is negatively buoyant, seabed interaction is enabled, and the line 
@@ -149,7 +156,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
         # double-back on itself; the line forms an "L" between the anchor and fairlead. Then it 
         # models it as bunched up on the seabed (instead of throwing an error)
     # ProfileType=5: Similar to above but both ends are off seabed, so it's U shaped and fully slack
-    # ProfileType=6: Completely vertical line that is off the seabed (on the seabed is handled by 4 and 5)
+    # ProfileType=6: Completely vertical line without seabed contact (on the seabed is handled by 4 and 5)
     # ProfileType = 7: Portion of the line is resting on the seabed, and the seabed has a slope
     
     EA_W = EA/W
@@ -537,7 +544,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         Kl = EA/L # inline stiffness
                         Kt = T0/d # transverse stiffness
                         K = np.matmul(R, np.matmul( np.array([[Kl,0],[0,Kt]]), R.T) ) # stiffness matrix (should check some of the math)
-
+                        
                         # put things in the format expected for later parts of the code
                         X = np.zeros(2)
                         X[0] = HF
@@ -1452,9 +1459,14 @@ if __name__ == "__main__":
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(274.9, 15.6, 328.5, 528887323., -121., 
     #         CB=-48., alpha=0, Tol=2e-05, MaxIter=100, plots=1, depth=200)
     
-    (fAH1, fAV1, fBH1, fBV1, info1) =  catenary(267.60271224572784, 11.629753388110558, 383.52733838297667, 528887323.6999998, -121.77472470613236, 
-        CB=-81.79782970374734, alpha=0, HF0=13369.512495199759, VF0=24221.869928543758, Tol=2e-05, 
-        MaxIter=100, depth=180, plots=1, nNodes=100)
+    #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(267.60271224572784, 11.629753388110558, 383.52733838297667, 528887323.6999998, -121.77472470613236, 
+    #    CB=-81.79782970374734, alpha=0, HF0=13369.512495199759, VF0=24221.869928543758, Tol=2e-05, 
+    #    MaxIter=100, depth=180, plots=1, nNodes=100)
+    
+    
+    #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(0.16525209064463553, 1000.1008645356192, 976.86359774357, 861890783.955385, -5.663702119364548, 0.0, -0.0, 0.0, 17325264.3383085, 5.000000000000001e-05, 101, 1, 1000)
+    #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(0.0, 997.8909672113768, 1006.0699998926483, 361256000.00000006, 2.4952615384615333, 0, 0.0, 0, 0, 0.0001, 101, 100, 1, 1000)
+    (fAH1, fAV1, fBH1, fBV1, info1) =  catenary(148.60942473375343, 1315.624259105325, 1279.7911844766932, 17497567581.802254, -81.8284437736437, CB=0.0, alpha=-0.0, HF0=795840.9590915733, VF0=6399974.444658389, Tol=0.0005, MaxIter=100, depth=1300.0, plots=1)
     
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(274.9, 15.6, 328.5, 528887323., -121., 
     #         CB=-48., alpha=0, HF0=17939., VF0=20596., Tol=2e-05, MaxIter=100, plots=1)
