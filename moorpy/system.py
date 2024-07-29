@@ -1245,7 +1245,7 @@ class System():
                     break
             
             #Line Properties
-            flag = "p" # "-" 
+            #flag = "p" # "-"   # "flag" is already set as an input to self.unload(), meaning you can set it in the function call
             
             #Outputs List
             Outputs = [f"FairTen{i+1}" for i in range(len(self.lineList))]        # for now, have a fairlead tension output for each line
