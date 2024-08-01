@@ -1279,7 +1279,7 @@ class System():
                         # Get dynamic stiffness including mean load dependence
                         EAd = di['EAd'] + di['EAd_Lm']*Lm*di['MBL']
                         # This damping value is chosen for critical damping of a 10 m segment
-                        c1 = 10 * np.sqrt(di['EA'] * di['m'])
+                        c2 = 10 * np.sqrt(di['EA'] * di['m'])
                         # or use c1 = di['BA'] ?
                         # This damping value is chosen to get the desired 
                         # half-way period between static and dynamic stiffnesses
@@ -1289,7 +1289,7 @@ class System():
                         K1= EAs
                         K2 = EAd
 
-                        c2 = (K1+K2)/(2*np.pi/T_half) * np.sqrt(((K1+frac*K2)**2 - K1**2)/((K1+K2)**2 - (K1+frac*K2)**2))
+                        c1 = (K1+K2)/(2*np.pi/T_half) * np.sqrt(((K1+frac*K2)**2 - K1**2)/((K1+K2)**2 - (K1+frac*K2)**2))
                         
                         
                         L.append("{:<12} {:7.4f} {:8.2f}  {:7.3e}|{:7.3e} {:7.3e}|{:7.3e} {:7.3e}   {:<7.3f} {:<7.3f} {:<7.2f} {:<7.2f}".format(
@@ -3363,6 +3363,8 @@ class System():
                         line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                     elif 'nylon' in line.type['material']:
                         line.drawLine(time, ax, color=[.8,.8,.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                    elif 'buoy' in line.type['material']:
+                        line.drawLine(time, ax, color=[.6,.6,.0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                     else:
                         line.drawLine(time, ax, color=[0.5,0.5,0.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 else:
