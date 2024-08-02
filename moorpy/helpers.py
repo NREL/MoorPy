@@ -1983,7 +1983,7 @@ def get_dynamic_tension(line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
             prepend= omegas[0] - (omegas[1]-omegas[0]),
             append= omegas[-1] + (omegas[-1]-omegas[-2]))
     dw = (dw[1:]+dw[:-1])/2
-    wave_amps = np.sqrt(S_zeta*dw) #evaluate wave amplitudes of harmonic components from wave spectrum
+    wave_amps = np.sqrt(2*S_zeta*dw) #evaluate wave amplitudes of harmonic components from wave spectrum
 
     r_dynamic *= wave_amps[:,None,None]
     r_total = r_static[None,:,:] + r_dynamic
@@ -1992,10 +1992,10 @@ def get_dynamic_tension(line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
     tangents = dr_static/np.linalg.norm(r_static[:-1] - r_static[1:], axis=-1)[:,None]
     L_static = np.linalg.norm(dr_static, axis=-1)
     dL_dynamic = np.einsum('mni,ni->mn', dr_dynamic, tangents)
-    eps_segs = np.abs(dL_dynamic)/L_static
+    eps_segs = dL_dynamic/L_static
 
     T_segs = EA_segs * eps_segs
-    T_nodes_amp = np.zeros((len(omegas),N))
+    T_nodes_amp = np.zeros((len(omegas),N), dtype='complex')
     T_nodes_amp[:,0] = T_segs[:,0]
     T_nodes_amp[:,1:-1] = (T_segs[:,:-1] + T_segs[:,1:])/2
     T_nodes_amp[:,-1] = T_segs[:,-1]
@@ -2004,7 +2004,7 @@ def get_dynamic_tension(line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
     # S_T[:,1:] = T_e**2/dw[:,None]
     # S_T[:,0] = S_T[:,1]
 
-    T_nodes_psd = T_nodes_amp**2/dw[:,None]
+    T_nodes_psd = np.abs(T_nodes_amp)**2/(2*dw[:,None])
     T_nodes_std = np.sqrt(np.trapz(T_nodes_psd,omegas,axis=0))
 
 
