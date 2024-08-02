@@ -1160,7 +1160,7 @@ class Line():
         '''Compute M,A,B,K matrices for Line. See get_dynamic_matrices().'''
         return get_dynamic_matrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=seabed_tol)    
 
-    def dynamicSolve(self, omegas, S_zeta, RAO_A, RAO_B, depth, kbot, cbot, seabed_tol=1e-4, tol = 0.01, iters=100, w = 0.8, conv_time=False, returnMatrices=False):
+    def dynamicSolve(self, omegas, S_zeta, RAO_A, RAO_B, depth, kbot=0, cbot=0, seabed_tol=1e-4, tol = 0.01, iters=100, w = 0.8, conv_time=False, returnMatrices=False):
         '''Compute complex amplitudes of line nodes. See get_dynamic_tension().'''
         return get_dynamic_tension(self, omegas, S_zeta, RAO_A, RAO_B, depth, kbot, cbot, seabed_tol=seabed_tol, tol=tol, iters=iters, w=w, conv_time=conv_time, returnMatrices=returnMatrices)
     
