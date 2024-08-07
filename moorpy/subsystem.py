@@ -89,7 +89,9 @@ class Subsystem(System, Line):
             self.currentMod = 1
             self.current = getFromDict(kwargs, 'current', shape=3)
             
-        self.shared     = getFromDict(kwargs, 'shared', dtype=bool, default=False)  # flag to indicate shared line
+        # flag to indicate shared line or suspended cable being modeled as symmetric
+        self.shared = getFromDict(kwargs, 'shared', dtype=bool, default=False)
+        
         self.span   = getFromDict(kwargs, 'span', default=0)  # horizontal end-end distance [m]
         self.rad_fair = getFromDict(kwargs, 'rad_fair', default=0)  # [m] fairlead radius [m]
         self.z_fair   = getFromDict(kwargs, 'z_fair'  , default=0)  # [m] fairlead z coord [m]
@@ -192,6 +194,7 @@ class Subsystem(System, Line):
         # set end A location depending on whether configuration is suspended/symmetrical
         if suspended==2:  # symmetrical suspended case
             rA = np.array([-0.5*self.span-self.rad_fair, 0, -1])  # shared line midpoint coordinates
+            self.shared = True  # flag that it's being modeled as symmetric
         elif suspended==1:  # general suspended case
             rA = np.array([-self.span-self.rad_fair, 0, self.z_fair])  # other suspended end
         else:  # normal anchored line case
@@ -323,11 +326,28 @@ class Subsystem(System, Line):
             Kt = -self.fB_L[0]/LH  
         
         # expand to get 3D stiffness matrices
+        '''
         R = np.eye(3)
         self.KA_L  = from2Dto3Drotated(K[:2,:2],  Kt, R.T)  # reaction at A due to motion of A
         self.KB_L  = from2Dto3Drotated(K[2:,2:],  Kt, R.T)  # reaction at B due to motion of B
         self.KBA_L = from2Dto3Drotated(K[2:,:2], -Kt, R.T)  # reaction at B due to motion of A
+        '''
+        self.KA_L = np.array([[K[0,0], 0 , K[0,1]],
+                              [  0   , Kt,   0   ],
+                              [K[1,0], 0 , K[1,1]]])
         
+        # If symmetrical model, ignore midpoint stiffness and force
+        if self.shared:  
+            self.KB_L = np.array(self.KA_L)  # same stiffness as A
+            self.fB_L = np.array([-self.fA_L[0], 0, self.fA_L[1]]) # mirror of fA
+        else:
+            self.KB_L = np.array([[K[2,2], 0 , K[2,3]],
+                                  [  0   , Kt,   0   ],
+                                  [K[3,2], 0 , K[3,3]]])
+        
+        self.KBA_L = -self.KB_L
+        
+        # Save tension magnitudes
         self.TA = np.linalg.norm(self.fA_L)  # tensions [N]
         self.TB = np.linalg.norm(self.fB_L)
         

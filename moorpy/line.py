@@ -753,6 +753,8 @@ class Line():
             w = np.linalg.norm(w_vec)
             w_hat = w_vec/w
             
+            # >>> may need to adjust to handle case of buoyant vertical lines <<<
+            
             # get rotation matrix from gravity down to w_vec being down
             if w_hat[0] == 0 and w_hat[1] == 0: 
                 if w_hat[2] < 0:
