@@ -3868,3 +3868,71 @@ class System():
                 out.write(L[x])
                 out.write('\n')    
 
+    def export_state(self, outFileName, version_major=2, version_minor=4):
+        '''Function to output MoorDyn state input file
+        Parameters
+        ----------
+        outFileName: Output file to be importd by MoorDyn
+        version_major: MoorDyn major version
+        version_minor: MoorDyn minor version
+        Returns
+        -------
+        None.
+        '''
+        import struct
+        from scipy.spatial.transform import Rotation as R
+        with open(outFileName, 'wb') as out:
+            # Write the header
+            out.write(b'MoorDyn')
+            out.write(struct.pack('<B', version_major))
+            out.write(struct.pack('<B', version_minor))
+            # Serialize the data
+            data = b''
+            for body in self.bodyList:
+                # MoorDyn is expecting a position vector:
+                data += struct.pack('<ddd', *body.r6[:3])
+                # A quaternion orientation:
+                r = R.from_matrix(body.R)
+                data += struct.pack('<dddd', *r.as_quat())
+                # And a 6DOF velocity vector
+                data += struct.pack('<d', 0.0) * 6
+            for rod in self.rodList:
+                if isinstance(rod, Line):
+                    x, y, z, _ = rod.getLineCoords(-1)
+                    rA = np.asarray([x[0], y[0], z[0]])
+                    rB = np.asarray([x[-1], y[-1], z[-1]])
+                    L = rod.L
+                else:
+                    rA = rB = rod.r
+                    L = 0
+                # MoorDyn is expecting a position vector:
+                data += struct.pack('<ddd', *rA)
+                # A quaternion orientation:
+                if L > 0.0:
+                    k = (rB - rA) / L
+                    Rmat = np.array(rotationMatrix(0, np.arctan2(np.hypot(k[0],k[1]), k[2]), np.arctan2(k[1],k[0])))
+                    r = R.from_matrix(Rmat)
+                else:
+                    r = R.from_matrix(np.eye(3))
+                data += struct.pack('<dddd', *r.as_quat())
+                # And a 6DOF velocity vector
+                data += struct.pack('<d', 0.0) * 6
+            for point in self.pointList:
+                # MoorDyn is expecting a position vector:
+                data += struct.pack('<ddd', *point.r)
+                # And a velocity vector
+                data += struct.pack('<d', 0.0) * 3
+            for line in self.lineList:
+                x, y, z, _ = line.getLineCoords(-1)
+                # MoorDyn is expecting first the number of points
+                n = len(x)
+                data += struct.pack('<Q', n - 2)
+                # And then the coordinates
+                for i in range(1, n - 1):
+                    data += struct.pack('<ddd', x[i], y[i], z[i])
+                # And the same for the velocity
+                data += struct.pack('<Q', n - 2)
+                data += struct.pack('<d', 0.0) * 3 * (n - 2)
+            # Save it
+            out.write(struct.pack('<Q', len(data) // 8))
+            out.write(data)
