@@ -61,7 +61,9 @@ class System():
         self.rodList = []  # note: Rods are currently only fully supported when plotting MoorDyn output, not in MoorPy modeling
         # <<< TODO: add support for Rods eventually, for compatability with MoorDyn systems
         self.pointList = []
+        self.isRodPoint = []
         self.lineList = []
+        self.isRodLine = []
         self.lineTypes = {}
         self.rodTypes = {}
         
@@ -194,14 +196,25 @@ class System():
         if nSegs==0:       # this is the zero-length special case
             lUnstr = 0
             self.rodList.append( Point(self, len(self.pointList)+1, 0, rA) )
+            self.pointList.append(self.rodList[-1])
+            self.isRodPoint.append(True)
         else:
             lUnstr = np.linalg.norm(rB-rA)
+            self.pointList.append( Point(self, len(self.pointList)+1, 0, rA) )
+            self.isRodPoint.append(True)
+            self.pointList.append( Point(self, len(self.pointList)+1, 0, rB) )
+            self.isRodPoint.append(True)
             self.rodList.append( Line(self, len(self.rodList)+1, lUnstr, rodType, nSegs=nSegs, isRod=1) )
+            self.lineList.append(self.rodList[-1])
+            self.isRodLine.append(True)
+            self.pointList[-2].attachLine(self.lineList[-1].number, 0)
+            self.pointList[-1].attachLine(self.lineList[-1].number, 1)
             
             if bodyID > 0:
                 self.bodyList[bodyID-1].attachRod(len(self.rodList), np.hstack([rA,rB]))
-                
-            else: # (in progress - unsure if htis works) <<<
+                self.bodyList[body-1].attachPoint(self.pointList[-2].number, rA)
+                self.bodyList[body-1].attachPoint(self.pointList[-1].number, rB)
+            else: # (in progress - unsure if this works) <<<
                 self.rodList[-1].rA = rA  #.setEndPosition(rA, 0)  # set initial end A position
                 self.rodList[-1].rB = rB  #.setEndPosition(rB, 1)  # set initial end B position
 
@@ -233,7 +246,7 @@ class System():
         '''
 
         self.pointList.append( Point(self, len(self.pointList)+1, mytype, r, m=m, v=v, fExt=fExt, DOFs=DOFs, d=d) )
-        
+        self.isRodPoint.append(False)        
         
         if body > 0:
             if body <= len(self.bodyList):
@@ -515,6 +528,7 @@ class System():
         # assuming normal form
         else: 
             f = open(filename, 'r')
+            n_lines = sum(1 for _ in f)
 
             # read in the data
             
@@ -600,7 +614,7 @@ class System():
                         mass = float(entries[2])
                         w = (mass - np.pi/4*d**2 *self.rho)*self.g
                         
-                        rodType = dict(name=type_string, d_vol=d, w=w, m=mass)  # make dictionary for this rod type
+                        rodType = dict(name=type_string, d_vol=d, w=w, m=mass, EA=1e9)  # make dictionary for this rod type
                         
                         if len(entries) >= 7: # read in hydro coefficients as well if enough columns are provided
                             rodType['Cd'   ] = float(entries[3])
@@ -700,22 +714,36 @@ class System():
                         rB = np.array(entries[6:9], dtype=float)
                         nSegs = int(entries[9])
                         # >>> note: this is currently only set up for use with MoorDyn output data <<<
-                        
+
+                        nRodPoints = np.sum(self.isRodPoint.astype(int))
                         if nSegs==0:       # this is the zero-length special case
                             lUnstr = 0
-                            self.rodList.append( Point(self, num, 0, rA) )
+                            self.rodList.append( Point(self, -num, 0, rA) )
+                            self.pointList.append(self.rodList[-1])
+                            self.isRodPoint.append(True)
                         else:
                             lUnstr = np.linalg.norm(rB-rA)
-                            self.rodList.append( Line(self, num, lUnstr, rodType, nSegs=nSegs, isRod=1) )
+                            self.pointList.append( Point(self, -n_lines - 2 * num, 0, rA) )
+                            self.isRodPoint.append(True)
+                            self.pointList.append( Point(self, -n_lines - 2 * num - 1, 0, rB) )
+                            self.isRodPoint.append(True)
+                            self.rodList.append( Line(self, -num, lUnstr, rodType, nSegs=nSegs, isRod=1) )
+                            self.lineList.append(self.rodList[-1])
+                            self.isRodLine.append(True)
+                            self.pointList[-2].attachLine(self.lineList[-1].number, 0)
+                            self.pointList[-1].attachLine(self.lineList[-1].number, 1)
                             
                             if ("body" in attachment) or ("turbine" in attachment):
                                 # attach to body here
                                 BodyID = int("".join(filter(str.isdigit, attachment)))
                                 if len(self.bodyList) < BodyID:
                                     self.bodyList.append( Body(self, 1, 0, np.zeros(6)))
+                                    print("New body added")  # <<< should add consistent warnings in these cases
                                     
-                                self.bodyList[BodyID-1].attachRod(num, np.hstack([rA,rB]))
-                                
+                                self.bodyList[BodyID-1].attachRod(self.rodList[-1].number, np.hstack([rA,rB]))
+                                self.bodyList[BodyID-1].attachPoint(self.pointList[-2].number, rA)
+                                self.bodyList[BodyID-1].attachPoint(self.pointList[-1].number, rB)
+
                             else: # (in progress - unsure if htis works) <<<
                                 self.rodList[-1].rA = rA #.setEndPosition(rA, 0)  # set initial end A position
                                 self.rodList[-1].rB = rB #.setEndPosition(rB, 1)  # set initial end B position
@@ -781,6 +809,7 @@ class System():
                         CdA= float(entries[7])
                         Ca = float(entries[8])
                         self.pointList.append( Point(self, num, pointType, r, m=m, v=v, CdA=CdA, Ca=Ca) )
+                        self.isRodPoint.append(False)
                         line = next(f)
                         
                         
@@ -799,20 +828,30 @@ class System():
                         
                         #lineList.append( Line(dirName, num, lUnstr, dia, nSegs) )
                         self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs)) #attachments = [int(entries[4]), int(entries[5])]) )
-                        
+                        self.isRodLine.append(False)
+
+                        def find_rod_points(num):
+                            for rod in self.rodList:
+                                if isinstance(rod, Point) and rod.number == -num:
+                                    return rod, rod
+                            pts = []
+                            for point in self.pointList:
+                                if -num in point.attached:
+                                    pts.append(point)
+                            return pts
+                                    
                         # attach end A
                         numA = int("".join(filter(str.isdigit, entries[2])))  # get number from the attachA string
                         if entries[2][0] in ['r','R']:    # if id starts with an "R" or "Rod"  
-                            if numA <= len(self.rodList) and numA > 0:
-                                if entries[2][-1] in ['a','A']:
-                                    self.rodList[numA-1].attachLine(num, 0)  # add line (end A, denoted by 0) to rod >>end A, denoted by 0<<
-                                elif entries[2][-1] in ['b','B']: 
-                                    self.rodList[numA-1].attachLine(num, 0)  # add line (end A, denoted by 0) to rod >>end B, denoted by 1<<
-                                else:
-                                    raise ValueError(f"Rod end (A or B) must be specified for line {num} end A attachment. Input was: {entries[2]}")
+                            rodPoints = find_rod_points(numA)
+                            if not rodPoints:
+                                raise ValueError(f"Rod ID ({numA}) asked by line {num} cannot be found.")
+                            if entries[2][-1] in ['a','A']:
+                                rodPoints[0].attachLine(num, 0)
+                            elif entries[2][-1] in ['b','B']: 
+                                rodPoints[1].attachLine(num, 0)
                             else:
-                                raise ValueError(f"Rod ID ({numA}) out of bounds for line {num} end A attachment.") 
-                        
+                                raise ValueError(f"Rod end (A or B) must be specified for line {num} end A attachment. Input was: {entries[2]}")
                         else:     # if J starts with a "C" or "Con" or goes straight ot the number then it's attached to a Connection
                            if numA <= len(self.pointList) and numA > 0:  
                               self.pointList[numA-1].attachLine(num, 0)  # add line (end A, denoted by 0) to Point
@@ -822,15 +861,15 @@ class System():
                         # attach end B
                         numB = int("".join(filter(str.isdigit, entries[3])))  # get number from the attachA string
                         if entries[3][0] in ['r','R']:    # if id starts with an "R" or "Rod"  
-                            if numB <= len(self.rodList) and numB > 0:
-                                if entries[3][-1] in ['a','A']:
-                                    self.rodList[numB-1].attachLine(num, 1)  # add line (end B, denoted by 1) to rod >>end A, denoted by 0<<
-                                elif entries[3][-1] in ['b','B']: 
-                                    self.rodList[numB-1].attachLine(num, 1)  # add line (end B, denoted by 1) to rod >>end B, denoted by 1<<
-                                else:
-                                    raise ValueError(f"Rod end (A or B) must be specified for line {num} end B attachment. Input was: {entries[2]}")
+                            rodPoints = find_rod_points(numB)
+                            if not rodPoints:
+                                raise ValueError(f"Rod ID ({numA}) asked by line {num} cannot be found.")
+                            if entries[2][-1] in ['a','A']:
+                                rodPoints[0].attachLine(num, 1)
+                            elif entries[2][-1] in ['b','B']: 
+                                rodPoints[1].attachLine(num, 1)
                             else:
-                                raise ValueError(f"Rod ID ({numB}) out of bounds for line {num} end B attachment.") 
+                                raise ValueError(f"Rod end (A or B) must be specified for line {num} end A attachment. Input was: {entries[2]}")
                         
                         else:     # if J starts with a "C" or "Con" or goes straight ot the number then it's attached to a Connection
                            if numB <= len(self.pointList) and numB > 0:  
@@ -1107,7 +1146,7 @@ class System():
             #L.append("ID  Attachment     X       Y       Z          Mass   Volume  CdA    Ca")
             #L.append("(#)   (-)         (m)     (m)     (m)         (kg)   (m^3)  (m^2)   (-)")
             
-            for point in self.pointList:
+            for i,point in enumerate(self.pointList):
                 point_pos = point.r             # get point position in global reference frame to start with
                 if point.type == 1:             # point is fixed or attached (anch, body, fix)
                     point_type = 'Fixed'
@@ -1345,40 +1384,24 @@ class System():
             
             
             #add zero length rods for dynamic cables
-            rod_id = 0
-            for point in self.pointList:
-                point_pos = point.r
-                if point.cable == True:
-                    
-                    rod_id = rod_id + 1
-                    if point.type == 1:             # point is fixed or attached (anch, body, fix)
-                        point_type = 'Fixed'
-                        
-                        #Check if the point is attached to body
-                        for body in self.bodyList:
-                            for attached_Point in body.attachedP:
-                                if attached_Point == point.number:
-                                    point_type = "Body" + str(body.number)
-                                    point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
-                        
-                    elif point.type == 0:           # point is coupled externally (con, free)
-                        point_type = 'Free'
-                            
-                    elif point.type == -1:          # point is free to move (fair, ves)
-                        point_type = 'Coupled'
-                    
-                    f = point.getForces(lines_only = True, xyz = True)
-                    f_unit = f / np.linalg.norm(f)
-                    rA = [point_pos[0] - f_unit[0], point_pos[1] - f_unit[1], point_pos[2] - f_unit[2]]
-                    rB = [point_pos[0] + f_unit[0], point_pos[1] + f_unit[1], point_pos[2] + f_unit[2]]
-                    L.append("{:<4d} {:9} {:9} {:8.2f} {:8.2f} {:9.2f} {:6.2f} {:6.2f} {:6.2f} {} {}".format(
-                              rod_id, 'connector', point_type, rA[0], rA[1], rA[2], rB[0], rB[1], rB[2], 0, '-'))
+            for rod in self.rodList:
+                if isinstance(rod, Line):
+                    rA = rB = rod.r
+                    n = 0
+                else:
+                    rA = rod.rA
+                    rB = rod.rB
+                    n = rod.nNodes-1
+                L.append("{:<4d} {:<15} {:8.2f} {:8.2f} {:9.2f} {:6.2f} {:6.2f} {:6.2f} {} {}".format(
+                    -rod.number, rod.type['name'], rA[0], rA[1], rA[2], rB[0], rB[1], rB[2], n, '-'))
                     
             L.append("---------------------- POINTS -------------------------------------------------------")
             L.append("ID  Attachment     X       Y       Z           Mass  Volume  CdA    Ca")
             L.append("(#)   (-)         (m)     (m)     (m)          (kg)  (m^3)  (m^2)   (-)")
             
-            for point in self.pointList:
+            for i, point in enumerate(self.pointList):
+                if self.isRodPoint[i]:
+                    continue
                 if point.cable == False:
                     point_pos = point.r             # get point position in global reference frame to start with
                     if point.type == 1:             # point is fixed or attached (anch, body, fix)
@@ -1405,7 +1428,9 @@ class System():
             L.append("ID    LineType      AttachA  AttachB  UnstrLen  NumSegs  LineOutputs")
             L.append("(#)    (name)        (#)      (#)       (m)       (-)     (-)")
             
-            for i,line in enumerate(self.lineList):
+            for i, line in enumerate(self.lineList):
+                if self.isRodLine[i]:
+                    continue
                 nSegs = int(np.ceil(line.L/line_dL)) if line_dL>0 else line.nNodes-1  # if target dL given, set nSegs based on it instead of line.nNodes
                 if connection_points[i,0] < 0:
                     attach = ['A', 'B']
@@ -1471,7 +1496,9 @@ class System():
                 nCpldDOF += body.nDOF
                 DOFtypes += [-1]*body.nDOF
         
-        for point in self.pointList:
+        for i, point in enumerate(self.pointList):
+            if self.isRodPoint[i]:
+                continue
             if point.type == 0: 
                 nDOF += point.nDOF
                 DOFtypes += [0]*point.nDOF
@@ -3866,5 +3893,4 @@ class System():
         with open(outFileName, 'w') as out:
             for x in range(len(L)):
                 out.write(L[x])
-                out.write('\n')    
-
+                out.write('\n')
