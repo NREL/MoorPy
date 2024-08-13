@@ -600,7 +600,7 @@ class System():
                         mass = float(entries[2])
                         w = (mass - np.pi/4*d**2 *self.rho)*self.g
                         
-                        rodType = dict(name=type_string, d_vol=d, w=w, m=mass)  # make dictionary for this rod type
+                        rodType = dict(name=type_string, d_vol=d, w=w, m=mass, EA=1e9)  # make dictionary for this rod type
                         
                         if len(entries) >= 7: # read in hydro coefficients as well if enough columns are provided
                             rodType['Cd'   ] = float(entries[3])
