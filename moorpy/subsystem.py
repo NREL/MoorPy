@@ -294,9 +294,13 @@ class Subsystem(System, Line):
         dr =  self.rB - self.rA
         LH = np.hypot(dr[0], dr[1])         # horizontal spacing of line ends
         LV = dr[2]                          # vertical rise from end A to B
-        self.pointList[ 0].setPosition([ -self.span   , 0, self.rA[2]])
-        self.pointList[-1].setPosition([ -self.span+LH, 0, self.rB[2]])
-        
+        if self.shared:
+            self.pointList[ 0].setPosition([  -self.span/2   , 0, self.rA[2]])
+            self.pointList[-1].setPosition([ -self.span/2+LH, 0, self.rB[2]])
+        else:
+            self.pointList[ 0].setPosition([ -self.span   , 0, self.rA[2]])
+            self.pointList[-1].setPosition([ -self.span+LH, 0, self.rB[2]])
+            
         # get equilibrium
         self.solveEquilibrium(tol=tol)
         
@@ -466,9 +470,14 @@ class Subsystem(System, Line):
         self.revertToStaticStiffness()
 
         # Ensure end A position and set end B position to offset values
-        self.rA = np.array([-self.span-self.rad_fair, 0, self.rA[2]])
-        self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
-        
+        if self.shared:
+            self.rA = np.array([-self.span/2-self.rad_fair, 0, self.rA[2]])
+            self.rB = np.array([-self.rad_fair + offset/2, 0, self.z_fair+z]) 
+            
+        else:
+            self.rA = np.array([-self.span-self.rad_fair, 0, self.rA[2]])
+            self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
+            
         self.staticSolve(tol=self.eqtol)  # solve the subsystem
         
         # Store some values at this offset position that may be used later
