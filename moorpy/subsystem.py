@@ -379,12 +379,13 @@ class Subsystem(System, Line):
             
             # color and width settings
             if color == 'self':
-                color = line.color  # attempt to allow custom colors
+                colorplot = line.color  # attempt to allow custom colors
                 lw = line.lw
             elif color == None:
-                color = [0.3, 0.3, 0.3]  # if no color, default to grey
+                colorplot = [0.3, 0.3, 0.3]  # if no color, default to grey
                 lw = 1
             else:
+                colorplot = color
                 lw = 1
             
             # get the Line's local coordinates
@@ -398,6 +399,7 @@ class Subsystem(System, Line):
             Xs2d = Xs*Xuvec[0] + Ys*Xuvec[1] + Zs*Xuvec[2] + Xoff
             Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] + Yoff
             
+            
             if colortension:    # if the mooring lines want to be plotted with colors based on node tensions
                 maxT = np.max(tensions); minT = np.min(tensions)
                 for i in range(len(Xs)-1):          # for each node in the line
@@ -406,15 +408,15 @@ class Subsystem(System, Line):
                     rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
                     ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba, zorder=100)
             else:
-                ax.plot(Xs2d, Ys2d, color=color, lw=lw, zorder=100, label=label, alpha=alpha)
+                ax.plot(Xs2d, Ys2d, color=colorplot, lw=lw, zorder=100, label=label, alpha=alpha)
             
             if len(plotnodes) > 0:
                 for i,node in enumerate(plotnodes):
                     if self.number==plotnodesline[i]:
-                        ax.plot(Xs2d[node], Ys2d[node], 'o', color=color, markersize=5)
+                        ax.plot(Xs2d[node], Ys2d[node], 'o', color=colorplot, markersize=5)
             
             if endpoints == True:
-                ax.scatter([Xs2d[0], Xs2d[-1]], [Ys2d[0], Ys2d[-1]], color = color)
+                ax.scatter([Xs2d[0], Xs2d[-1]], [Ys2d[0], Ys2d[-1]], color = colorplot)
 
 
     def drawLine(self, Time, ax, color="k", endpoints=False, shadow=True, colortension=False, cmap_tension='rainbow'):
