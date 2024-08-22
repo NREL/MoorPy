@@ -205,7 +205,7 @@ class Subsystem(System, Line):
         self.rB = rB
 
         if suspended==2:
-            self.addPoint(-1, rA, DOFs=[2]) # add shared line point, free only to move in z
+            self.addPoint(0, rA, DOFs=[2]) # add shared line point, free only to move in z
         else:
             self.addPoint(-1, rA, DOFs=[0,2])                # add anchor point
         
