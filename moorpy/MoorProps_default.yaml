@@ -78,7 +78,9 @@ lineProps:
     mass_d2   :  5293    # linear mass density per diameter^2 [kg/m/m^2]    
     dvol_dnom :  1.18     # volume-equivalent diameter per nominal diameter [-] (assumes 4,875.5 kg/m^3 material density)
     MBL_d2    :  1022e6    # minimum breaking load per diameter^2 [N/m^2] 
-    EA_d2     :  97.1e9    # stiffness per diameter^2 [N/m^2]    
+    EA_d2     :  97.1e9    # stiffness per diameter^2 [N/m^2]
+    Cd        :  1.021    # drag coefficient (transverse) based on DNV-OS-E301 adjusted for volumetric diameter; longitudinal (Cd_ax) is neglected
+    cost_MBL  :  1.2e-05  # cost per N of MBL
 
   polyester   :     # polyester synthetic rope
     mass_d2   :  679       # linear mass density per diameter^2 [kg/m/m^2]       
@@ -116,6 +118,7 @@ lineProps:
     Cd        :  1.988     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
     Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
     Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    cost_MBL  :  1.4e-04    # cost per N of MBL [$/m/N]
 
 
 
