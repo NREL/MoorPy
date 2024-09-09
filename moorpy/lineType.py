@@ -7,7 +7,7 @@ import numpy as np
 class LineType():
     '''A class to hold the various properties of a mooring line type'''
         
-    def __init__(self, name, d, massden, EA, MBL=0.0, cost=0.0, notes="", input_d=0.0, input_type=''):
+    def __init__(self, name, d, massden, EA, MBL=0.0, cost=0.0, notes="", input_d=0.0, input_type='',Cd=0.,Ca=0.,CdAx=0.,CaAx=0.):
         '''Initialize LineType attributes
 
         Parameters
@@ -45,6 +45,10 @@ class LineType():
         self.notes = notes                          # optional notes/description string
         self.input_d = input_d                      # the non-volume-equivalent, input diameter [m]
         self.input_type = input_type                # line type string (e.g. chain, polyester)
+        self.Cd = Cd
+        self.Ca = Ca
+        self.CdAx = CdAx
+        self.CaAx = CaAx
         
 
 

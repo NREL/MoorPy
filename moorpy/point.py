@@ -336,8 +336,32 @@ class Point():
             return K
         else:                       # otherwise only return rows/columns of active DOFs
             return K[:,self.DOFs][self.DOFs,:]
+
+    def getDynamicMatrices(self):
+        '''Gets inertia, added mass, damping, and stiffness matrices of Point due only to mooring lines (with other objects fixed)
+        using a lumped mass model.
+
+        Returns
+        -------
+        '''
+        M = np.zeros([3,3])
+        A = np.zeros([3,3])
+        B = np.zeros([3,3])
+        K = np.zeros([3,3])
+
+        # append the stiffness matrix of each line attached to the point
+        for lineID,endB in zip(self.attached,self.attachedEndB):            
+            line = self.sys.lineList[lineID-1]     
+
+            M_all, A_all, B_all, K_all = line.getDynamicMatricesLumped()
+             
+            M += M_all[-3:,-3:] if endB == 1 else M_all[:3, :3]
+            A += A_all[-3:,-3:] if endB == 1 else A_all[:3, :3]
+            B += B_all[-3:,-3:] if endB == 1 else B_all[:3, :3]
+            K += K_all[-3:,-3:] if endB == 1 else K_all[:3, :3]
+
+        return M, A, B, K
         
-    
     def getCost(self):
         '''Fill in and returns a cost dictionary for this Point object.
         So far it only applies for if the point is an anchor.'''

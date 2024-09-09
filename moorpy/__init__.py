@@ -9,6 +9,8 @@ from moorpy.body import Body
 from moorpy.lineType import LineType
 from moorpy.system import System
 from moorpy.subsystem import Subsystem
+#from moorpy.compositeLine import CompositeLine
+#from moorpy.dynamic_tension_functions import *
 
 from moorpy.helpers import *
 from moorpy.Catenary import catenary

@@ -274,7 +274,7 @@ class System():
             else:
                 raise ValueError(f"The specified lineType name ({lineType}) does not correspond with any lineType stored in this MoorPy System")
         
-        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, lineType, nSegs=nSegs, cb=cb) )
+        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, lineType, nSegs=nSegs, cb=cb, attachments = [pointA,pointB]) )
         
         if pointA > 0:
             if pointA <= len(self.pointList):
@@ -409,6 +409,11 @@ class System():
 
         # <<< the "name" keyword in this method is confusing in that it isn't the index key. Does it have a purpose? <<<
 
+    def captureCompositeLine(self,point_id):
+        if not hasattr(self,'compositeLineList'):
+            self.compositeLineList = []
+        
+        self.compositeLineList.append(CompositeLine(self,point_id))
 
     def setLineType(self, dnommm, material, source=None, name="", **kwargs):
         '''Add or update a System lineType using the new dictionary-based method.
@@ -798,7 +803,7 @@ class System():
                         nSegs  = int(entries[5])         
                         
                         #lineList.append( Line(dirName, num, lUnstr, dia, nSegs) )
-                        self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs)) #attachments = [int(entries[4]), int(entries[5])]) )
+                        self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs, attachments = [int(entries[2]), int(entries[3])]) )
                         
                         # attach end A
                         numA = int("".join(filter(str.isdigit, entries[2])))  # get number from the attachA string
@@ -1506,6 +1511,8 @@ class System():
             
         for line in self.lineList:
             line.staticSolve(profiles=1)  # flag to enable additional line outputs used for plotting, tension results, etc.
+            if hasattr(line, 'lineList'):
+                line.initialize()
             
         for point in self.pointList:
             point.getForces()
@@ -2934,7 +2941,255 @@ class System():
         
         return K
     
+    def getCoupledDynamicMatrices(self, lines_only=False):
+        '''Write something here later
+        '''                                    
+        self.nDOF, self.nCpldDOF, DOFtypes = self.getDOFs()
+        
+        n = self.nDOF + self.nCpldDOF
+        
+        if self.display > 2:
+            print("Getting mooring system stiffness matrix...")
+
+        # get full system stiffness matrix
+        M_all, A_all, B_all, K_all = self.getSystemDynamicMatrices(DOFtype="both", lines_only=lines_only)
+        
+        # invert matrix
+        M_inv_all = np.linalg.pinv(M_all)
+        A_inv_all = np.linalg.pinv(A_all)
+        B_inv_all = np.linalg.pinv(B_all)
+        K_inv_all = np.linalg.pinv(K_all)
+        
+        # remove free DOFs (this corresponds to saying that the sum of forces on these DOFs will remain zero)
+        #indices = list(range(n))                # list of DOF indices that will remain active for this step
+        mask = [True]*n                         # this is a mask to be applied to the array K indices
+        
+        for i in range(n-1, -1, -1):            # go through DOFs and flag free ones for exclusion
+            if DOFtypes[i] == 0:
+                mask[i] = False
+                #del indices[i]
+        
+        M_inv_coupled = M_inv_all[mask,:][:,mask]
+        A_inv_coupled = A_inv_all[mask,:][:,mask]
+        B_inv_coupled = B_inv_all[mask,:][:,mask]        
+        K_inv_coupled = K_inv_all[mask,:][:,mask]
+        
+        # invert reduced matrix to get coupled stiffness matrix (with free DOFs assumed to equilibrate linearly)
+        M_coupled = np.linalg.pinv(M_inv_coupled)
+        A_coupled = np.linalg.pinv(A_inv_coupled)
+        B_coupled = np.linalg.pinv(B_inv_coupled)
+        K_coupled = np.linalg.pinv(K_inv_coupled)
+
+        return M_coupled, A_coupled, B_coupled, K_coupled
+        
     
+    def getSystemDynamicMatrices(self, DOFtype="free", lines_only=False):
+        '''Write something here later        
+        '''                      
+        # find the total number of free and coupled DOFs in case any object types changed
+        self.nDOF, self.nCpldDOF, _ = self.getDOFs()
+        
+        #self.solveEquilibrium()   # should we make sure the system is in equilibrium?
+        
+        # allocate stiffness matrix according to the DOFtype specified
+        if DOFtype=="free":
+            M = np.zeros([self.nDOF, self.nDOF])
+            A = np.zeros([self.nDOF, self.nDOF])
+            B = np.zeros([self.nDOF, self.nDOF])
+            K = np.zeros([self.nDOF, self.nDOF])
+            d = [0]
+        elif DOFtype=="coupled":
+            M = np.zeros([self.nCpldDOF, self.nCpldDOF])
+            A = np.zeros([self.nCpldDOF, self.nCpldDOF])
+            B = np.zeros([self.nCpldDOF, self.nCpldDOF])
+            K = np.zeros([self.nCpldDOF, self.nCpldDOF])
+            d = [-1]
+        elif DOFtype=="both":
+            M = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
+            A = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
+            B = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
+            K = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
+            d = [0,-1]
+        else:
+            raise ValueError("getSystemDynamicMatrices called with invalid DOFtype input. Must be free, coupled, or both")
+        
+        
+        # The following will go through and get the lower-triangular stiffness terms,
+        # calculated as the force/moment on Body/Point 2 from translation/rotation of Body/Point 1.
+        
+        # go through DOFs, looking for lines that couple to anchors or other DOFs
+        
+        i = 0                               # start counting number of DOFs at zero
+        
+        # go through each movable body in the system
+        for body1 in self.bodyList:
+            if body1.type in d:    # >>>> when DOFtype==both, this approach gives different indexing than what is in setPositions/getForces and getSystemStiffness <<<<<
+                
+                #i = (body1.number-1)*6      # start counting index for body DOFs based on body number to keep indexing consistent
+                
+                # get body's self-stiffness matrix (now only cross-coupling terms will be handled on a line-by-line basis)
+                M6, A6, B6, K6 = body1.getDynamicMatrices(lines_only=lines_only)
+                M[i:i+body1.nDOF, i:i+body1.nDOF] += M6
+                A[i:i+body1.nDOF, i:i+body1.nDOF] += A6
+                B[i:i+body1.nDOF, i:i+body1.nDOF] += B6
+                K[i:i+body1.nDOF, i:i+body1.nDOF] += K6                            
+                
+                # go through each attached point
+                for pointID1,rPointRel1 in zip(body1.attachedP,body1.rPointRel):
+                    point1 = self.pointList[pointID1-1]
+                    
+                    r1 = rotatePosition(rPointRel1, body1.r6[3:])   # relative position of Point about body ref point in unrotated reference frame  
+                    H1 = getH(r1)                                   # produce alternator matrix of current point's relative position to current body
+                  
+                    for lineID in point1.attached:      # go through each attached line to the Point, looking for when its other end is attached to something that moves
+
+                        endFound = 0                    # simple flag to indicate when the other end's attachment has been found
+                        j = i + body1.nDOF              # first index of the DOFs this line is attached to. Start it off at the next spot after body1's DOFs
+                        
+                        # get cross-coupling stiffness of line: force on end attached to body1 due to motion of other end
+                        M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped()
+                                             
+                        MB = M_all[-3:,:3] if point1.attachedEndB == 1 else M_all[:3,-3:]
+                        AB = A_all[-3:,:3] if point1.attachedEndB == 1 else A_all[:3,-3:]
+                        BB = B_all[-3:,:3] if point1.attachedEndB == 1 else B_all[:3,-3:]
+                        KB = K_all[-3:,:3] if point1.attachedEndB == 1 else K_all[:3,-3:]
+                        
+                        # look through Bodies further on in the list (coupling with earlier Bodies will already have been taken care of)
+                        for body2 in self.bodyList[self.bodyList.index(body1)+1: ]:
+                            if body2.type in d:
+                                
+                                # go through each attached Point
+                                for pointID2,rPointRel2 in zip(body2.attachedP,body2.rPointRel):
+                                    point2 = self.pointList[pointID2-1]
+                                    
+                                    if lineID in point2.attached:     # if the line is also attached to this Point2 in Body2
+                                        
+                                        # following are analagous to what's in functions getH and translateMatrix3to6 except for cross coupling between two bodies
+                                        r2 = rotatePosition(rPointRel2, body2.r6[3:])   # relative position of Point about body ref point in unrotated reference frame  
+                                        H2 = getH(r2)
+                                        
+                                        # loads on body1 due to motions of body2
+                                        K66 = np.block([[   KB        , np.matmul(KB, H2)],
+                                                  [np.matmul(H1.T, KB), np.matmul(np.matmul(H2, KB), H1.T)]])
+                                        
+                                        # Trim for only enabled DOFs of the two bodies
+                                        K66 = K66[body1.DOFs,:][:,body2.DOFs]
+                                        
+                                        K[i:i+body1.nDOF, j:j+body2.nDOF] += K66    # f on B1 due to x of B2
+                                        K[j:j+body2.nDOF, i:i+body1.nDOF] += K66.T  # mirror
+                                        
+                                        # note: the additional rotational stiffness due to change in moment arm does not apply to this cross-coupling case
+                                        endFound = 1  # signal that the line has been handled so we can move on to the next thing
+                                        break  
+
+                                j += body2.nDOF # if this body has DOFs we're considering, then count them
+                        
+                        
+                        # look through free Points
+                        if endFound==0:                              #  if the end of this line hasn't already been found attached to a body
+                            for point2 in self.pointList:
+                                if point2.type in d:                 # if it's a free point and
+                                    if lineID in point2.attached:    # the line is also attached to it
+                                        
+                                        # only add up one off-diagonal sub-matrix for now, then we'll mirror at the end                                          
+                                        K63 = np.vstack([KB, np.matmul(H1.T, KB)])                                        
+                                        
+                                        # Trim for only enabled DOFs of the point and body
+                                        K63 = K63[body1.DOFs,:][:,point2.DOFs]
+                                        
+                                        K[i:i+ body1.nDOF, j:j+point2.nDOF] += K63  # f on B1 due to x of P2
+                                        K[j:j+point2.nDOF, i:i+ body1.nDOF] += K63.T    # mirror 
+                                        
+                                        break
+                                    
+                                    j += point2.nDOF                  # if this point has DOFs we're considering, then count them
+                                    
+                                # note: No cross-coupling with fixed points. The body's own stiffness matrix is now calculated at the start.
+              
+                i += body1.nDOF  # moving along to the next body...
+                
+
+        # go through each movable point in the system
+        for point in self.pointList:
+            if point.type in d:
+            
+                n = point.nDOF
+                
+                # >>> TODO: handle case of free end point resting on seabed <<<
+                
+                # get point's self-stiffness matrix                    
+                M1, A1, B1, K1 = point.getDynamicMatrices()
+                M[i:i+n,i:i+n] += M1
+                A[i:i+n,i:i+n] += A1
+                B[i:i+n,i:i+n] += B1 
+                K[i:i+n,i:i+n] += K1
+
+                for lineID in point.attached:
+                    
+                    j = i + n
+                    
+                    # go through movable points to see if one is attached
+                    for point2 in self.pointList[self.pointList.index(point)+1: ]:
+                        if point2.type in d:
+                            if lineID in point2.attached:  # if this point is at the other end of the line
+
+                                # get cross-coupling stiffness of line: force on end attached to point1 due to motion of other end
+                                # The names are somewhat confusing, but AB: Added mass matrix (A) at point B due to motions of the other extremity
+                                M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped()
+                                             
+                                MB = M_all[-3:,:3] if point.attachedEndB == 1 else M_all[:3,-3:]
+                                AB = A_all[-3:,:3] if point.attachedEndB == 1 else A_all[:3,-3:]
+                                BB = B_all[-3:,:3] if point.attachedEndB == 1 else B_all[:3,-3:]
+                                KB = K_all[-3:,:3] if point.attachedEndB == 1 else K_all[:3,-3:]
+                                 
+                                # Trim stiffness matrix to only use the enabled DOFs of each point
+                                MB = MB[point.DOFs,:][:,point2.DOFs]
+                                AB = AB[point.DOFs,:][:,point2.DOFs]
+                                BB = BB[point.DOFs,:][:,point2.DOFs]
+                                KB = KB[point.DOFs,:][:,point2.DOFs]                                
+                                
+                                # Include in total inertia matrix
+                                M[i:i+n          , j:j+point2.nDOF] += MB    # force on P1 due to movement of P2
+                                M[j:j+point2.nDOF, i:i+n          ] += MB.T  # mirror (f on P2 due to x of P1)
+
+                                # Include in total added mass matrix
+                                A[i:i+n          , j:j+point2.nDOF] += AB    # force on P1 due to movement of P2
+                                A[j:j+point2.nDOF, i:i+n          ] += AB.T  # mirror (f on P2 due to x of P1)
+
+                                # Include in total damping matrix
+                                B[i:i+n          , j:j+point2.nDOF] += BB    # force on P1 due to movement of P2
+                                B[j:j+point2.nDOF, i:i+n          ] += BB.T  # mirror (f on P2 due to x of P1)
+
+                                # Include in total stiffness matrix
+                                K[i:i+n          , j:j+point2.nDOF] += KB    # force on P1 due to movement of P2
+                                K[j:j+point2.nDOF, i:i+n          ] += KB.T  # mirror (f on P2 due to x of P1)
+                                
+                            j += point2.nDOF                  # if this point has DOFs we're considering, then count them
+                                
+                i += n
+        
+        return M, A, B, K
+
+
+    def updateSystemDynamicMatrices(self, omegas=np.array([0.0]), S_zeta=np.array([0.0]), seabed_tol=1e-4):
+        '''Updates the dynamic matrices of all the lines in the system. Works only with lumped mass approach (MoorDyn input file)
+        This function can only properly update/compute the inertia, added mass, and stiffness matrices of each line in the system.        
+        
+        This function also updates the damping matrix, but this is done considering unitary amplitude motions of the nodes, which
+        is not correct.
+        If `omegas` and `S_zeta` are provided, the damping matrix will account for wave kinematics as well, but that would still
+        be wrong
+
+        To properly compute the damping matrix, you should call line.updateLumpedMass externally providing the motion RAOs of the
+        line ends.
+        '''
+        kbot=0 # Should read those from the input file
+        cbot=0
+        
+        for line in self.lineList:
+            line.updateLumpedMass(omegas, S_zeta, self.depth, kbot=kbot, cbot=cbot, seabed_tol=seabed_tol)
+
+
     def getAnchorLoads(self, sfx, sfy, sfz, N):
         ''' Calculates anchor loads
         Parameters

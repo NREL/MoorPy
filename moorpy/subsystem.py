@@ -152,7 +152,7 @@ class Subsystem(System, Line):
         self.damage = np.zeros(self.nNodes)
         
     
-    def makeGeneric(self, lengths, types, connectors=[], suspended=0):
+    def makeGeneric(self, lengths, types, connectors=[], suspended=0, nSegs=40):
 
         '''Creates a cable of n components going between an anchor point and
         a floating body (or a bridle point). If shared, it goes between two
@@ -227,7 +227,14 @@ class Subsystem(System, Line):
                 raise Exception(f"Can't find lineType '{types[i]}' in the SubSystem.")
             
             # add the line segment using the reference to its lineType dict
-            self.addLine(lengths[i],self.lineTypes[i])
+            if nSegs is None:
+                self.addLine(lengths[i], self.lineTypes[i])
+            elif isinstance(nSegs, (int, float)):
+                self.addLine(lengths[i], self.lineTypes[i], nSegs=nSegs)
+            elif isinstance(nSegs, list):
+                self.addLine(lengths[i], self.lineTypes[i], nSegs=nSegs[i])
+            else:
+                raise ValueError("Invalid type for nSegs. Expected None, a number, or a list.")
 
             # add the upper end point of the segment
             if i==self.nLines-1:                            # if this is the upper-most line
@@ -525,6 +532,56 @@ class Subsystem(System, Line):
     def revertToStaticStiffness(self):
         '''Calls the static stiffness method from System rather than from Line.'''
         System.revertToStaticStiffness(self)
+    
+    
+    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=1e-4):
+        '''Compute M,A,B,K matrices for the Subsystem. This calls 
+        get_dynamic_matrices() for each Line in the Subsystem then combines
+        the results. Note that this method overrides the Line method. Other
+        Line methods used for dynamics can be used directly in Subsystem.
+        '''
+        self.nNodes = np.sum([line.nNodes for line in self.lineList]) - self.nLines + 1
+        
+        EA_segs = np.zeros(self.nNodes-1) # extensional stiffness of the segments
+        n_dofs = 3*self.nNodes # number of dofs
+        M = np.zeros([n_dofs,n_dofs], dtype='float')
+        A = np.zeros([n_dofs,n_dofs], dtype='float')
+        B = np.zeros([n_dofs,n_dofs], dtype='float')
+        K = np.zeros([n_dofs,n_dofs], dtype='float')
+        r_mean = np.zeros([self.nNodes,3], dtype='float')
+        r_dynamic = np.ones((len(omegas),self.nNodes,3),dtype='float')*r_dynamic
+        v_dynamic = 1j*omegas[:,None,None]*r_dynamic
+
+        n = 0  # starting index of the next line's entries in the matrices
+        
+        for line in self.lineList:
+            n1 = int(n/3) 
+            n2 = n1 + line.nNodes
+
+            # Filling matrices for line (dof n to dof 3xline_nodes+n)
+            M_n,A_n,B_n,K_n,r_n,EA_segs_n = line.getDynamicMatrices(omegas, S_zeta,r_dynamic[:,n1:n2,:],depth,kbot,cbot,seabed_tol=seabed_tol)
+            M[n:3*line.nNodes+n,n:3*line.nNodes+n] += M_n
+            A[n:3*line.nNodes+n,n:3*line.nNodes+n] += A_n
+            B[n:3*line.nNodes+n,n:3*line.nNodes+n] += B_n
+            K[n:3*line.nNodes+n,n:3*line.nNodes+n] += K_n
+
+            # Attachment point properties
+            attachment = self.pointList[line.attached[-1]-1] # attachment point
+            attachment_idx = n2 - 1 # last node index
+            sigma_vp = np.sqrt(np.trapz(np.abs(v_dynamic[:,attachment_idx,:])**2*S_zeta[:,None],omegas,axis=0)) # standard deviations of the global components of the attachment point's velocity
+
+            M[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += attachment.m*np.eye(3) 
+            A[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += attachment.Ca* self.rho * attachment.v * np.eye(3)
+            B[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += 0.5* self.rho * attachment.CdA * np.pi*(3*attachment.v/4/np.pi)**(2/3) \
+                                                                                   * np.eye(3) * np.sqrt(8/np.pi) * np.diag(sigma_vp)
+
+            # Static line properties
+            r_mean[n1:n2,:] = r_n
+            EA_segs[n1:n2-1] = EA_segs_n 
+
+            n += 3*line.nNodes - 3 # next line starting node add the number of dofs of the current line minus 3 to get the last shared node
+        
+        return M,A,B,K,r_mean,EA_segs
     
     
     # ---- Extra convenience functions (subsystem should be in equilibrium) -----

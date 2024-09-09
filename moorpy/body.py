@@ -382,8 +382,81 @@ class Body():
             return K
         else:  # only return rows/columns of active DOFs
             return K[:,self.DOFs][self.DOFs,:]
-    
+
+
+    def getDynamicMatrices(self, lines_only=False, all_DOFs=False):
+        '''Gets the dynamic matrices of the Body with other objects fixed
+        using a lumped mass approach.
+
+        Parameters
+        ----------
+        lines_only : boolean, optional
+            If true, the Body's contribution to its stiffness is ignored.
+        all_DOFs : boolean, optional
+            True: return all forces/moments; False: only those in DOFs list.
+
+        Returns
+        -------
+        M, A, B, K: 6x6 inertia, added mass, damping, and stiffness matrices.
+        '''
+                
+        M, A, B, K = (np.zeros([6,6]) for _ in range(4))
         
+        # Contributions from attached points (and any of their attached lines)
+        for PointID,rPointRel in zip(self.attachedP,self.rPointRel):            
+            r = rotatePosition(rPointRel, self.r6[3:])          # relative position of Point about body ref point in unrotated reference frame  
+            f3 = self.sys.pointList[PointID-1].getForces()      # total force on point (for additional rotational stiffness term due to change in moment arm)
+
+            M3, A3, B3, K3 = self.sys.pointList[PointID-1].getDynamicMatrices()  # local 3D dynamic matrices of the point
+            
+            # following are from functions translateMatrix3to6            
+            H = getH(r)
+            K[:3,:3] += K3
+            K[:3,3:] += np.matmul(K3, H)                        # only add up one off-diagonal sub-matrix for now, then we'll mirror at the end
+            K[3:,3:] += -np.matmul(getH(f3), H) - np.matmul(H, np.matmul(K3,H))   # updated 2023-05-02
+
+            # Inertia, added mass, and damping matrices are similar. Except for the lower right submatrix, which does not have the first term because 
+            # the moment arm does not explictly change with the velocity or acceleration of the body.
+            M[:3,:3] += M3
+            M[:3,3:] += np.matmul(M3, H)
+            M[3:,3:] += - np.matmul(H, np.matmul(M3,H))
+
+            A[:3,:3] += A3
+            A[:3,3:] += np.matmul(A3, H)
+            A[3:,3:] += - np.matmul(H, np.matmul(A3,H))
+
+            B[:3,:3] += B3
+            B[:3,3:] += np.matmul(B3, H)
+            B[3:,3:] += - np.matmul(H, np.matmul(B3,H))            
+   
+        K[3:,:3] = K[:3,3:].T                                   # copy over other off-diagonal sub-matrix
+        M[3:,:3] = M[:3,3:].T
+        A[3:,:3] = A[:3,3:].T
+        B[3:,:3] = B[:3,3:].T        
+        
+        # body's own stiffness components
+        if lines_only == False:
+        
+            # rotational stiffness effect of weight
+            rCG_rotated = rotatePosition(self.rCG, self.r6[3:]) # relative position of CG about body ref point in unrotated reference frame  
+            Kw = -np.matmul( getH([0,0, -self.m*self.sys.g]) , getH(rCG_rotated) )
+            
+            # rotational stiffness effect of buoyancy at metacenter
+            rM_rotated = rotatePosition(self.rM, self.r6[3:])   # relative position of metacenter about body ref point in unrotated reference frame  
+            Kb = -np.matmul( getH([0,0, self.sys.rho*self.sys.g*self.v]) , getH(rM_rotated) )
+           
+            # hydrostatic heave stiffness (if AWP is nonzero)
+            Kwp = self.sys.rho*self.sys.g*self.AWP
+            
+            K[3:,3:] += Kw + Kb
+            K[2 ,2 ] += Kwp
+            
+        # Return stiffness matrix
+        if all_DOFs:
+            return M, A, B, K
+        else:  # only return rows/columns of active DOFs
+            return M[:,self.DOFs][self.DOFs,:], A[:,self.DOFs][self.DOFs,:], B[:,self.DOFs][self.DOFs,:], K[:,self.DOFs][self.DOFs,:]
+
     
     def draw(self, ax):
         '''Draws the reference axis of the body
