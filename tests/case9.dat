@@ -1,0 +1,61 @@
+test case for two bodies with one shared mooring line between them
+---------------------- LINE TYPES -----------------------------------------------------
+Name   Diam   MassDen  EA       BA/-zeta   EI    Cd    Ca   CdAx   CaAx 
+(-)    (m)    (kg/m)   (N)      (N-s/-)   (-)   (-)   (-)   (-)   (-)     
+main   0.2   200.00  2.0E+09      -1        0    30    0.27  30     0.20     
+----------------------- BODIES ------------------------------------------------------
+ID   Attachment    X0     Y0     Z0     r0      p0     y0     Mass   CG*     I*      Volume   CdA*   Ca*
+(#)     (-)        (m)    (m)    (m)   (deg)   (deg)  (deg)   (kg)   (m)   (kg-m^2)  (m^3)   (m^2)  (-)
+1     coupled      0.00   0.00   0.00   0.00   0.00   0.00     0.0    0.0   0.0      0.0     0.00  0.00   
+2     coupled    200.00   0.00   0.00   0.00   0.00   0.00     0.0    0.0   0.0      0.0     0.00  0.00   
+---------------------- POINTS --------------------------------                                       
+Node Type      X         Y         Z     M        V     CdA   CA
+(-)  (-)      (m)       (m)       (m)   (kg)     (m^3) (m^2) (-)
+1   Fixed   -141.4    -141.4   -100.0     0      0      0     0
+2   Fixed   -141.4     141.4   -100.0     0      0      0     0
+3   Fixed    341.4    -141.4   -100.0     0      0      0     0
+4   Fixed    341.4     141.4   -100.0     0      0      0     0
+5   Body1    -14.14    -14.14   -20.0     0      0      0     0
+6   Body1    -14.14     14.14   -20.0     0      0      0     0
+7   Body2     14.14    -14.14   -20.0     0      0      0     0
+8   Body2     14.14     14.14   -20.0     0      0      0     0
+9   Body1     20.0       0.0    -20.0     0      0      0     0
+10  Body2    -20.0       0.0    -20.0     0      0      0     0
+---------------------- LINES -----------------------------------------------------
+Line       LineType EndA     EndB    UnstrLen  NumSegs    Flags/Outputs                   
+(-)        (-)      (-)       (-)      (m)       (-)        (-)     
+1          main      1         5       210.0     40        -    
+2          main      2         6       210.0     40        -    
+3          main      3         7       210.0     40        -    
+4          main      4         8       210.0     40        -    
+5          main      9        10       168.2     40        -    
+---------------------- SOLVER OPTIONS ----------------------------------------
+100      depth
+0.0004   dtM       - time step to use in mooring integration (s)
+3e6      kbot      - bottom stiffness (Pa/m)
+3e5      cbot      - bottom damping (Pa-s/m)
+2        dtIC      - time interval for analyzing convergence during IC gen (s)
+600      TmaxIC    - max time for ic gen (s)
+4       CdScaleIC - factor by which to scale drag coefficients during dynamic relaxation (-)
+0.01     threshIC  - threshold for IC convergence (-)
+0.1      dtOut
+----------------------------OUTPUTS--------------------------------------------
+FairTen1
+FairTen2
+FairTen3
+FairTen4
+FairTen5
+AnchTen5
+Body1fx
+Body1fy
+Body1fz
+Body1mx
+Body1my
+Body1mz
+Body2fx
+Body2fy
+Body2fz
+Body2mx
+Body2my
+Body2mz
+--------------------- need this line ------------------

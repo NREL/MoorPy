@@ -3,31 +3,24 @@
 # lineProps -> [line material name] -> [line material coefficients]
 
 # All possible lineProps coefficients are as follow:
-#    mass_0    :     # linear mass density offset [kg/m]
-#    mass_d    :     # linear mass density per diameter [kg/m^2]
 #    mass_d2   :     # linear mass density per diameter^2 [kg/m^3]
-#    mass_d3   :     # linear mass density per diameter^3 [kg/m^4]
-#    
-#    EA_0      :     # stiffness offset [N]
-#    EA_d      :     # stiffness per diameter [N/m]
-#    EA_d2     :     # stiffness per diameter^2 [N/m^2]
-#    EA_d3     :     # stiffness per diameter^3 [N/m^3]
-#    EA_MBL    :     # stiffness per MBL [N/N]
-
-NEW:
-#    Krs       or EAs_MBL      :     # quasi-static stiffness per MBL [N/N]
-#    Krd_alpha or EAd_MBL      :     # dynamic stiffness per MBL [N/N]
-#    Krd_beta  or EAd_MBL_PML  :     # dynamic stiffness per MBL per % mean load [N/N]
-# (% mean load will be input later in the modeling code)
-
-
 #    
 #    MBL_0     :     # minimum breaking load offset [N]
 #    MBL_d     :     # minimum breaking load per diameter [N/m]
 #    MBL_d2    :     # minimum breaking load per diameter^2 [N/m^2]
 #    MBL_d3    :     # minimum breaking load per diameter^3 [N/m^3]
 #    
+#    EA_0      :     # stiffness offset [N]
+#    EA_d      :     # stiffness per diameter [N/m]
+#    EA_d2     :     # stiffness per diameter^2 [N/m^2]
+#    EA_d3     :     # stiffness per diameter^3 [N/m^3]
+#    EA_MBL    :     # (quasi-static) stiffness per MBL [N/N] (aka Kr, Krs) 
+#    EAd_MBL   :     # dynamic stiffness per MBL [N/N] (aka Krd or Krd_alpha)
+#    EAd_MBL_Lm:     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (aka or Krd_beta)
+#
 #    dvol_dnom :     # volume-equivalent diameter per nominal diameter [-]
+#    density   :     # density of the line material [kg/m^3] (e.g., chain density = 7850 kg/m^3)
+#    NOTE: Only one of the above three variables can be used as input!
 #    
 #    cost_0    :     # cost offset [$/m]
 #    cost_d    :     # cost per diameter [$/m^2]
@@ -36,50 +29,96 @@ NEW:
 #    cost_mass :     # cost per mass [$/kg]
 #    cost_EA   :     # cost per stiffness [$/m/N]
 #    cost_MBL  :     # cost per MBL [$/m/N]
+#
+#    Cd        :     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+#    Cd_ax     :     # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+#    Ca        :     # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+#    Ca_ax     :     # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07 
+
+# Chain Notes
+# - The MBLs between studless and studlink chains are the same, for every grade
+# - The masses between different grades of chain are the same (for now...different grades might correspond to different material densities)
+# - If the user needs a different grade of chain, they will have to add another section and include those properties here. This default file only considers R4 chain
+# - This default yaml uses R4 studless chain as the default style of chain
+# - The chain MBL uses a cubic function, so be aware if you are researching theoretical chains with diameters greater than about 360mm, as the MBL will then decrease
+# - Chain EA values not provided in manufacturer catalogs, so the below coefficients are taken from DNV-OS-E301 2013
+
 
 
 lineProps: 
 
-  chain       :            # R4 grade studless chain
-    mass_d2   :  19.9e3    # linear mass density per diameter^2 [kg/m^3]    
-    EA_d2     :  85.4e9    # stiffness per diameter^2 [N/m^2]    
-    MBL_d     :  66.72e6   # minimum breaking load per diameter [N/m]   
-    MBL_d2    : 482.2e6    # minimum breaking load per diameter^2 [N/m^2]   
-    dvol_dnom :   1.8      # volume-equivalent diameter per nominal diameter [-]    
+  chain       :     # R4 grade studless chain (the default chain that will be used when linetypename='chain')
+    mass_d2   :  20.0e3    # linear mass density per diameter^2 [kg/m/m^2]    
+    EA_d3     : -3.93e7    # stiffness per diameter^3 [N/m^3]
+    EA_d2     :  85.6e9    # stiffness per diameter^2 [N/m^2]    
+    MBL_d3    : -2.19e9    # minimum breaking load per diameter^3 [N/m^3]
+    MBL_d2    :  1.21e9    # minimum breaking load per diameter^2 [N/m^2] 
+    MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
+    dvol_dnom :   1.80     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
     cost_mass :   2.585    # cost per mass [$/kg]
+    Cd        :   1.333    # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Cd_ax     :   0.639    # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.0       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.5       # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07 
     
-    
-  chain_studlink :         # R4 grade studlink chain
-    mass_d2   :  19.9e3    # linear mass density per diameter^2 [kg/m^3]    
-    EA_d2     :  85.4e9    # stiffness per diameter^2 [N/m^2]    
-    MBL_d     :  66.72e6   # minimum breaking load per diameter [N/m]   
-    MBL_d2    : 482.2e6    # minimum breaking load per diameter^2 [N/m^2]   
-    dvol_dnom :   1.89     # volume-equivalent diameter per nominal diameter [-]    
-    cost_mass :   2.585    # cost per mass [$/kg]           
-            
-  
-  polyester   :            # polyester synthetic rope
-    mass_d2   :  797.8     # linear mass density per diameter^2 [kg/m^3]    
-    EA_d2     :  1.09e9    # stiffness per diameter^2 [N/m^2]    
-    MBL_d2    :  170.5e6   # minimum breaking load per diameter^2 [N/m^2]   
-    dvol_dnom :  0.86      # volume-equivalent diameter per nominal diameter [-]    
+  chain_studlink :  # R4 grade studlink chain
+    mass_d2   :  21.9e3    # linear mass density per diameter^2 [kg/m/m^2]    
+    EA_d2     :  88.0e9    # stiffness per diameter^2 [N/m^2]    
+    MBL_d3    : -2.19e9    # minimum breaking load per diameter^3 [N/m^3]
+    MBL_d2    :  1.21e9    # minimum breaking load per diameter^2 [N/m^2] 
+    MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
+    dvol_dnom :   1.89     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
+    cost_mass :   2.585    # cost per mass [$/kg]
+    Cd        :   1.376    # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Cd_ax     :   0.741    # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.0       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.5       # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07      
+
+  wire :  # wire rope
+    mass_d2   :  5293    # linear mass density per diameter^2 [kg/m/m^2]    
+    dvol_dnom :  1.18     # volume-equivalent diameter per nominal diameter [-] (assumes 4,875.5 kg/m^3 material density)
+    MBL_d2    :  1022e6    # minimum breaking load per diameter^2 [N/m^2] 
+    EA_d2     :  97.1e9    # stiffness per diameter^2 [N/m^2]
+    Cd        :  1.021    # drag coefficient (transverse) based on DNV-OS-E301 adjusted for volumetric diameter; longitudinal (Cd_ax) is neglected
+    cost_MBL  :  1.2e-05  # cost per N of MBL
+
+  polyester   :     # polyester synthetic rope
+    mass_d2   :  679       # linear mass density per diameter^2 [kg/m/m^2]       
+    MBL_d2    :  308e6     # minimum breaking load per diameter^2 [N/m^2]     
+    EA_MBL    :   14       # quasi-static stiffness per MBL [N/N]
+    EAd_MBL   :   11.6     # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm :  40.0     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
+    density   :  1380      # density of the polyester material [kg/m^3] (taken from specific gravity of 1.38, relative to 1000 kg/m^3)
     cost_MBL  :  1.65e-05  # cost per MBL [$/m/N]
-    
-  nylon       :            # nylon synthetic rope
-    mass_d2   :  647.6     # linear mass density per diameter^2 [kg/m^3]
-    EA_d2     :  1.18e8    # stiffness per diameter^2 [N/m^2] 
-    MBL_d2    :  139.4e6   # minimum breaking load per diameter^2 [N/m^2] 
-    dvol_dnom :  0.85      # volume-equivalent diameter per nominal diameter [-]  
+    Cd        :  2.021     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
+
+  nylon       :     # nylon synthetic rope
+    mass_d2   :  585       # linear mass density per diameter^2 [kg/m/m^2]
+    MBL_d3    :  230e6     # minimum breaking load per diameter^3 [N/m^2]
+    MBL_d2    :  207e6     # minimum breaking load per diameter^2 [N/m^2] 
+    EA_MBL    :  5         # quasi-static stiffness per MBL [N/N] (can range from 1 to 10)
+    EAd_MBL   :  2.08      # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm : 39.0      # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
+    density   :  1140      # density of the nylon material [kg/m^3] (taken from specific gravity of 1.14, relative to 1000 kg/m^3)
     cost_MBL  :  4.29e-05  # cost per MBL [$/m/N]
-
-  wire        :
-    mass_d2   :  3989.7    # linear mass density per diameter^2 [kg/m^3]
-    EA_d2     :  4.04e10   # stiffness per diameter^2 [N/m^2]    
-    MBL_d2    :  633.36e6  # minimum breaking load per diameter^2 [N/m^2]
-    dvol_dnom :  0.8       # volume-equivalent diameter per nominal diameter [-]
-    cost_d2   :  0.04542e6 # cost per diameter^2 with d in meters [$/m]
-
-
+    Cd        :  1.979     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
+  
+  hmpe        :     # high modulus polyethylene synthetic rope
+    mass_d2   :  496       # linear mass density per diameter^2 [kg/m/m^2]
+    MBL_d3    :  651e6     # minimum breaking load per diameter^3 [N/m^2]
+    MBL_d2    :  580e6     # minimum breaking load per diameter^2 [N/m^2] 
+    EA_MBL    :  56        # quasi-static stiffness per MBL [N/N]
+    EAd_MBL   :  59        # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm : 54.0      # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
+    density   :  975       # density of the hmpe/dyneema material [kg/m^3] (taken from specific gravity of 0.975, relative to 1000 kg/m^3
+    Cd        :  1.988     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
+    cost_MBL  :  1.4e-04    # cost per N of MBL [$/m/N]
 
 
 
