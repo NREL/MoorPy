@@ -144,6 +144,7 @@ class Subsystem(System, Line):
         self.Te0 = np.zeros([self.nLines,2])  # undispalced values
         self.TeM = np.zeros([self.nLines,2])  # mean offset values
         self.TeD = np.zeros([self.nLines,2])  # dynamic values
+        self.TeDmin = np.zeros([self.nLines,2])  # dynamic minimum values
         
         # adjustment on laylength... positive means that the dynamic lay length is greater than linedesign laylength 
         self.LayLen_adj = getFromDict(daf_dict, 'LayLen_adj', shape=0, default=0.0) 
@@ -283,7 +284,7 @@ class Subsystem(System, Line):
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
     
     
-    def staticSolve(self, reset=False, tol=0, profiles=0):
+    def staticSolve(self, reset=False, tol=0, profiles=0, maxIter = 500):
         '''Solve internal equilibrium of the Subsystem and saves the forces
         and stiffnesses at the ends in the global reference frame. All the 
         This method mimics the behavior of the Line.staticSolve method and 
@@ -309,7 +310,7 @@ class Subsystem(System, Line):
             self.pointList[-1].setPosition([ -self.span+LH, 0, self.rB[2]])
             
         # get equilibrium
-        self.solveEquilibrium(tol=tol)
+        self.solveEquilibrium(tol=tol, maxIter = maxIter)
         
         # get 2D stiffness matrices of end points
         K = self.getCoupledStiffnessA()
@@ -379,7 +380,7 @@ class Subsystem(System, Line):
             plt.show()    
     
     
-    def drawLine2d(self, Time, ax, color="k", endpoints=False, Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, plotnodes=[], plotnodesline=[],label="",cmap='rainbow', alpha=1.0):
+    def drawLine2d(self, Time, ax, color="k", endpoints=False, Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, plotnodes=[], plotnodesline=[],label="",cmap='rainbow', alpha=1.0, linewidth = 1):
         '''wrapper to System.plot2d with some transformation applied'''
         
         for i, line in enumerate(self.lineList):
@@ -487,8 +488,11 @@ class Subsystem(System, Line):
             self.rA = np.array([-self.span-self.rad_fair, 0, self.rA[2]])
             self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
             
-        self.staticSolve(tol=self.eqtol)  # solve the subsystem
-        
+        if hasattr(self, 'maxIter'):
+            self.staticSolve(tol=self.eqtol, maxIter = self.maxIter)  # solve the subsystem
+        else:
+            self.staticSolve(tol=self.eqtol)
+            
         # Store some values at this offset position that may be used later
         for i, line in enumerate(self.lineList):
             self.TeM[i,0] = np.linalg.norm(line.fA)
@@ -498,6 +502,7 @@ class Subsystem(System, Line):
         self.anchorFz0 = self.lineList[0].fA[2]
     
         self.TeD = np.copy(self.TeM)  # set the dynamic values as well, in case they get queried right away
+        self.TeDmin = np.copy(self.TeM)  # set the dynamic values as well, in case they get queried right away
         
     
     def setDynamicOffset(self, offset, z=0):
@@ -521,6 +526,7 @@ class Subsystem(System, Line):
         # Store dynamic values at this offset position that may be used later
         for i, line in enumerate(self.lineList):
             self.TeD[i,:] = self.TeM[i,:] + self.DAFs[i]*( np.array([line.TA, line.TB]) - self.TeM[i,:] )
+            self.TeDmin[i,:] = self.TeM[i,:] - self.DAFs[i]*( np.array([line.TA, line.TB]) - self.TeM[i,:] )
         
         
     
@@ -654,6 +660,15 @@ class Subsystem(System, Line):
                           self.Te0[iLine,1] + self.DAFs[iLine]*(np.linalg.norm(line.fB) - self.Te0[iLine,1])])
         '''
         dynamicTe = max( self.TeD[iLine,:] )
+        
+        return dynamicTe 
+    
+    def getMinTen(self, iLine):
+        '''Compute the end (maximum) tension for a specific line, including
+        a dynamic amplification factor.'''
+        line = self.lineList[iLine]
+
+        dynamicTe = min( self.TeDmin[iLine,:] )
         
         return dynamicTe 
     
