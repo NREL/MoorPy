@@ -93,8 +93,14 @@ class System():
         
         if 'bathymetry' in kwargs:
             self.seabedMod = 2
-            self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = readBathymetryFile(kwargs['bathymetry'])
-        
+            if isinstance(kwargs['bathymetry'],str):
+                self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = readBathymetryFile(kwargs['bathymetry'])
+            elif isinstance(kwargs['bathymetry'],dict):
+                bath_dictionary = kwargs['bathymetry']
+                # grid sent in, just assign to properties
+                self.bathGrid_Xs = bath_dictionary['x']
+                self.bathGrid_Ys = bath_dictionary['y']
+                self.bathGrid = bath_dictionary['depth']        
         
         # initializing variables and lists        
         self.nDOF = 0       # number of (free) degrees of freedom of the mooring system (needs to be set elsewhere)        
