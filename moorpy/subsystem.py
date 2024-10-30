@@ -434,13 +434,13 @@ class Subsystem(System, Line):
             
             # color and width settings
             if color == 'self':
-                color = line.color  # attempt to allow custom colors
-                lw = line.lw
+                line.color = line.color  # attempt to allow custom colors
+                line.lw = line.lw
             elif color == None:
-                color = [0.3, 0.3, 0.3]  # if no color, default to grey
-                lw = 1
+                line.color = [0.3, 0.3, 0.3]  # if no color, default to grey
+                line.lw = 1
             else:
-                lw = 1
+                line.lw = 1
             
             # get the Line's local coordinates
             Xs0, Ys0, Zs, tensions = line.getLineCoords(Time)
@@ -459,14 +459,14 @@ class Subsystem(System, Line):
                     ax.plot(Xs[i:i+2], Ys[i:i+2], Zs[i:i+2], color=rgba, zorder=100)
             else:
                 #linebit.append(ax.plot(Xs, Ys, Zs, color=color, lw=lw, zorder=100))
-                ax.plot(Xs, Ys, Zs, color=color, lw=lw, zorder=100)
+                ax.plot(Xs, Ys, Zs, color=line.color, lw=line.lw, zorder=100)
             
             if shadow:
-                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.depth, color=[0.5, 0.5, 0.5, 0.2], lw=lw, zorder = 1.5) # draw shadow
+                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.depth, color=[0.5, 0.5, 0.5, 0.2], lw=line.lw, zorder = 1.5) # draw shadow
             
             if endpoints == True:
                 #linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
-                ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color)
+                ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = line.color)
     
     
     def setOffset(self, offset, z=0):
