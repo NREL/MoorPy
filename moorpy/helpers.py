@@ -1966,7 +1966,10 @@ def get_dynamic_tension(line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
         F_B = np.einsum('nij,njk->ni',-H[:,3:-3,-3:],RAO_B[:,:,None])
         F = F_A + F_B
 
-        X[:,3:-3] = np.linalg.solve(H[:,3:-3,3:-3],F)
+        # Solve for each frequency
+        for i in range(H.shape[0]):
+            X[i, 3:-3] = np.linalg.solve(H[i, 3:-3, 3:-3], F[i])
+            
         S_Xd[:] = np.abs(1j*omegas[:,None]*X)**2*S_zeta[:,None]
         sigma_Xd[:] = np.sqrt(np.trapz(S_Xd,omegas,axis=0)) 
         r_dynamic[:] = X.reshape(X.shape[0],int(X.shape[1]/3),3)
