@@ -1021,7 +1021,7 @@ class System():
 
 
     def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', 
-               outputList=[], Lm=0, T_half=42):
+               outputList=[], Lm=[0], T_half=42):
         '''Unloads a MoorPy system into a MoorDyn-style input file
 
         Parameters
@@ -1034,8 +1034,10 @@ class System():
             Optional specified for target segment length when discretizing Rods
         outputList : list of strings, optional
             Optional list of additional requested output channels
-        Lm : float
-            Mean load on mooring line as FRACTION of MBL, used for dynamic stiffness calculation. Only used if line type has a nonzero EAd
+        Lm : list of floats
+            Mean load on mooring line as FRACTION of MBL, used for dynamic stiffness calculation. Only used if line type has a nonzero EAd.
+            Can either be a list with a single Lm to be assumed for all line types, or a list of Lm values with length equal to the number
+            of lines with a nonzero EAd
         T_half : float, optional
             For tuning response of viscoelastic model, the period when EA is
             half way between the static and dynamic values [s]. Default is 42.
@@ -1281,14 +1283,24 @@ class System():
             L.append("TypeName      Diam     Mass/m     EA     BA/-zeta     EI        Cd      Ca      CdAx    CaAx")
             L.append("(name)        (m)      (kg/m)     (N)    (N-s/-)    (N-m^2)     (-)     (-)     (-)     (-)")
             
+            j = 0 # count for list of Lms
             for key, lineType in self.lineTypes.items(): 
                 di = lineTypeDefaults.copy()  # start with a new dictionary of just the defaults
                 di.update(lineType)           # then copy in the lineType's existing values
                 if 'EAd' in di.keys() and di['EAd'] > 0:
-                    if Lm > 0:
+                    if Lm[0] > 0:
                         print('Calculating dynamic stiffness with Lm = ' + str(Lm)+'* MBL')
-                        # Get dynamic stiffness including mean load dependence
-                        EAd = di['EAd'] + di['EAd_Lm']*Lm*di['MBL']
+                        
+                        #assume list of Lms (length must equal number of lines with EAd)
+                        if len(Lm) > 1:
+                            # Get dynamic stiffness including mean load dependence
+                            EAd = di['EAd'] + di['EAd_Lm']*Lm[j]*di['MBL']
+                            j = j + 1
+                        
+                        #otherwise assume same Lm for all 
+                        else:
+                            # Get dynamic stiffness including mean load dependence
+                            EAd = di['EAd'] + di['EAd_Lm']*Lm[0]*di['MBL']
                         # This damping value is chosen for critical damping of a 10 m segment
                         c2 = 10 * np.sqrt(di['EA'] * di['m'])
                         # or use c1 = di['BA'] ?
@@ -3809,6 +3821,9 @@ class System():
                     line.drawLine2d(time, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
                 elif 'rope' in line.type['material'] or 'polyester' in line.type['material']:
                     line.drawLine2d(time, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
+                elif 'buoy' in line.type['material']:
+                    line.drawLine2d(time, ax, color=[.6,.6,.0], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
+                 
                 else:
                     line.drawLine2d(time, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
             else:

@@ -1482,8 +1482,50 @@ def subsystem2Line(ms,ssNum,nsegs=10):
         ms.bodyList[points[-1]['body']].attachPoint(len(ms.pointList),[ms.pointList[-1].r[0]-ms.bodyList[points[-1]['body']].r6[0],ms.pointList[-1].r[1]-ms.bodyList[points[-1]['body']].r6[1],ms.pointList[-1].r[2]])
    
             
+def duplicateSyntheticLines(ms):
+    '''reads in a MoorPy system and duplicates linetypes with nonzero EAd. needed for system unload to work with 
+    multiple mean load values'''
+    import copy
     
+    # list of line types with nonzero EAd
+    types = []
+    for key, lineType in ms.lineTypes.items():
+        if 'EAd' in lineType.keys() and lineType['EAd'] > 0:
+            types.append(lineType['name'])
+    
+
+    if len(types) > 0:
+        
+        #iterate through types with nonzero EAd
+        for t in types:
+
+            #store indexes of lines that use that line type
+            inds = []
+            for i, line in enumerate(ms.lineList):
+                if line.type['name'] == t:
+                    inds.append(i)
+            
+            names = [t]
+            
+            # make copies of lineType (so that each segment with nonzero EAd has unique LineType)
+            for i in inds[1:]:
                 
+                # insert the copies right below the existing linetype to make ordering more logical
+                
+                pos = list(ms.lineTypes.keys()).index(t) + 1
+                items = list(ms.lineTypes.items())     
+                items.insert(pos, (t+str(i), copy.deepcopy(ms.lineTypes[t])))
+                ms.lineTypes = dict(items)
+                ms.lineTypes[t + str(i)]['name'] = t + str(i)
+                
+                names.append(t + str(i))
+            
+            #make sure each line points to the correct lineType
+            for j, i in enumerate(inds):
+                ms.lineList[i].type = ms.lineTypes[names[j]]
+        return(ms)
+    else:
+        print('No lines have nonzero EAd')                
 
 def readBathymetryFile(filename):
     '''Read a MoorDyn-style bathymetry input file (rectangular grid of depths)
