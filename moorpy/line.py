@@ -743,6 +743,21 @@ class Line():
         else:
             self.cb = -depthA - self.rA[2]  # when cb < 0, -cb is defined as height of end A off seabed (in catenary)
 
+        # Handle case of line above the water
+        if self.rA[2] > 0 or self.rB[2] > 0:  # end B out of water  << or do this in catenary?
+            ww = (self.type['m'] - np.pi/4*self.type['d_vol']**2 *self.sys.rho) * self.sys.g
+            wa = (self.type['m']) * self.sys.g  # weight in air
+            
+            z_top = max(self.rA[2], self.rB[2])
+            z_bot = min(self.rA[2], self.rB[2])
+            
+            # overwrite the weight based on the wet-dry weight ratio based on end z vals
+            self.w = ww + (wa - ww) * ( -min(0, z_bot) )/( z_top - z_bot )
+        else:
+            # reset to the normal weight if the line hasn't left the water
+            self.w = (self.type['m'] - np.pi/4*self.type['d_vol']**2 *self.sys.rho) * self.sys.g
+            
+            # >>> TODO: should replace all this with a more versatile catenary solve in future <<<
         
         # ----- Perform rotation/transformation to 2D plane of catenary -----
         
@@ -752,9 +767,9 @@ class Line():
         if np.sum(np.abs(self.fCurrent)) > 0:
         
             # total line exernal force per unit length vector (weight plus current drag)
-            w_vec = self.fCurrent/self.L + np.array([0, 0, -self.type["w"]])
-            w = np.linalg.norm(w_vec)
-            w_hat = w_vec/w
+            w_vec = self.fCurrent/self.L + np.array([0, 0, -self.w])
+            w_total = np.linalg.norm(w_vec)
+            w_hat = w_vec/w_total
             
             # >>> may need to adjust to handle case of buoyant vertical lines <<<
             
@@ -773,7 +788,7 @@ class Line():
         # if no current force, things are simple
         else:
             R_curr = np.eye(3,3)
-            w = self.type["w"]
+            w_total = self.w
         
         
         # apply a rotation about Z' to align the line profile with the X'-Z' plane
@@ -811,14 +826,14 @@ class Line():
         if 'EA' in self.type:
             try:
                 (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.EA, 
-                     w, CB=cb, alpha=alpha, HF0=self.HF, VF0=self.VF, Tol=tol, 
+                     w_total, CB=cb, alpha=alpha, HF0=self.HF, VF0=self.VF, Tol=tol, 
                      nNodes=self.nNodes, plots=profiles, depth=self.sys.depth)
             
             except CatenaryError as error:
                 raise LineError(self.number, error.message)       
         #If EA isnt found then we will use the ten-str relationship defined in the input file 
         else:
-            (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],np.linalg.norm(w)) 
+            (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],np.linalg.norm(w_total)) 
     
     
         # save line profile coordinates in global frame (involves inverse rotation)
