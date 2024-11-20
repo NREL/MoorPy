@@ -791,6 +791,11 @@ class Line():
             w_total = self.w
         
         
+        # horizontal and vertical dimensions of line profile (end A to B)
+        LH = np.linalg.norm(dr[:2])
+        LV = dr[2]
+        
+        
         # apply a rotation about Z' to align the line profile with the X'-Z' plane
         theta_z = -np.arctan2(dr[1], dr[0])
         R_z = rotationMatrix(0, 0, theta_z)
@@ -802,8 +807,10 @@ class Line():
         if self.rA[2] <= -depthA or self.rB[2] <= -depthB:
             nvecA_prime = np.matmul(R, nvecA)
         
-            dz_dx = -nvecA_prime[0]*(1.0/nvecA_prime[2])  # seabed slope components
-            dz_dy = -nvecA_prime[1]*(1.0/nvecA_prime[2])  # seabed slope components
+            #dz_dx = -nvecA_prime[0]*(1.0/nvecA_prime[2])  # seabed slope components
+            #dz_dy = -nvecA_prime[1]*(1.0/nvecA_prime[2])  # seabed slope components
+            # Seabed slope along line direction (based on end A/B depth)
+            dz_dx = (-depthB + depthA)/LH  
             # we only care about dz_dx since the line is in the X-Z plane in this rotated situation
             alpha = np.degrees(np.arctan(dz_dx))
             cb = self.cb
@@ -814,10 +821,6 @@ class Line():
             else:  # otherwise proceed as usual (this is the normal case)
                 alpha = 0
                 cb = self.cb
-        
-        # horizontal and vertical dimensions of line profile (end A to B)
-        LH = np.linalg.norm(dr[:2])
-        LV = dr[2]
         
         
         # ----- call catenary function or alternative and save results -----
