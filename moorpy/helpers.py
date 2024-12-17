@@ -1117,7 +1117,6 @@ def lines2ss(ms):
         
         lines = list(subsys_lines)
         points = list(subsys_points)
-
         ms = lines2subsystem(lines, points, ms, span=None, case=case)
         ms.initialize()
         ms.solveEquilibrium()
@@ -1127,7 +1126,7 @@ def lines2ss(ms):
 
     return ms
 
-def lines2subsystem(lines, points, ms, span=None, case=0):
+def lines2subsystem(lines,points, ms,span=None,case=0):
     '''Takes a set of connected lines (in order from rA to rB) in a moorpy system and creates a subsystem equivalent.
     The original set of lines are then removed from the moorpy system and replaced with the 
     subsystem.
@@ -1155,9 +1154,7 @@ def lines2subsystem(lines, points, ms, span=None, case=0):
     from copy import deepcopy
     # save a deepcopy of the line list to delete
     originalList = deepcopy(lines)
-    print(originalList)
-    if any(type(ms.lineList[x])==Subsystem for x in originalList):
-        breakpoint()
+
     # # check that all lines connect (all are sections of one full mooring line)
     # for i in range(0,len(lines)):
     #     if i>0:
@@ -1247,7 +1244,6 @@ def lines2subsystem(lines, points, ms, span=None, case=0):
         helpers.deleteLine(ms,lines[i],delpts)
     
     # print('Replacing lines ',originalList,' with a subsystem appended to the end of the lineList ')
-    ss.staticSolve()
     # append subsystem to ms
     ms.lineList.append(ss)
     ssNum = len(ms.lineList)
@@ -1370,33 +1366,7 @@ def deleteLine(ms,ln,delpts=0):
             i -= 1
         # increment i
         i += 1
-        
-            
     return(ms)
-
-def deletePoint(ptnum,ms):
-    
-    for i in range(len(ms.pointList)):
-        # reduce point.number 
-        if ms.pointList[i].number > ptnum:
-            ms.pointList[i].number -= 1
-    # lower index of any body-attached points after deleted point, remove from any body-attached points
-    for i in range(len(ms.bodyList)):
-        ii = 0 
-        while ii < len(ms.bodyList[i].attachedP):
-            if ms.bodyList[i].attachedP[ii] == ptnum:
-                # remove point from rel list
-                ms.bodyList[i].rPointRel.pop(ii)
-                # remove point from attached list
-                ms.bodyList[i].attachedP.pop(ii)
-                ii = ii - 1
-            elif ms.bodyList[i].attachedP[ii] > ptnum:
-                # reduce index by one
-                ms.bodyList[i].attachedP[ii] -= 1 
-            ii += 1
-    
-    # remove point
-    ms.pointList.pop(ptnum-1)
                     
 def subsystem2Line(ms,ssNum,nsegs=10):
     '''Replace a subsystem with equivalent set of lines
