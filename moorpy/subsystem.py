@@ -284,7 +284,7 @@ class Subsystem(System, Line):
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
     
     
-    def staticSolve(self, reset=False, tol=0, profiles=0, maxIter = 500):
+    def staticSolve(self, tol=0, profiles=0, maxIter = 500):
         '''Solve internal equilibrium of the Subsystem and saves the forces
         and stiffnesses at the ends in the global reference frame. All the 
         This method mimics the behavior of the Line.staticSolve method and 
@@ -292,7 +292,7 @@ class Subsystem(System, Line):
         equilibrium happens in the local 2D plane. Values in this local 
         frame are also saved. 
         '''
-        
+#        >>> need to deal with bathymetry transformation for subsystems! >>>
         if tol==0:
             tol=self.eqtol
         
@@ -462,7 +462,16 @@ class Subsystem(System, Line):
                 ax.plot(Xs, Ys, Zs, color=line.color, lw=line.lw, zorder=100)
             
             if shadow:
-                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.depth, color=[0.5, 0.5, 0.5, 0.2], lw=line.lw, zorder = 1.5) # draw shadow
+                if self.seabedMod == 0:
+                    Zs = np.zeros_like(Xs)-self.depth
+                elif self.seabedMod == 1:
+                    Zs = self.depth - self.xSlope*Xs - self.ySlope*Ys
+                elif self.seabedMod == 2:
+                    Zs = np.zeros(len(Xs))
+                    for i in range(len(Xs)):
+                        Zs[i] = self.getDepthAtLocation(Xs[i], Ys[i])
+
+                ax.plot(Xs, Ys, Zs, color=[0.5, 0.5, 0.5, 0.2], lw=line.lw, zorder = 1.5) # draw shadow
             
             if endpoints == True:
                 #linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))

@@ -564,7 +564,16 @@ class Line():
                 linebit.append(ax.plot(Xs, Ys, Zs, color=color, lw=lw, zorder=100))
             
             if shadow:
-                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.sys.depth, color=[0.5, 0.5, 0.5, 0.2], lw=lw, zorder = 1.5) # draw shadow
+                if self.sys.seabedMod == 0:
+                    Zs = np.zeros_like(Xs)-self.sys.depth
+                elif self.seabedMod == 1:
+                    Zs = self.sys.depth - self.sys.xSlope*Xs - self.sys.ySlope*Ys
+                elif self.seabedMod == 2:
+                    Zs = np.zeros(len(Xs))
+                    for i in range(len(Xs)):
+                        Zs[i] = self.sys.getDepthAtLocation(Xs[i], Ys[i])
+
+                ax.plot(Xs, Ys, Zs, color=[0.5, 0.5, 0.5, 0.2], lw=lw, zorder = 1.5) # draw shadow
             
             if endpoints == True:
                 linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
