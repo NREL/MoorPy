@@ -107,9 +107,21 @@ class Subsystem(System, Line):
             self.xSlope = getFromDict(kwargs, 'xSlope', default=0)
             self.ySlope = getFromDict(kwargs, 'ySlope', default=0)
         
+        #if 'bathymetry' in kwargs:
+            #self.seabedMod = 2
+            #self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = self.readBathymetryFile(kwargs['bathymetry'])
+        '''
         if 'bathymetry' in kwargs:
             self.seabedMod = 2
-            self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = self.readBathymetryFile(kwargs['bathymetry'])
+            if isinstance(kwargs['bathymetry'],str):
+                self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = readBathymetryFile(kwargs['bathymetry'])
+            elif isinstance(kwargs['bathymetry'],dict):
+                bath_dictionary = kwargs['bathymetry']
+                # grid sent in, just assign to properties
+                self.bathGrid_Xs = bath_dictionary['x']
+                self.bathGrid_Ys = bath_dictionary['y']
+                self.bathGrid = bath_dictionary['depth'] 
+        '''
         # Note, System and Subsystem bathymetry can be set after creation 
         # by setBathymetry, which uses link to existing data, for efficiency.
         
@@ -124,6 +136,53 @@ class Subsystem(System, Line):
         
         self.MDoptions = {} # dictionary that can hold any MoorDyn options read in from an input file, so they can be saved in a new MD file if need be
         self.qs = 1         # flag that it's a MoorPy analysis, so System methods don't complain. One day should replace this <<<
+    
+    def setSSBathymetry(self):
+        '''Provides global bathymetry data, but creates a 2D line corresponding to what's underneath the subsystem
+
+        - not naming it 'setBathymetry' since that is already a function name in the System class, but maybe I could name it the same?
+        
+        - should theoretically be called every iteration / every call to a new position, to get the most update bathymetry plane
+
+        - need to make sure that any bathymetric operation in subsystem uses this new bathymetry information, and not the System.getDepthFromBathymetry
+        - - the fact that the bathGrid_Xs and Ys and grid arrays are new, should solve this issue
+
+        - could set up something for seabedMod = 0, 1, 2
+        
+        Parameters
+        ----------
+        x : list or array
+            X coordinates of a global, rectangular bathymetry grid [m].
+        y : list or array
+            Y coordinates of a global, rectangular bathymetry grid [m].
+        depth : 2D array
+            Matrix of depths at x and y locations [m]. Positive depths.
+            Shape should be [len(x), len(y)]
+        '''
+
+        # get the depth at the anchor point of the subsystem
+        depthA, nvecA = self.sys.getDepthFromBathymetry(self.rA[0], self.rA[1])
+        # get the depth under the fairlead point of the subsystem
+        depthB, nvecB = self.sys.getDepthFromBathymetry(self.rB[0], self.rB[1])
+
+        # collection information to create a new list of x coordinates to use for bathymetry for the subsystem (subsystems don't have y coordinates)
+        nNodes = [line.nNodes for line in self.lineList]    # collecting the number of nodes in all the line sections
+        nx = np.sum(nNodes) - len(self.lineList) + 1        # adding all those nodes, subtracting the top nodes from each line (to avoid duplicates) and adding the fairlead node
+        xs = np.linspace(-self.span, 0, nx)                 # assuming that the subsystem rB will always be at 0,0
+
+        # calculate the bathymetric depths directly underneath the subsystem
+        depths = np.zeros(len(xs))
+        for i in range(len(xs)):
+            x = self.rA[0] + (xs[i]+self.span)*self.cos_th    # take the global x position of the anchor and add the cosine of the node x (while setting it relative to 0,0)
+            y = self.rA[1] + (xs[i]+self.span)*self.sin_th    # take the global y position of the anchor and add the sine of the node x (while setting it relative to 0,0)
+            depths[i], _ = self.sys.getDepthFromBathymetry(x, y)    # calculate the depth at this individual point for one row of depths
+
+        # save all these variables to use later (overwrites any previous 'System' bathymetry arrays, and now getDepthFromBathymetry can use this data)
+        self.bathGrid_Xs = np.array(xs)
+        self.bathGrid_Ys = np.array([0])
+        self.bathGrid    = np.array([depths])
+
+        self.seabedMod = 2
         
     
     def initialize(self, daf_dict={}):
@@ -284,7 +343,7 @@ class Subsystem(System, Line):
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
     
     
-    def staticSolve(self, reset=False, tol=0, profiles=0, maxIter = 500):
+    def staticSolve(self, tol=0, profiles=0, maxIter=500):
         '''Solve internal equilibrium of the Subsystem and saves the forces
         and stiffnesses at the ends in the global reference frame. All the 
         This method mimics the behavior of the Line.staticSolve method and 
@@ -292,7 +351,7 @@ class Subsystem(System, Line):
         equilibrium happens in the local 2D plane. Values in this local 
         frame are also saved. 
         '''
-        
+#        >>> need to deal with bathymetry transformation for subsystems! >>>
         if tol==0:
             tol=self.eqtol
         
@@ -308,6 +367,9 @@ class Subsystem(System, Line):
         else:
             self.pointList[ 0].setPosition([ -self.span   , 0, self.rA[2]])
             self.pointList[-1].setPosition([ -self.span+LH, 0, self.rB[2]])
+        
+        # update the bathymetry based on any new positions
+        #self.setSSBathymetry()
             
         # get equilibrium
         self.solveEquilibrium(tol=tol, maxIter = maxIter)
@@ -462,7 +524,16 @@ class Subsystem(System, Line):
                 ax.plot(Xs, Ys, Zs, color=line.color, lw=line.lw, zorder=100)
             
             if shadow:
-                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.depth, color=[0.5, 0.5, 0.5, 0.2], lw=line.lw, zorder = 1.5) # draw shadow
+                if self.seabedMod == 0:
+                    Zs = np.zeros_like(Xs)-self.depth
+                elif self.seabedMod == 1:
+                    Zs = self.depth - self.xSlope*Xs - self.ySlope*Ys
+                elif self.seabedMod == 2:
+                    Zs = np.zeros(len(Xs))
+                    for i in range(len(Xs)):
+                        Zs[i] = self.getDepthAtLocation(Xs[i], Ys[i])
+
+                ax.plot(Xs, Ys, Zs, color=[0.5, 0.5, 0.5, 0.2], lw=line.lw, zorder = 1.5) # draw shadow
             
             if endpoints == True:
                 #linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
