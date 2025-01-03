@@ -1051,6 +1051,7 @@ def lines2ss(ms):
             raise ValueError("f point number {pointi.number} branches out.")
         # 1) define the connected lines if any
         subsys_line_id.append(pointi.attached[0])
+
         subsys_point_id.append(pointi.number)
         # 2) check where the line with line_ID has been repeated in other points
         while True:
@@ -1135,6 +1136,8 @@ def lines2subsystem(lines,points, ms,span=None,case=0):
     ----------
     lines : list
         List of indices in the ms.lineList to replace.
+    points : list
+        List of indices in the ms.pointList to replace
     ms : object
         MoorPy system object the lines are part of
     span : float (optional)
@@ -1167,20 +1170,9 @@ def lines2subsystem(lines,points, ms,span=None,case=0):
     ss = Subsystem(depth=ms.depth, span=span,rBFair=ms.lineList[lines[-1]].rB)
     lengths = []
     types = []
-    pt = [] # list of points that 
-    # ptB = []
 
     # go through each line
     for i in lines:
-        # see which point is connected to end A and end B
-        for j in range(0,len(ms.pointList)):
-            for k in range(0,len(ms.pointList[j].attached)):
-                if ms.pointList[j].attached[k] == i+1: #and ms.pointList[j].attachedEndB[k] == 0:
-                    if not j in pt:
-                        pt.append(j)
-                # elif ms.pointList[j].attached[k] == i+1 and ms.pointList[j].attachedEndB[k] == 1:
-                #     ptB.append(j)
-
         # collect line lengths and types                                          
         lengths.append(ms.lineList[i].L)
         types.append(ms.lineList[i].type['name'])
@@ -1194,13 +1186,10 @@ def lines2subsystem(lines,points, ms,span=None,case=0):
     
     # add in any info on the points connected to the lines
     # currently, mass, volume, and diameter but others could be added
-    for i in range(0,len(pt)):
-        ss.pointList[i].m = ms.pointList[pt[i]].m
-        ss.pointList[i].v = ms.pointList[pt[i]].v
-        ss.pointList[i].d = ms.pointList[pt[i]].d
-        # ss.pointList[i].m = ms.pointList[ptB[i]].m
-        # ss.pointList[i].v = ms.pointList[ptB[i]].v
-        # ss.pointList[i].d = ms.pointList[ptB[i]].d
+    for i in range(0,len(points)):
+        ss.pointList[i].m = ms.pointList[points[i]].m
+        ss.pointList[i].v = ms.pointList[points[i]].v
+        ss.pointList[i].d = ms.pointList[points[i]].d
     
     from moorpy import helpers
     # delete old line
@@ -1212,11 +1201,11 @@ def lines2subsystem(lines,points, ms,span=None,case=0):
             delpts = 2
             for j in range(0,len(ms.pointList)):
                 if lines[i]+1 in ms.pointList[j].attached:
-                    if pt[-1]>j and decB == 0:                    
-                        pt[-1] -= 1
+                    if points[-1]>j and decB == 0:                    
+                        points[-1] -= 1
                         decB = 1
-                    if pt[0]>j and decA == 0:
-                        pt[0] -= 1 
+                    if points[0]>j and decA == 0:
+                        points[0] -= 1 
                         decA = 1
         elif i == 0 and i == len(lines) - 1:
             # first line, only line (keep point A and B)
@@ -1230,11 +1219,11 @@ def lines2subsystem(lines,points, ms,span=None,case=0):
             # reduce index of last point B in ptB list and first point A in ptA list (only care about last ptB and first ptA now) by one
             for j in range(0,len(ms.pointList)):
                 if lines[i]+1 in ms.pointList[j].attached:
-                    if pt[-1]>j and decB == 0:                    
-                        pt[-1] -= 1
+                    if points[-1]>j and decB == 0:                    
+                        points[-1] -= 1
                         decB = 1
-                    if pt[0]>j and decA == 0:
-                        pt[0] -= 1 
+                    if points[0]>j and decA == 0:
+                        points[0] -= 1 
                         decA = 1
         # adjust index of any lines that have a higher index than the line to delete
         for j in range(0,len(lines)):
