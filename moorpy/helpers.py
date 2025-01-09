@@ -1051,6 +1051,7 @@ def lines2ss(ms):
             raise ValueError("f point number {pointi.number} branches out.")
         # 1) define the connected lines if any
         subsys_line_id.append(pointi.attached[0])
+
         subsys_point_id.append(pointi.number)
         # 2) check where the line with line_ID has been repeated in other points
         while True:
@@ -1117,7 +1118,7 @@ def lines2ss(ms):
         
         lines = list(subsys_lines)
         points = list(subsys_points)
-        ms = lines2subsystem(lines, ms, span=None, case=case)
+        ms = lines2subsystem(lines, points, ms, span=None, case=case)
         ms.initialize()
         ms.solveEquilibrium()
         i += 1
@@ -1126,7 +1127,7 @@ def lines2ss(ms):
 
     return ms
 
-def lines2subsystem(lines,ms,span=None,case=0):
+def lines2subsystem(lines,points, ms,span=None,case=0):
     '''Takes a set of connected lines (in order from rA to rB) in a moorpy system and creates a subsystem equivalent.
     The original set of lines are then removed from the moorpy system and replaced with the 
     subsystem.
@@ -1135,6 +1136,8 @@ def lines2subsystem(lines,ms,span=None,case=0):
     ----------
     lines : list
         List of indices in the ms.lineList to replace.
+    points : list
+        List of indices in the ms.pointList to replace
     ms : object
         MoorPy system object the lines are part of
     span : float (optional)
@@ -1154,7 +1157,7 @@ def lines2subsystem(lines,ms,span=None,case=0):
     from copy import deepcopy
     # save a deepcopy of the line list to delete
     originalList = deepcopy(lines)
-    
+
     # # check that all lines connect (all are sections of one full mooring line)
     # for i in range(0,len(lines)):
     #     if i>0:
@@ -1167,20 +1170,9 @@ def lines2subsystem(lines,ms,span=None,case=0):
     ss = Subsystem(depth=ms.depth, span=span,rBFair=ms.lineList[lines[-1]].rB)
     lengths = []
     types = []
-    pt = [] # list of points that 
-    # ptB = []
 
     # go through each line
     for i in lines:
-        # see which point is connected to end A and end B
-        for j in range(0,len(ms.pointList)):
-            for k in range(0,len(ms.pointList[j].attached)):
-                if ms.pointList[j].attached[k] == i+1: #and ms.pointList[j].attachedEndB[k] == 0:
-                    if not j in pt:
-                        pt.append(j)
-                # elif ms.pointList[j].attached[k] == i+1 and ms.pointList[j].attachedEndB[k] == 1:
-                #     ptB.append(j)
-
         # collect line lengths and types                                          
         lengths.append(ms.lineList[i].L)
         types.append(ms.lineList[i].type['name'])
@@ -1194,13 +1186,10 @@ def lines2subsystem(lines,ms,span=None,case=0):
     
     # add in any info on the points connected to the lines
     # currently, mass, volume, and diameter but others could be added
-    for i in range(0,len(pt)):
-        ss.pointList[i].m = ms.pointList[pt[i]].m
-        ss.pointList[i].v = ms.pointList[pt[i]].v
-        ss.pointList[i].d = ms.pointList[pt[i]].d
-        # ss.pointList[i].m = ms.pointList[ptB[i]].m
-        # ss.pointList[i].v = ms.pointList[ptB[i]].v
-        # ss.pointList[i].d = ms.pointList[ptB[i]].d
+    for i in range(0,len(points)):
+        ss.pointList[i].m = ms.pointList[points[i]].m
+        ss.pointList[i].v = ms.pointList[points[i]].v
+        ss.pointList[i].d = ms.pointList[points[i]].d
     
     from moorpy import helpers
     # delete old line
@@ -1212,11 +1201,11 @@ def lines2subsystem(lines,ms,span=None,case=0):
             delpts = 2
             for j in range(0,len(ms.pointList)):
                 if lines[i]+1 in ms.pointList[j].attached:
-                    if pt[-1]>j and decB == 0:                    
-                        pt[-1] -= 1
+                    if points[-1]>j and decB == 0:                    
+                        points[-1] -= 1
                         decB = 1
-                    if pt[0]>j and decA == 0:
-                        pt[0] -= 1 
+                    if points[0]>j and decA == 0:
+                        points[0] -= 1 
                         decA = 1
         elif i == 0 and i == len(lines) - 1:
             # first line, only line (keep point A and B)
@@ -1230,11 +1219,11 @@ def lines2subsystem(lines,ms,span=None,case=0):
             # reduce index of last point B in ptB list and first point A in ptA list (only care about last ptB and first ptA now) by one
             for j in range(0,len(ms.pointList)):
                 if lines[i]+1 in ms.pointList[j].attached:
-                    if pt[-1]>j and decB == 0:                    
-                        pt[-1] -= 1
+                    if points[-1]>j and decB == 0:                    
+                        points[-1] -= 1
                         decB = 1
-                    if pt[0]>j and decA == 0:
-                        pt[0] -= 1 
+                    if points[0]>j and decA == 0:
+                        points[0] -= 1 
                         decA = 1
         # adjust index of any lines that have a higher index than the line to delete
         for j in range(0,len(lines)):
@@ -1248,8 +1237,8 @@ def lines2subsystem(lines,ms,span=None,case=0):
     ms.lineList.append(ss)
     ssNum = len(ms.lineList)
     # attach subystem line to the end points
-    ms.pointList[pt[0]].attachLine(ssNum,0) # rA
-    ms.pointList[pt[-1]].attachLine(ssNum,1) # rB     
+    ms.pointList[points[0]].attachLine(ssNum,0) # rA
+    ms.pointList[points[-1]].attachLine(ssNum,1) # rB     
         
     return(ms)
 
@@ -1482,8 +1471,50 @@ def subsystem2Line(ms,ssNum,nsegs=10):
         ms.bodyList[points[-1]['body']].attachPoint(len(ms.pointList),[ms.pointList[-1].r[0]-ms.bodyList[points[-1]['body']].r6[0],ms.pointList[-1].r[1]-ms.bodyList[points[-1]['body']].r6[1],ms.pointList[-1].r[2]])
    
             
+def duplicateSyntheticLines(ms):
+    '''reads in a MoorPy system and duplicates linetypes with nonzero EAd. needed for system unload to work with 
+    multiple mean load values'''
+    import copy
     
+    # list of line types with nonzero EAd
+    types = []
+    for key, lineType in ms.lineTypes.items():
+        if 'EAd' in lineType.keys() and lineType['EAd'] > 0:
+            types.append(lineType['name'])
+    
+
+    if len(types) > 0:
+        
+        #iterate through types with nonzero EAd
+        for t in types:
+
+            #store indexes of lines that use that line type
+            inds = []
+            for i, line in enumerate(ms.lineList):
+                if line.type['name'] == t:
+                    inds.append(i)
+            
+            names = [t]
+            
+            # make copies of lineType (so that each segment with nonzero EAd has unique LineType)
+            for i in inds[1:]:
                 
+                # insert the copies right below the existing linetype to make ordering more logical
+                
+                pos = list(ms.lineTypes.keys()).index(t) + 1
+                items = list(ms.lineTypes.items())     
+                items.insert(pos, (t+str(i), copy.deepcopy(ms.lineTypes[t])))
+                ms.lineTypes = dict(items)
+                ms.lineTypes[t + str(i)]['name'] = t + str(i)
+                
+                names.append(t + str(i))
+            
+            #make sure each line points to the correct lineType
+            for j, i in enumerate(inds):
+                ms.lineList[i].type = ms.lineTypes[names[j]]
+        return(ms)
+    else:
+        print('No lines have nonzero EAd')                
 
 def readBathymetryFile(filename):
     '''Read a MoorDyn-style bathymetry input file (rectangular grid of depths)
@@ -1966,7 +1997,10 @@ def get_dynamic_tension(line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
         F_B = np.einsum('nij,njk->ni',-H[:,3:-3,-3:],RAO_B[:,:,None])
         F = F_A + F_B
 
-        X[:,3:-3] = np.linalg.solve(H[:,3:-3,3:-3],F)
+        # Solve for each frequency
+        for i in range(H.shape[0]):
+            X[i, 3:-3] = np.linalg.solve(H[i, 3:-3, 3:-3], F[i])
+            
         S_Xd[:] = np.abs(1j*omegas[:,None]*X)**2*S_zeta[:,None]
         sigma_Xd[:] = np.sqrt(np.trapz(S_Xd,omegas,axis=0)) 
         r_dynamic[:] = X.reshape(X.shape[0],int(X.shape[1]/3),3)

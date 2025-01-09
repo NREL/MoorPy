@@ -564,7 +564,16 @@ class Line():
                 linebit.append(ax.plot(Xs, Ys, Zs, color=color, lw=lw, zorder=100))
             
             if shadow:
-                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.sys.depth, color=[0.5, 0.5, 0.5, 0.2], lw=lw, zorder = 1.5) # draw shadow
+                if self.sys.seabedMod == 0:
+                    Zs = np.zeros_like(Xs)-self.sys.depth
+                elif self.seabedMod == 1:
+                    Zs = self.sys.depth - self.sys.xSlope*Xs - self.sys.ySlope*Ys
+                elif self.seabedMod == 2:
+                    Zs = np.zeros(len(Xs))
+                    for i in range(len(Xs)):
+                        Zs[i] = self.sys.getDepthAtLocation(Xs[i], Ys[i])
+
+                ax.plot(Xs, Ys, Zs, color=[0.5, 0.5, 0.5, 0.2], lw=lw, zorder = 1.5) # draw shadow
             
             if endpoints == True:
                 linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
@@ -743,6 +752,21 @@ class Line():
         else:
             self.cb = -depthA - self.rA[2]  # when cb < 0, -cb is defined as height of end A off seabed (in catenary)
 
+        # Handle case of line above the water
+        if self.rA[2] > 0 or self.rB[2] > 0:  # end B out of water  << or do this in catenary?
+            ww = (self.type['m'] - np.pi/4*self.type['d_vol']**2 *self.sys.rho) * self.sys.g
+            wa = (self.type['m']) * self.sys.g  # weight in air
+            
+            z_top = max(self.rA[2], self.rB[2])
+            z_bot = min(self.rA[2], self.rB[2])
+            
+            # overwrite the weight based on the wet-dry weight ratio based on end z vals
+            self.w = ww + (wa - ww) * ( -min(0, z_bot) )/( z_top - z_bot )
+        else:
+            # reset to the normal weight if the line hasn't left the water
+            self.w = (self.type['m'] - np.pi/4*self.type['d_vol']**2 *self.sys.rho) * self.sys.g
+            
+            # >>> TODO: should replace all this with a more versatile catenary solve in future <<<
         
         # ----- Perform rotation/transformation to 2D plane of catenary -----
         
@@ -752,9 +776,9 @@ class Line():
         if np.sum(np.abs(self.fCurrent)) > 0:
         
             # total line exernal force per unit length vector (weight plus current drag)
-            w_vec = self.fCurrent/self.L + np.array([0, 0, -self.type["w"]])
-            w = np.linalg.norm(w_vec)
-            w_hat = w_vec/w
+            w_vec = self.fCurrent/self.L + np.array([0, 0, -self.w])
+            w_total = np.linalg.norm(w_vec)
+            w_hat = w_vec/w_total
             
             # >>> may need to adjust to handle case of buoyant vertical lines <<<
             
@@ -773,7 +797,12 @@ class Line():
         # if no current force, things are simple
         else:
             R_curr = np.eye(3,3)
-            w = self.type["w"]
+            w_total = self.w
+        
+        
+        # horizontal and vertical dimensions of line profile (end A to B)
+        LH = np.linalg.norm(dr[:2])
+        LV = dr[2]
         
         
         # apply a rotation about Z' to align the line profile with the X'-Z' plane
@@ -787,8 +816,10 @@ class Line():
         if self.rA[2] <= -depthA or self.rB[2] <= -depthB:
             nvecA_prime = np.matmul(R, nvecA)
         
-            dz_dx = -nvecA_prime[0]*(1.0/nvecA_prime[2])  # seabed slope components
-            dz_dy = -nvecA_prime[1]*(1.0/nvecA_prime[2])  # seabed slope components
+            #dz_dx = -nvecA_prime[0]*(1.0/nvecA_prime[2])  # seabed slope components
+            #dz_dy = -nvecA_prime[1]*(1.0/nvecA_prime[2])  # seabed slope components
+            # Seabed slope along line direction (based on end A/B depth)
+            dz_dx = (-depthB + depthA)/LH  
             # we only care about dz_dx since the line is in the X-Z plane in this rotated situation
             alpha = np.degrees(np.arctan(dz_dx))
             cb = self.cb
@@ -800,10 +831,6 @@ class Line():
                 alpha = 0
                 cb = self.cb
         
-        # horizontal and vertical dimensions of line profile (end A to B)
-        LH = np.linalg.norm(dr[:2])
-        LV = dr[2]
-        
         
         # ----- call catenary function or alternative and save results -----
         
@@ -811,14 +838,14 @@ class Line():
         if 'EA' in self.type:
             try:
                 (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.EA, 
-                     w, CB=cb, alpha=alpha, HF0=self.HF, VF0=self.VF, Tol=tol, 
+                     w_total, CB=cb, alpha=alpha, HF0=self.HF, VF0=self.VF, Tol=tol, 
                      nNodes=self.nNodes, plots=profiles, depth=self.sys.depth)
             
             except CatenaryError as error:
                 raise LineError(self.number, error.message)       
         #If EA isnt found then we will use the ten-str relationship defined in the input file 
         else:
-            (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],np.linalg.norm(w)) 
+            (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],np.linalg.norm(w_total)) 
     
     
         # save line profile coordinates in global frame (involves inverse rotation)

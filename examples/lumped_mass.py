@@ -62,8 +62,8 @@ K_qsA  = ms.getCoupledStiffnessA(lines_only=True) # We can also compute the stif
 # Get the dynamic tension along the line
 line = ms.lineList[0] # Get the line object
 RAO_data = pickle.load(open(os.path.join(current_dir, 'RAO_fl.pkl'), 'rb')) # Read the nFreq x 3 RAO matrix (nFreq x 4 complex numpy array, first column are the frequencies in rad/s)
-RAO_fl = RAO_data[:, 1:] # Motion RAOs of the fairlead
-w = RAO_data[:, 0] # Frequencies of the RAO data
+RAO_fl = RAO_data['RAO_fl'] # Motion RAOs of the fairlead
+w = RAO_data['w'] # Frequencies of the RAO data
 Sw = JONSWAP(ws = w, Hs = 6, Tp = 8) # Arbitrary wave spectrum
 T_nodes_amp, T_nodes_psd,T_nodes_std,s,r_static,r_dynamic,r_total,X = line.dynamicSolve(w, Sw, RAO_A=0,RAO_B=RAO_fl, depth=np.abs(line.rA[2]))
 
