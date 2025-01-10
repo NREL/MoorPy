@@ -43,7 +43,8 @@
 # - The chain MBL uses a cubic function, so be aware if you are researching theoretical chains with diameters greater than about 360mm, as the MBL will then decrease
 # - Chain EA values not provided in manufacturer catalogs, so the below coefficients are taken from DNV-OS-E301 2013
 
-
+# Note costs combine all provided coefficients. If a coefficient is not provided it is assumed zero. All provided values will be used according to: 
+# cost = 'cost_0' + 'cost_d'*d + 'cost_d2'*d**2 + 'cost_d3'*d**3 + 'cost_mass'*mass + 'cost_EA'*EA + 'cost_MBL'*MBL
 
 lineProps: 
 
