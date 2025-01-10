@@ -803,43 +803,169 @@ def loadLineProps(source):
     return output
 
 
+def getPointProps(weight = None, rho = 1025.0, g = 9.81, con_mbl = None, Type = None, PointProps = None, ConnectProps = None, source = None, **kwargs):
+    '''Sets up a dictionary that represents a point type based on the 
+    specified attached line MBL and design type. Data used for determining 
+    these properties is a MoorPy PointProps and ConnectProps dictionary data 
+    structure, created by loadLineProps. This data can be passed in via the 
+    PointProps and Connect Props parameters, or a new data set can be generated 
+    based on a YAML filename or dictionary passed in via the source 
+    parameter. The PointProps and ConnectProps dictionary should be error-checked 
+    at creation, so it is not error check in this function for efficiency.
+    
+    Parameters
+    ----------
+    weight: (optional)
+        wet weight of the point [tons]
+    rho : float (optional)
+        Water density used for computing apparent (wet) weight [kg/m^3].
+    g : float (unused legacy variable)
+        Gravitational constant used for computing weight [m/s^2].
+    con_mbl: float (optional)
+        MBL of attached lines or anchors, for automatic sizing of the hardware pieces
+    Type: string
+        string identifier of the point design type to be used.
+    PointProps : dictionary (optional)
+        A MoorPy PointProps dictionary data structure containing the property scaling coefficients.
+    ConnectProps : dictionary (optional)
+        A MoorPy ConnectProps dictionary data structure containing the property scaling coefficients.
+    source : dict or filename (optional)
+        YAML file name or dictionary containing point property dictionaries of designs and connection hardware
 
-
-def getPointProps(weight, rho=1025.0, g=9.81, **kwargs):
-    '''for now this is just getClumpMV put in a place where it could grow 
-    into a fully versatile equivalent to getMoorProps.
+    Returns
+    -------
+    outputs
     '''
-    
-    '''A function to provide a consistent scheme for converting a clump weight/float magnitude to the 
-    mass and volume to use in a MoorPy Point.'''
-    
-    if weight >= 0:                          # if the top point of the intermediate line has a clump weight
-        pointvol = 0.0
-        pointmass = weight*1000.0           # input variables are in units of tons (1000 kg), convert to kg
-    else:
-        pointvol = -weight*1200.0/rho  # input variables are still in tons. Assume additional 20% of BM mass
-        pointmass = -weight*200.0
 
-    return dict(m=pointmass, v=pointvol)
+    if Type == None: # The original getPointProps function
+
+        '''for now this is just getClumpMV put in a place where it could grow 
+        into a fully versatile equivalent to getMoorProps.
+        '''
+        
+        '''A function to provide a consistent scheme for converting a clump weight/float magnitude to the 
+        mass and volume to use in a MoorPy Point.'''
+
+        if weight == None:
+            raise ValueError('Weight needs to be provided for legacy getPointProps method')
+        elif weight >= 0:                          # if the top point of the intermediate line has a clump weight
+            pointvol = 0.0
+            pointmass = weight*1000.0           # input variables are in units of tons (1000 kg), convert to kg
+        else:
+            pointvol = -weight*1200.0/rho  # input variables are still in tons. Assume additional 20% of BM mass
+            pointmass = -weight*200.0
+        
+        pointmbl = None # Placeholders for now
+        pointcost = None # Placeholders for now
+        pointtype = 'old_approach'
+    
+    else: # Loading data from point props YAML
+
+        # TODO: remove dependecy on having connect props if the user give mass, vol, mbl, and cost in the point props dict. Remove error check in loadPointProps that checks this requirement for the YAML format
+
+        if (PointProps==None or ConnectProps==None) and source==None:
+            raise Exception('Either PointProps and ConnectProps or source keyword arguments must be provided')
+        
+        # deal with the source (is it a dictionary, or reading in a new yaml?)
+        if not source==None:
+            if not (PointProps==None or ConnectProps==None):
+                print('Warning: both PointProps/ConnectProps and source arguments were passed to getLineProps. PointProps/ConnectProps will be ignored.')
+            PointProps, ConnectProps = loadPointProps(source)
+            
+        # raise an error if the material isn't in the source dictionary
+        if not Type in PointProps:
+            raise ValueError(f'Specified point design, {Type}, is not in the database.')
+
+        ptype = PointProps[Type]       # shorthand for the sub-dictionary of properties for the design in question   
+        
+        # raise error is auto point sizing is requested without attached MBL provided
+        if ptype['con_mbl'] == -1 and con_mbl == None:
+            raise Exception('Automatic connection component sizing requires MBL of attached lines')
+        if con_mbl < 0:
+            raise ValueError('Provided con_mbl must be non-negative')
+
+        pointtype = Type
+
+        # gather the number and size of each component in the point design and load the component data 
+
+        if ptype['con_mbl'] != -1:
+            try: # Future this will read a list of sizes and numbers to get things added together. con_mbl will be a list for each component type 
+                con_mbl = float(ptype['con_mbl'])
+            except:
+                raise Exception("Invalid user input for con_mbl") 
+        
+        pointmass = 0.0
+        pointvol = 0.0
+        pointmbl = con_mbl
+        pointcost = 0.0
+
+        for key in ptype.keys():
+            if 'num_' in key:
+                props = ConnectProps[key[4:]] # Error checking of valid keys is already done in loadPointProps
+                d = 0 # TODO: nominal size ignored for now. Need to implement list in PointProps yaml that replaces con_mbl var with con_size. The con_mbl will calculated from the mbl_d coefficient using this size list. If auto we can autosize based on attached line MBLand/or diam. 
+                b = ptype['buoyancy']
+                pointmass = pointmass + ( ptype[key] * (props['mass'] + props['mass_d'] * d) )
+                pointvol = pointvol + ( ptype[key] * (props['vol'] + props['v_d'] * d) )
+                pointcost = pointcost + ( ptype[key] * (props['cost'] + props['cost_MBL'] * con_mbl + props['cost_MBL2'] * con_mbl**2 + props['cost_MBL3'] * con_mbl**3 + props['cost_b'] * b + props['cost_b2'] * b**2 + props['cost_b'] * b**3) )
+                #  pointmbl = min( pointmbl, (props['mbl'] + props['mbl_d'] * d)) # TODO: enable once data for mbl to nominal size is known. Maybe throw a warning if it is less than the input design load? how does con_mbl play in here?
+
+        # overwrite the relevant properties for this specific point design if provided
+
+        if ptype['mass'] != 0.0:  # user input overwrites 
+            try:
+                pointmass = float(ptype['mass'])
+            except:
+                raise Exception("Invalid user input for Point mass")
+        
+        if ptype['volume'] != 0.0:  # user input overwrites 
+            try:
+                pointvol = float(ptype['volume'])
+            except:
+                raise Exception("Invalid user input for Point volume")
+        
+        if ptype['mbl'] != 0.0:  # user input overwrites 
+            try:
+                pointmbl = float(ptype['mbl'])
+            except:
+                raise Exception("Invalid user input for Point mbl")
+        
+        if ptype['cost'] != 0.0:  # user input overwrites 
+            try:
+                pointcost = float(ptype['cost'])
+            except:
+                raise Exception("Invalid user input for Point cost") 
+
+    return dict(type=pointtype, m=pointmass, v=pointvol, mbl=pointmbl, cost=pointcost)
 
 
 def loadPointProps(source):
     '''Loads a set of MoorPy point property scaling coefficients from
-    a specified YAML file or passed dictionary. 
+    a specified YAML file or passed dictionary. If the source is a passed 
+    dictionary, it needs to contain two dictionaries with the corresponding keys 
+    'PointProps' and 'ConnectProps'. Any coefficients not included will take a 
+    default value (zero for everything except for con_mbl which is -1 for 
+    automatic component sizing). It returns two dictionaries containing the 
+    complete point design descriptions and the connection component scaling 
+    coefficient set to use for any provided point data types.
     
     Parameters
     ----------
     source : dict or filename
-        YAML file name or dictionary containing line property scaling coefficients
+        YAML file name or dictionary containing point property dictionaries of designs and connection hardware
     
     Returns
     -------
     dictionary
-        PointProps dictionary listing each supported mooring line type and 
+        PointProps dictionary listing each supported connection design type and 
+        subdictionaries with number and size of components for each.
+    dictionary
+        ConnectProps dictionary listing each connection component type and 
         subdictionaries of scaling coefficients for each.
     '''
-    
-    '''
+
+    # Note that the assumption that connection hardware matches line MBL is not necessarily correct. Typical hardware FOS are 5:1 (tri-plates) or 6:1 (shackles). 
+    # A more accurate approach would find nominal size to MBL coefficients for each type, and find a relation between attached line diam and nominal size.
+
     if type(source) is dict:
         source = source
         
@@ -854,20 +980,63 @@ def loadPointProps(source):
             source = yaml.load(file, Loader=yaml.FullLoader)
 
     else:
-        raise Exception("loadLineProps supplied with invalid source")
+        raise Exception("loadPointProps supplied with invalid source")
     
-    if 'lineProps' in source:
-        lineProps = source['lineProps']
+    # read the connection hardware dict
+    if 'ConnectProps' in source:
+        ConnectProps = source['ConnectProps']
     else:
-        raise Exception("YAML file or dictionary must have a 'lineProps' field containing the data")
-    '''
+        raise Exception("YAML file or dictionary must have a 'ConnectProps' field containing the data") # We might want to remove this requirement becasue if a user just gives point mass volume and cost they wont need a connect dict
     
-    output = dict()  # output dictionary combining default values with loaded coefficients
+    connect_output = dict()  # output dictionary combining default values with loaded coefficients
     
-    #output['generic'] = dict(rho = , m_v = , )
-    
-    return output
+     # combine loaded coefficients and default values into dictionary that will be saved for each material
+    for ctype, props in ConnectProps.items():  
+        connect_output[ctype] = {}
+        connect_output[ctype]['mass'     ] = getFromDict(props, 'mass'     , default=0.0)
+        connect_output[ctype]['mass_d'   ] = getFromDict(props, 'mass_d'   , default=0.0)  
+        connect_output[ctype]['vol'      ] = getFromDict(props, 'vol'      , default=0.0)
+        connect_output[ctype]['v_d'      ] = getFromDict(props, 'v_d'      , default=0.0)
+        connect_output[ctype]['MBL'      ] = getFromDict(props, 'MBL'      , default=0.0)
+        connect_output[ctype]['MBL_m'    ] = getFromDict(props, 'MBL_m'    , default=0.0)
+        connect_output[ctype]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
+        connect_output[ctype]['cost_MBL2'] = getFromDict(props, 'cost_MBL2', default=0.0)
+        connect_output[ctype]['cost_MBL3'] = getFromDict(props, 'cost_MBL3', default=0.0)
+        connect_output[ctype]['cost_b'   ] = getFromDict(props, 'cost_b'   , default=0.0)
+        connect_output[ctype]['cost_b2'  ]= getFromDict(props,  'cost_b2'  , default=0.0)
+        connect_output[ctype]['cost_b3'  ] = getFromDict(props, 'cost_b3'  , default=0.0)
+        connect_output[ctype]['cost'     ] = getFromDict(props, 'cost'     , default=0.0)
 
+    # read the point design dict
+    if 'PointProps' in source:
+        PointProps = source['PointProps']
+    else:
+        raise Exception("YAML file or dictionary must have a 'PointProps' field containing the data")
+    
+
+    point_output = dict()  # output dictionary combining default values with loaded designs
+    
+    # combine loaded coefficients and default values into dictionary that will be saved for each material
+    for ptype, props in PointProps.items():  
+        point_output[ptype] = {}
+
+        # handle the numbers of each Connection type
+        for key in props.keys():
+            if 'num_' in key:
+                ctype = key[4:]
+                if ctype in ConnectProps.keys():
+                    point_output[ptype][key] = getFromDict(props, key, default=0) 
+                else:
+                    raise Exception(f'Connection type {ctype} not found in ConnectProps dictionary')
+
+        point_output[ptype]['con_mbl'       ] = getFromDict(props, 'con_mbl'       , default=-1)
+        point_output[ptype]['buoyancy'      ] = getFromDict(props, 'buoyancy'      , default=0.0)
+        point_output[ptype]['cost'          ] = getFromDict(props, 'cost'          , default=0.0) # these are written based on data from ConnectProps unless user provided
+        point_output[ptype]['mass'          ] = getFromDict(props, 'mass'          , default=0.0) # these are written based on data from ConnectProps unless user provided
+        point_output[ptype]['volume'        ] = getFromDict(props, 'volume'        , default=0.0) # these are written based on data from ConnectProps unless user provided
+        point_output[ptype]['mbl'           ] = getFromDict(props, 'mbl'           , default=0.0) # these are written based on data from ConnectProps unless user provided
+
+    return point_output, connect_output
 
 
 def getFromDict(dict, key, shape=0, dtype=float, default=None):
