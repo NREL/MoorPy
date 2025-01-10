@@ -1,0 +1,146 @@
+# THIS IS IN PROGRESS
+
+# Default point properties with cost curves based on work presented in OMAE2025-156384
+# The following is YAML syntax and follows a heirarchy of
+
+# PointProps -> [point type name] -> [number and size of components]
+# ConnectProps -> [connection component name] -> [component coefficients]
+
+# All possible ConnectProps coefficients are as follows:
+    # mass      :     # mass offset [kg]
+    # mass_d    :     # mass as a function of nominal size (bar diameter) [kg/m]  NOT YET FULLY SUPPORTED
+    # vol       :     # volume offset [m^3]
+    # v_d       :     # volume as a function of nominal size [m^3/m]  NOT YET FULLY SUPPORTED
+    # MBL       :     # MBL offset [kN] NOT YET FULLY SUPPORTED
+    # MBL_m     :     # minimum breaking load per mass [kN/kg] NOT YET FULLY SUPPORTED
+    # cost_MBL  :     # cost per MBL [$/kN]
+    # cost_MBL2 :     # cost per MBL^2 [$/kN^2]
+    # cost_MBL3 :     # cost per MBL^3 [$/kN^3]
+    # cost_b    :     # cost per buoyancy [$/kN]
+    # cost_b2   :     # cost per buoyancy^2 [$/kN^2]
+    # cost_b3   :     # cost per buoyancy^3 [$/kN^3]
+    # cost      :     # baseline cost offset [$]
+
+# All possible PointProps coefficients are as follows:
+    # num_<connect name>:   # number of this connection type where <connect name> matches the name of a ConnectProps entry (case sensistive). If no value is give num of component is assumed zero
+    # con_mbl          :   # nominal size of component (a number) or automatically size based on attached line size (-1 flag)
+    # buoyancy          :   # the size of any buoys in this connection type [kN]
+    # cost              :   # cost to overwrite the calculated cost [$]
+    # mass              :   # mass to overwrite the calculated mass [kg]
+    # volume            :   # volume to overwrite the calculated volume [m^3]
+    # mbl               :   # mbl to overwrite the calculated volume [kN]
+
+
+ConnectProps: 
+  # TODO: mass, v, and MBL relationships from the tables on pg 132 in the Vryhof Manual. Size to MBL relationships can also be derived from the data I gathered. 
+  
+  shackle    :     
+    # mass      :     # mass offset [kg]
+    # mass_d    :     # mass as a function of nominal size (bar diameter) [kg/m]
+    # vol       :     # volume offset [m^3]
+    # v_d       :     # volume as a function of nominal size [m^3/m]     
+    # MBL       :     # MBL offset [kN]
+    # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    cost_MBL  :  9.0499e-2    # cost per MBL [$/kN]
+    cost_MBL2 :  1.1632e-5    # cost per MBL^2 [$/kN^2]
+    cost_MBL3 :  3.6484e-9    # cost per MBL^3 [$/kN^3]
+
+  connector  :  
+    # mass      :     # mass offset [kg]   
+    # mass_d    :     # mass as a function of nominal size [kg/m]   
+    # vol       :     # volume offset [m^3]
+    # v_d       :     # volume as a function of nominal size [m^3/m]  
+    # MBL       :     # MBL offset [kN]
+    # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    cost_MBL  :  1.3492       # cost per MBL [$/kN]
+    cost_MBL2 :  1.1512e-4    # cost per MBL^2 [$/kN^2]
+    cost_MBL3 :  3.3701e-9    # cost per MBL^3 [$/kN^3]
+
+  swivel     :  
+    # mass      :     # mass offset [kg]   
+    # mass_d    :     # mass as a function of nominal size [kg/m]   
+    # vol       :     # volume offset [m^3]
+    # v_d       :     # volume as a function of nominal size [m^3/m]  
+    # MBL       :     # MBL offset [kN]
+    # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    cost_MBL  :  2.2756    # cost per MBL [$/kN]
+    cost_MBL2 :  0        # cost per MBL^2 [$/kN^2]
+    cost_MBL3 :  0        # cost per MBL^3 [$/kN^3]
+
+  triplate   :   
+    # mass      :     # mass offset [kg]  
+    # mass_d    :     # mass as a function of nominal size [kg/m]   
+    # vol       :     # volume offset [m^3]
+    # v_d       :     # volume as a function of nominal size [m^3/m]  
+    # MBL       :     # MBL offset [kN]
+    # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    cost_MBL  :  4.0647e-1  # cost per MBL [$/kN]
+    cost_MBL2 :  0   # cost per MBL^2 [$/kN^2]
+    cost_MBL3 :  0   # cost per MBL^3 [$/kN^3]
+
+  misc       :     
+    # mass      :     # mass offset [kg]
+    # mass_d    :     # mass as a function of nominal size [kg/m]  
+    # vol       :     # volume offset [m^3]
+    # v_d       :     # volume as a function of nominal size [m^3/m]   
+    # MBL       :     # MBL offset [kN]
+    # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    cost_MBL  :  6.9072e-1    # cost per MBL [$/kN]
+    cost_MBL2 :  4.4545e-5    # cost per MBL^2 [$/kN^2]
+    cost_MBL3 :  1.5231e-9    # cost per MBL^3 [$/kN^3]
+
+  buoy       :
+    # mass      :     # mass offset [kg]
+    # mass_b    :     # mass as a function of buoyancy [kg/kN]
+    # vol       :     # volume offset [m^3]
+    # v_n       :     # volume as a function of buoyancy [m^3/kN]   
+    cost_b  :  5.2761e2  # cost per buoyancy [$/kN]
+    cost_b2 : -1.1863    # cost per buoyancy^2 [$/kN^2]
+    cost_b3 :  0         # cost per buoyancy^3 [$/kN^3]
+
+PointProps:
+
+  General         :  # TODO: This is a place holder, it should be replaced by more detailed designs. VA-02 design from pg 132 of Vryhof Manual in here for now. 
+    num_shackle   : 1  # number of shackles in this connection type
+    num_connector : 2  # number of pear or C connectors in this connection type
+    num_swivel    : 1  # number of swivels in this connection type
+    num_misc      : 3  # number of other hardware components in this connection type (typically chain links)
+    con_mbl       : -1 # nominal mbl of component (kN) or automatically size based on attached line size (-1 flag)
+
+  # Chain2Chain     :
+  #   num_shackle    :   # number of shackles in this connection type
+  #   num_connector  :   # number of pear or C connectors in this connection type
+  #   num_swivel     :   # number of swivels in this connection type
+  #   num_triplate   :   # number of tri-plates in this connection type
+  #   num_other      :   # number of other hardware components in this connection type (typically chain links)
+  #   num_buoy       :   # number of buoys in this connection type
+  #   con_mbl        : 'auto' # nominal mbl of component (kN) or automatically size based on attached line size (-1 flag)
+
+  # Chain2Rope      :
+  #   num_shackle    :   # number of shackles in this connection type
+  #   num_connector  :   # number of pear or C connectors in this connection type
+  #   num_swivel     :   # number of swivels in this connection type
+  #   num_triplate   :   # number of tri-plates in this connection type
+  #   num_other      :   # number of other hardware components in this connection type (typically chain links)
+  #   num_buoy       :   # number of buoys in this connection type
+  #   con_mbl        : 'auto' # nominal mbl of component (kN) or automatically size based on attached line size (-1 flag)
+
+  # Rope2Rope       :
+  #   num_shackle    :   # number of shackles in this connection type
+  #   num_connector  :   # number of pear or C connectors in this connection type
+  #   num_swivel     :   # number of swivels in this connection type
+  #   num_triplate   :   # number of tri-plates in this connection type
+  #   num_other      :   # number of other hardware components in this connection type (typically chain links)
+  #   num_buoy       :   # number of buoys in this connection type
+  #   con_mbl       : 'auto' # nominal mbl of component (kN) or automatically size based on attached line size (-1 flag)
+
+  # Chain2Anchor    :
+  #   num_shackle    :   # number of shackles in this connection type
+  #   num_connector  :   # number of pear or C connectors in this connection type
+  #   num_swivel     :   # number of swivels in this connection type
+  #   num_triplate   :   # number of tri-plates in this connection type
+  #   num_other      :   # number of other hardware components in this connection type (typically chain links)
+  #   num_buoy       :   # number of buoys in this connection type
+  #   con_mbl        : 'auto' # nominal mbl of component (kN) or automatically size based on attached line size (-1 flag)
+  
+  # # etc.
