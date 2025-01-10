@@ -42,7 +42,7 @@ ConnectProps:
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
     cost_MBL  :  9.0499e-2    # cost per MBL [$/kN]
-    cost_MBL2 :  1.1632e-5    # cost per MBL^2 [$/kN^2]
+    cost_MBL2 : -1.1632e-5    # cost per MBL^2 [$/kN^2]
     cost_MBL3 :  3.6484e-9    # cost per MBL^3 [$/kN^3]
 
   connector  :  
@@ -53,7 +53,7 @@ ConnectProps:
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
     cost_MBL  :  1.3492       # cost per MBL [$/kN]
-    cost_MBL2 :  1.1512e-4    # cost per MBL^2 [$/kN^2]
+    cost_MBL2 : -1.1512e-4    # cost per MBL^2 [$/kN^2]
     cost_MBL3 :  3.3701e-9    # cost per MBL^3 [$/kN^3]
 
   swivel     :  
@@ -86,7 +86,7 @@ ConnectProps:
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
     cost_MBL  :  6.9072e-1    # cost per MBL [$/kN]
-    cost_MBL2 :  4.4545e-5    # cost per MBL^2 [$/kN^2]
+    cost_MBL2 : -4.4545e-5    # cost per MBL^2 [$/kN^2]
     cost_MBL3 :  1.5231e-9    # cost per MBL^3 [$/kN^3]
 
   buoy       :

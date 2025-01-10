@@ -56,7 +56,7 @@ lineProps:
     MBL_d2    :  1.21e9    # minimum breaking load per diameter^2 [N/m^2] 
     MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
     dvol_dnom :  1.80      # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
-    cost_d    :  1.5363e3  # cost per diameter [$/m^2]
+    cost_d    : -1.5363e3  # cost per diameter [$/m^2]
     cost_d2   :  1.5520e5  # cost per diameter^2 [$/m^3]
     Cd        :  1.333     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
     Cd_ax     :  0.639     # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
@@ -70,7 +70,7 @@ lineProps:
     MBL_d2    :  1.21e9    # minimum breaking load per diameter^2 [N/m^2] 
     MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
     dvol_dnom :  1.89      # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
-    cost_d    :  1.5363e3  # cost per diameter [$/m^2]
+    cost_d    : -1.5363e3  # cost per diameter [$/m^2]
     cost_d2   :  1.5520e5  # cost per diameter^2 [$/m^3]
     Cd        :  1.376     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
     Cd_ax     :  0.741     # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
@@ -124,7 +124,7 @@ lineProps:
     Cd        :  1.988     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
     Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
     Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
-    cost_d    :  2.2742e3  # cost per diameter [$/m^2]
+    cost_d    : -2.2742e3  # cost per diameter [$/m^2]
     cost_d2   :  1.1004e5  # cost per diameter^2 [$/m^3]
 
 
