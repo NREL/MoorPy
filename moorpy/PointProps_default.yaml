@@ -3,8 +3,46 @@
 # Default point properties with cost curves based on work presented in OMAE2025-156384
 # The following is YAML syntax and follows a heirarchy of
 
-# PointProps -> [point type name] -> [number and size of components]
+# PointProps   -> [point type name]           -> [number and size of components]
+# AnchorProps  -> [anchor type name]          -> [component coefficients] NOT SUPPORTED - potential approach
+# BuoyProps    -> [buoy type name]            -> [component coefficients]
 # ConnectProps -> [connection component name] -> [component coefficients]
+
+# All possible AnchorProps coefficients are as follows: NOT SUPPORTED - potential approach
+    # soilType     :     # soilType [one of 'soft clay', 'medium clay', 'hard clay', or 'sand']
+    # a_softclay   :     # a coefficient in getAnchorMass for softclay
+    # b_softclay   :     # b coefficient in getAnchorMass for softclay
+    # c_softclay   :     # c coefficient in getAnchorMass for softclay
+    # d_softclay   :     # d coefficient in getAnchorMass for softclay
+    # a_medclay    :     # a coefficient in getAnchorMass for medclay
+    # b_medclay    :     # b coefficient in getAnchorMass for medclay
+    # c_medclay    :     # c coefficient in getAnchorMass for medclay
+    # d_medclay    :     # d coefficient in getAnchorMass for medclay
+    # a_hardclay   :     # a coefficient in getAnchorMass for hardclay
+    # b_hardclay   :     # b coefficient in getAnchorMass for hardclay
+    # c_hardclay   :     # c coefficient in getAnchorMass for hardclay
+    # d_hardclay   :     # d coefficient in getAnchorMass for hardclay
+    # a_sand       :     # a coefficient in getAnchorMass for sand
+    # b_sand       :     # b coefficient in getAnchorMass for sand
+    # c_sand       :     # c coefficient in getAnchorMass for sand
+    # d_sand       :     # d coefficient in getAnchorMass for sand
+    # t2_m_ratio   :     # thickness to mass ratio [-]
+    # t2_a_ratio   :     # thickness to area ratio [-]
+    # mass         :     # mass [kg]
+    # area         :     # area [m^2]
+    # cost_m       :     # cost per mass [$/kN]
+    # cost_m2      :     # cost per mass^2 [$/kN^2]
+    # cost_m3      :     # cost per mass^3 [$/kN^3]
+
+# All possible Buoy coefficients are as follows:
+    # buoyancy  :     # the buoyancy [kN] 
+    # mass      :     # mass offset [kg]
+    # mass_b    :     # mass as a function of buoyancy [kg/kN]
+    # vol       :     # volume offset [m^3]
+    # v_b       :     # volume as a function of buoyancy [m^3/kN]   
+    # cost_b    :     # cost per buoyancy [$/kN]
+    # cost_b2   :     # cost per buoyancy^2 [$/kN^2]
+    # cost_b3   :     # cost per buoyancy^3 [$/kN^3]
 
 # All possible ConnectProps coefficients are as follows:
     # mass      :     # mass offset [kg]
@@ -13,23 +51,32 @@
     # v_d       :     # volume as a function of nominal size [m^3/m]  NOT YET FULLY SUPPORTED
     # MBL       :     # MBL offset [kN] NOT YET FULLY SUPPORTED
     # MBL_m     :     # minimum breaking load per mass [kN/kg] NOT YET FULLY SUPPORTED
+    # FOS       :     # the factor of safety between WLL and MBL
     # cost_MBL  :     # cost per MBL [$/kN]
     # cost_MBL2 :     # cost per MBL^2 [$/kN^2]
     # cost_MBL3 :     # cost per MBL^3 [$/kN^3]
-    # cost_b    :     # cost per buoyancy [$/kN]
-    # cost_b2   :     # cost per buoyancy^2 [$/kN^2]
-    # cost_b3   :     # cost per buoyancy^3 [$/kN^3]
     # cost      :     # baseline cost offset [$]
 
-# All possible PointProps coefficients are as follows:
-    # num_<connect name>:   # number of this connection type where <connect name> matches the name of a ConnectProps entry (case sensistive). If no value is give num of component is assumed zero
-    # con_mbl          :   # nominal size of component (a number) or automatically size based on attached line size (-1 flag)
-    # buoyancy          :   # the size of any buoys in this connection type [kN]
-    # cost              :   # cost to overwrite the calculated cost [$]
-    # mass              :   # mass to overwrite the calculated mass [kg]
-    # volume            :   # volume to overwrite the calculated volume [m^3]
-    # mbl               :   # mbl to overwrite the calculated volume [kN]
+# All possible PointProps coefficients are as follows: 
+    # num_a_<anchor name> :   # number of this anchor type where <anchor name> matches the name of a AnchorProps entry (case sensistive). If no value is give num of component is assumed zero NOT SUPPORTED - potential approach
+    # num_b_<buoy name>   :   # number of this buoy type where <buoy name> matches the name of a BuoyProps entry (case sensistive). If no value is give num of component is assumed zero
+    # num_c_<connect name>:   # number of this connection type where <connect name> matches the name of a ConnectProps entry (case sensistive). If no value is give num of component is assumed zero
+    # design_load         :   # nominal size of component (a number) or automatically size based on attached line size (-1 flag)
+    # cost                :   # cost to overwrite the calculated cost [$]
+    # mass                :   # mass to overwrite the calculated mass [kg]
+    # volume              :   # volume to overwrite the calculated volume [m^3]
+    # mbl                 :   # mbl to overwrite the calculated mbl [kN]
 
+BuoyProps: 
+
+  general      : # general buoy based on input from industry
+    # mass      :     # mass offset [kg]
+    # mass_b    :     # mass as a function of buoyancy [kg/kN]
+    # vol       :     # volume offset [m^3]
+    # v_b       :     # volume as a function of buoyancy [m^3/kN]   
+    cost_b  :  5.2761e2  # cost per buoyancy [$/kN]
+    cost_b2 : -1.1863    # cost per buoyancy^2 [$/kN^2]
+    cost_b3 :  0         # cost per buoyancy^3 [$/kN^3]
 
 ConnectProps: 
   # TODO: mass, v, and MBL relationships from the tables on pg 132 in the Vryhof Manual. Size to MBL relationships can also be derived from the data I gathered. 
@@ -41,6 +88,7 @@ ConnectProps:
     # v_d       :     # volume as a function of nominal size [m^3/m]     
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    FOS       :  6            # the factor of safety between WLL and MBL
     cost_MBL  :  9.0499e-2    # cost per MBL [$/kN]
     cost_MBL2 : -1.1632e-5    # cost per MBL^2 [$/kN^2]
     cost_MBL3 :  3.6484e-9    # cost per MBL^3 [$/kN^3]
@@ -52,6 +100,7 @@ ConnectProps:
     # v_d       :     # volume as a function of nominal size [m^3/m]  
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    FOS       :  6            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
     cost_MBL  :  1.3492       # cost per MBL [$/kN]
     cost_MBL2 : -1.1512e-4    # cost per MBL^2 [$/kN^2]
     cost_MBL3 :  3.3701e-9    # cost per MBL^3 [$/kN^3]
@@ -63,6 +112,7 @@ ConnectProps:
     # v_d       :     # volume as a function of nominal size [m^3/m]  
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    FOS       :  5            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
     cost_MBL  :  2.2756    # cost per MBL [$/kN]
     cost_MBL2 :  0        # cost per MBL^2 [$/kN^2]
     cost_MBL3 :  0        # cost per MBL^3 [$/kN^3]
@@ -74,6 +124,7 @@ ConnectProps:
     # v_d       :     # volume as a function of nominal size [m^3/m]  
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    FOS       :  5          # the factor of safety between WLL and MBL
     cost_MBL  :  4.0647e-1  # cost per MBL [$/kN]
     cost_MBL2 :  0   # cost per MBL^2 [$/kN^2]
     cost_MBL3 :  0   # cost per MBL^3 [$/kN^3]
@@ -85,27 +136,19 @@ ConnectProps:
     # v_d       :     # volume as a function of nominal size [m^3/m]   
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    FOS       :  6            # the factor of safety between WLL and MBL
     cost_MBL  :  6.9072e-1    # cost per MBL [$/kN]
     cost_MBL2 : -4.4545e-5    # cost per MBL^2 [$/kN^2]
     cost_MBL3 :  1.5231e-9    # cost per MBL^3 [$/kN^3]
 
-  buoy       :
-    # mass      :     # mass offset [kg]
-    # mass_b    :     # mass as a function of buoyancy [kg/kN]
-    # vol       :     # volume offset [m^3]
-    # v_n       :     # volume as a function of buoyancy [m^3/kN]   
-    cost_b  :  5.2761e2  # cost per buoyancy [$/kN]
-    cost_b2 : -1.1863    # cost per buoyancy^2 [$/kN^2]
-    cost_b3 :  0         # cost per buoyancy^3 [$/kN^3]
+PointProps: # These are data structures that hold information of what is in a point. Any point can have any number of Acnhor, Buoy, and Connection types as described in the respective props section. 
 
-PointProps:
-
-  General         :  # TODO: This is a place holder, it should be replaced by more detailed designs. VA-02 design from pg 132 of Vryhof Manual in here for now. 
-    num_shackle   : 1  # number of shackles in this connection type
-    num_connector : 2  # number of pear or C connectors in this connection type
-    num_swivel    : 1  # number of swivels in this connection type
-    num_misc      : 3  # number of other hardware components in this connection type (typically chain links)
-    con_mbl       : -1 # nominal mbl of component (kN) or automatically size based on attached line size (-1 flag)
+  general         :  # TODO: This is a place holder, it should be replaced by more detailed designs. VA-02 design from pg 132 of Vryhof Manual in here for now. 
+    num_c_shackle   : 1  # number of shackles in this connection type
+    num_c_connector : 2  # number of pear or C connectors in this connection type
+    num_c_swivel    : 1  # number of swivels in this connection type
+    num_c_misc      : 3  # number of other hardware components in this connection type (typically chain links)
+    con_mbl         : -1 # nominal mbl of component (kN) or automatically size based on attached line size (-1 flag)
 
   # Chain2Chain     :
   #   num_shackle    :   # number of shackles in this connection type
@@ -144,3 +187,4 @@ PointProps:
   #   con_mbl        : 'auto' # nominal mbl of component (kN) or automatically size based on attached line size (-1 flag)
   
   # # etc.
+  # TODO: Anchor options in here
