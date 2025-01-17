@@ -400,9 +400,19 @@ def getAnchorMass( uhc_mode = True, fx=0, fz=0, mass_int=0, anchor="drag-embedme
             info["Mass"] = mass                 #[kg]
             #info["Length"] = L
           
+    elif anchor == "gravity":
 
-    
-    
+        capacity_x = 1.6*fx                           #[N]
+        #capacity_x = fx
+        capacity_z = 2.0*fz                           #[N]
+        uhc = np.linalg.norm([capacity_x, capacity_z])  
+ 
+        mass = max(capacity_x / gravity, capacity_z / gravity) # 2x safety factor for vertial 1.6x for horizontal per API standards. Use the larger value. Max load in kg * FOS = mass
+        # Alteratively use 4x the horizontal load per WEC mooring advice from UW APL. 
+
+        info["UHC"] = uhc           #[N]
+        info["Mass"] = mass                 #[kg]
+
     #-----IN PROGRESS -----------------------------------
 
     elif anchor == "SEPLA":
@@ -462,7 +472,7 @@ def getAnchorMass( uhc_mode = True, fx=0, fz=0, mass_int=0, anchor="drag-embedme
     #return info
 
 
-def getAnchorCost(fx, fz, type="drag-embedment",soil_type='medium clay', method = 'static'):
+def getAnchorCostOld(fx, fz, type="drag-embedment",soil_type='medium clay', method = 'static'):
     ''' applies factors to material cost '''
     
 
@@ -504,6 +514,54 @@ def getAnchorCost(fx, fz, type="drag-embedment",soil_type='medium clay', method 
     
 
     return anchorMatCost, anchorInstCost, anchorDecomCost, info   # [USD]
+
+def getAnchorCost(fx, fz, type="drag-embedment", mass = None, soil_type='medium clay', method = 'static'):
+    ''' Anchor costs based on the WEC Mooring Cost Modeling Work. updated 1-15-2025 using 2024$'''
+    
+    if mass == None:
+        uhc, mass, info = getAnchorMass( uhc_mode = False, fx=fx, fz=fz, anchor= type, soil_type=soil_type, method = method) 
+    else:
+        info = dict(UHC = "", Mass = mass)      
+    
+    if type == "drag-embedment":
+
+ 
+        anchorMatCost = 4.1513*mass # $ per kg mass
+        anchorInstCost = 0       # installation cost
+        anchorDecomCost = 0      # decommissioning cost
+        
+    elif type == "gravity":
+
+        anchorMatCost = 0.57611*mass # $ per kg mass
+        anchorInstCost = 0 #TODO       # installation cost
+        anchorDecomCost = 0 #TODO      # decommissioning cost
+
+    elif type == "suction":
+        raise ValueError('Suction pile material costs are not yet supported')
+        anchorMatCost = 0*mass # $ per kg mass
+        anchorInstCost = 0   # installation cost
+        anchorDecomCost = 0  # decommissioning cost
+    
+        
+    elif type == "micropile":   
+        
+        raise ValueError('Micropile material costs are not yet supported')
+        #anchorMatCost = 0.48 * mass # $ per kg mass
+        anchorInstCost = 0                                  # installation cost
+        anchorDecomCost = 0                                 # decommissioning cost
+    
+    elif type == "plate":   # cross between suction and plate
+        
+        raise ValueError('Plate material costs are not yet supported')
+        #anchorMatCost = 0.45 * mass# $ per kg mass
+        anchorInstCost = 0                      # installation cost
+        anchorDecomCost = 0                     # decommissioning cost
+    
+    else:
+        raise ValueError(f'getAnchorProps received an unsupported anchor type ({type})')    
+
+    return anchorMatCost, anchorInstCost, anchorDecomCost, info   # [USD]
+
 
 
 def getAnchorProps(fx, fz, type="drag-embedment", display=0):

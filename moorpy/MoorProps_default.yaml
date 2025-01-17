@@ -9,11 +9,15 @@
 #    MBL_d     :     # minimum breaking load per diameter [N/m]
 #    MBL_d2    :     # minimum breaking load per diameter^2 [N/m^2]
 #    MBL_d3    :     # minimum breaking load per diameter^3 [N/m^3]
+#    MBL_dmin  :     # minimum valid diameter for the MBL curve (values < 0 ignored) [m]
+#    MBL_dmax  :     # maximum valid diameter for the MBL curve (values < 0 ignored) [m]
 #    
 #    EA_0      :     # stiffness offset [N]
 #    EA_d      :     # stiffness per diameter [N/m]
 #    EA_d2     :     # stiffness per diameter^2 [N/m^2]
 #    EA_d3     :     # stiffness per diameter^3 [N/m^3]
+#    EA_dmin   :     # minimum valid diameter for the EA curve (values < 0 ignored) [m]
+#    EA_dmax   :     # maximum valid diameter for the EA curve (values < 0 ignored) [m]
 #    EA_MBL    :     # (quasi-static) stiffness per MBL [N/N] (aka Kr, Krs) 
 #    EAd_MBL   :     # dynamic stiffness per MBL [N/N] (aka Krd or Krd_alpha)
 #    EAd_MBL_Lm:     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (aka or Krd_beta)
