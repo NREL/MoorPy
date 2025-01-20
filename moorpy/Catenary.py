@@ -1246,8 +1246,16 @@ def eval_func_cat(X, args):
             breakpoint()
         
         else:
-        
-            LBot = L - (VF - HF * sin_alpha/cos_alpha)/W  # Lb on the seafloor
+            
+            # Improved LBot (seabed contact unstretched lenght) estimate
+            if VF/HF < ZF/XF:  # if the end B tension angle is guessed too horizontal
+                VF0 = 1.0*VF  # original copy of VF
+                VFI = ZF/XF*HF  # ideal VF for taut line
+                VFU = 0.1*VF0 + 0.9*VFI # let's make it 90% closer to the taut line angle
+            else:
+                VFU = 1.0*VF
+            
+            LBot = L - (VFU - HF * sin_alpha/cos_alpha)/W  # Lb on the seafloor
             
             # Practical limits on LBot, because the estimates can be way off
             if LBot > XF/cos_alpha:  # if LBot is too large (if true, this would be profileType 4)
@@ -1527,7 +1535,8 @@ if __name__ == "__main__":
     #   CB=-897.8894086817654, alpha=0, HF0=1045436.0319202082, VF0=4280849.602990574, Tol=0.0001, MaxIter=100, depth=800, plots=1)
     
     
-    (fAH1, fAV1, fBH1, fBV1, info1) =  catenary(242.43063215088046, 16.438515754164882, 242.94180148966598, 1977564385.9456, 3941.831324315529, CB=0.0, alpha=3.879122219600495, HF0=400446.3427158061, VF0=26452.686481212237, Tol=0.0001, MaxIter=100, depth=820.2155229016184, plots=1)
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(239.68133374054617, 5.572397767284315, 239.67708907645783, 2003669644.0239, 3993.8681384566403, CB=0.0, alpha=0.7703995482284995, HF0=265897.4720034979, VF0=3575.475193332911, Tol=0.0001, MaxIter=100, depth=835.6052666569179, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(242.43063215088046, 16.438515754164882, 242.94180148966598, 1977564385.9456, 3941.831324315529, CB=0.0, alpha=3.879122219600495, HF0=400446.3427158061, VF0=26452.686481212237, Tol=0.0001, MaxIter=100, depth=820.2155229016184, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(113.98763202381406, 135.64003587014417, 222.9088982113214, 1799620189.0374997, 3587.1279256290677, CB=0.0, alpha=-1.6131140432335964, HF0=737382.1987996304, VF0=1014826.8890259801, Tol=0.0001, MaxIter=100, depth=914.6515127916663, plots=1)
     
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(274.9, 15.6, 328.5, 528887323., -121., 
