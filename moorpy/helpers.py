@@ -4,6 +4,7 @@ import time
 import yaml
 import os
 import re
+from moorpy.MoorProps import getAnchorCost
 
  
 # base class for MoorPy exceptions
@@ -772,7 +773,7 @@ def loadLineProps(source):
     elif source is None or source=="default":
         import os
         mpdir = os.path.dirname(os.path.realpath(__file__))
-        with open(os.path.join(mpdir,"MoorProps_default.yaml")) as file:
+        with open(os.path.join(mpdir,"MoorProps_newCosts.yaml")) as file:
             source = yaml.load(file, Loader=yaml.FullLoader)
         
     elif type(source) is str:
@@ -836,8 +837,14 @@ def loadLineProps(source):
     return output
 
 
-def getPointProps(weight = None, rho = 1025.0, g = 9.81, design_load = None, Type = None, Props = None, source = None, **kwargs):
-    '''<TODO: description>
+def getPointProps(weight = None, rho = 1025.0, g = 9.81, design_load = None, design = None, Props = None, source = None, **kwargs):
+    '''Sets up a dictionary that represents a mooring point type based on the 
+    specified design. Data used for determining these properties is a MoorPy
+    pointTypes dictionary data structure, created by loadPointProps. This data
+    can be passed in via the Props parameter, or a new data set can be
+    generated based on a YAML filename or dictionary passed in via the source 
+    parameter. The pointProps dictionary should be error-checked at creation,
+    so it is not error check in this function for efficiency.
     
     Parameters
     ----------
@@ -848,13 +855,13 @@ def getPointProps(weight = None, rho = 1025.0, g = 9.81, design_load = None, Typ
     g : float (unused legacy variable)
         Gravitational constant used for computing weight [m/s^2].
     design_load: float (optional)
-        design_load of attached lines or anchors, for automatic MBL sizing of the hardware pieces using the FOS provided in PointProps
-    Type: string
+        design_load of attached lines or anchors, for automatic MBL sizing of the hardware pieces using the FOS provided in PointProps [kN]
+    design : string
         string identifier of the point design type to be used. Either 'anchor' or a value in the PointProps dictionary
     Props : dictionary (optional)
-        A MoorPy PointProps dictionary data structure containing the property scaling coefficients.
+        A MoorPy PointProps dictionary data structure containing designs and property scaling coefficients.
     source : dict or filename (optional)
-        YAML file name or dictionary containing point property dictionaries of designs and connection hardware
+        YAML file name or dictionary containing designs and property scaling coefficients.
 
     Returns
     -------
@@ -862,7 +869,7 @@ def getPointProps(weight = None, rho = 1025.0, g = 9.81, design_load = None, Typ
         A pointType dictionary 
     '''
 
-    if Type == None: # The original getPointProps function
+    if design == None: # The original getPointProps function
 
         '''for now this is just getClumpMV put in a place where it could grow 
         into a fully versatile equivalent to getMoorProps.
@@ -883,20 +890,11 @@ def getPointProps(weight = None, rho = 1025.0, g = 9.81, design_load = None, Typ
         pointmbl = None # Placeholders for now
         pointcost = None # Placeholders for now
         pointtype = 'old_approach'
-    elif Type == 'anchor': # This is a place holder until ABC yaml is done
+        pointinfo = None # Placeholders for now
 
-        # TODO: handle
-        
-        pass
+    else:  # Loading data from point props YAML
 
-    else: # Loading data from point props YAML
-
-        # TODO: add check for if type == anchor
-
-        # TODO: structure this for anchors, connections, and buoys. Maybe an anchor props? <-- This should all be contained in getPointProps because points are anchors, connections, and buoys
-        # To be consisitent: Pointprops will contain designs, and then dictionaries for connections, buoys, and anchors,
-
-        # TODO: remove dependecy on having connect props if the user give mass, vol, mbl, and cost in the point props dict. Remove error check in loadPointProps that checks this requirement for the YAML format
+        pointinfo = {} # Dictionary to hold any information statements
 
         if Props==None  and source==None:
             raise Exception('Either Props or source keyword arguments must be provided')
@@ -908,96 +906,149 @@ def getPointProps(weight = None, rho = 1025.0, g = 9.81, design_load = None, Typ
             Props = loadPointProps(source)
             
         # raise an error if the material isn't in the source dictionary
-        if not Type in Props["PointProps"]:
-            raise ValueError(f'Specified point design, {Type}, is not in the database.')
-
-        ptype = Props["PointProps"][Type]       # shorthand for the sub-dictionary of properties for the design in question
+        if not design in Props["DesignProps"]:
+            raise ValueError(f'Specified point design, {design}, is not in the database.')
         
-        # raise error is auto point sizing is requested without attached MBL provided
-        if ptype['design_load'] == -1 and design_load == None:
-            raise Exception('Automatic connection component sizing requires MBL of attached lines')
-        if design_load != None and design_load < 0:
-            raise ValueError('Provided design_load must be non-negative')
+        dtype = Props["DesignProps"][design]       # shorthand for the sub-dictionary of properties for the design in question
 
-        pointtype = Type
+        # if there are connections in the design, check for valid design load input and overwrite if a value is provided in the props
+        if any('num_c_' in string for string in dtype.keys()) :
+            # error check auto point sizing. Either design_load needs to be passed in or provided in the YAML
+            if dtype['design_load'] == 0.0 and design_load == None:
+                raise Exception('Connection component sizing requires a design_load of attached lines')
+            if design_load != None and design_load < 0:
+                raise ValueError('Provided design_load must be non-negative')
 
-        # gather the number and size of each component in the point design and load the component data 
+            # gather the number and size of each component in the point design and load the component data. Design load is in kN
+            if dtype['design_load'] > 0.0: 
+                try:
+                    design_load = float(dtype['design_load']) # if valid design_load is given in the DesignProps dict it will overwrite the user input
+                except:
+                    raise Exception("Invalid user input for design_load. Must be -1 or non-zero positive float.") 
+                else: 
+                    if design_load > 0:
+                        raise Exception("Invalid user input for design_load. Must be -1 or non-zero positive float.") 
 
-        if ptype['design_load'] != -1:
-            try: # Future this will read a list of sizes and numbers to get things added together. design_load will be a list for each component type 
-                design_load = float(ptype['design_load'])
-            except:
-                raise Exception("Invalid user input for design_load") 
-        
-        # load ABC props (TODO: would it be cleaner to put this in the loop below?)
-        # if any('num_a' in string for string in ptype.keys()):
-            # aprops = ptype["anchorProps"]
-        if any('num_b' in string for string in ptype.keys()):
-            bprops = Props["BuoyProps"]
-        if any('num_c' in string for string in ptype.keys()):
-            cprops = Props["ConnectProps"] 
-
+        pointtype = design # save the design name for returning
+                
+        # initialize point values for the design 
         pointmass = 0.0
         pointvol = 0.0
-        pointdload = design_load / 1000 # convert from N to kN to work with con cost coefficients
         pointcost = 0.0
-        pointfos = 1 # min factor of safety. Overwritten by the max value of a component
-        for key in ptype.keys():
+
+        # initialize props dicts
+        aprops = {}
+        bprops = {}
+        cprops = {}
+
+        # initialize empty listy to hold mbls
+        pointmbl_list = [] # MBL in N
+
+        # load ABC props and assign values to the point
+        for key in dtype.keys():
             
-            # # anchors
-            # if 'num_a_' in key:
-            #     props = bprops[key[6:]] # Error checking of valid keys is already done in loadPointProps
-            #     m = ptype['mass'] + mass # input mass. This isnt quite right
-            #     pointcost = pointcost + ( ptype[key] * (props['cost'] + props['cost_m'] * m + props['cost_m2'] * m**2 + props['cost_m3'] * m**3) )
+            # anchors
+            if 'num_a_' in key:
+                '''
+                Mass: Anchor mass is provided in AnchorProps.
+                Volume: anchors do not contirbute to volume as they are assumed to be on the seabed (never buoyant)
+                Costs: Anchor costs are calculated by the MoorProps.getAnchorCost function using the anchor mass and type. 
+                MBL: Anchor UHC is provided as the MBL value for the point.
+                '''
+                if not aprops:
+                    aprops = Props["AnchorProps"]
+
+                props = aprops[key[6:]] # Error checking of valid keys is already done in loadPointProps
+                
+                m = props['mass'] # + <some curve>
+                cost = getAnchorCost(type = key[6:], mass = m, aprops = aprops) # other function defaults are ignored becasue mass is passed into the function
+                if sum(cost[:3]) == 0.0 and m > 0.0:
+                    raise ValueError(f"{key[6:]} anchor costs are not yet supported")
+                
+                # dtype[key] is the number of this anchor
+                pointmass = pointmass + ( dtype[key] * m )                
+                pointcost = pointcost + ( dtype[key] * sum(cost[:3])) 
+
+                if props["UHC"] > 0:
+                    pointmbl_list.append(props["UHC"] * 1000) # convert UHC from kN to N
+                else:
+                    pointinfo["Anchors"] = "UHC not included in point MBL calc as no data was provided"
 
             # buoys
             if 'num_b_' in key:
+                '''
+                Mass: Mass is calculated based on provided info and the mass vs buoyancy ratio
+                Volume: Volume is calculated based on provided info and the volume vs buoyancy ratio
+                Cost: Cost is calculated as a 3rd order polynomial function of buoyancy 
+                MBL: Buoys themselves do not contribute to the MBL, their connection components are assumed to hold the info of connection MBL.
+                '''
+                if not bprops:
+                    bprops = Props["BuoyProps"]
+
+                # dtype[key] is the number of this buoy
                 props = bprops[key[6:]] # Error checking of valid keys is already done in loadPointProps
-                # ptype["volume"] # do we handle user given mass and volume here as a buoyancy cost? 
-                pointmass = pointmass + ( ptype[key] * (props['mass'] + props['mass_b'] * props['buoyancy']) )
-                pointvol = pointvol + ( ptype[key] * (props['vol'] + props['v_b'] * props['buoyancy']) )
-                pointcost = pointcost + ( ptype[key] * (props['cost'] + props['cost_b'] * props['buoyancy'] + props['cost_b2'] * props['buoyancy']**2 + props['cost_b3'] * props['buoyancy']**3) )
+                pointmass = pointmass + ( dtype[key] * (props['mass'] + props['mass_b'] * props['buoyancy']) )
+                pointvol = pointvol + ( dtype[key] * (props['vol'] + props['v_b'] * props['buoyancy']) )
+                pointcost = pointcost + ( dtype[key] * (props['cost'] + props['cost_b'] * props['buoyancy'] + props['cost_b2'] * props['buoyancy']**2 + props['cost_b3'] * props['buoyancy']**3) )
 
             # connections
             if 'num_c_' in key:
-                props = cprops[key[6:]] # Error checking of valid keys is already done in loadPointProps
-                d = 0 # TODO: nominal size ignored for now. Need to implement list in PointProps yaml that replaces design_load var with con_size. The design_load will calculated from the mbl_d coefficient using this size list. If auto we can autosize based on attached line MBLand/or diam. 
-                pointmbl = pointdload * props['FOS']
-                pointmass = pointmass + ( ptype[key] * (props['mass'] + props['mass_d'] * d) )
-                pointvol = pointvol + ( ptype[key] * (props['vol'] + props['v_d'] * d) )
-                pointcost = pointcost + ( ptype[key] * (props['cost'] + props['cost_MBL'] * pointmbl + props['cost_MBL2'] * pointmbl**2 + props['cost_MBL3'] * pointmbl**3) )
-                pointfos = max(pointfos, props['FOS'])
+                '''
+                Mass: Mass is calculated based on provided info and the mass vs MBL (in kN) ratio
+                Volume: Volume is calculated based on provided info and the volume vs MBL (in kN) ratio
+                Cost: Cost is calculated as a 3rd order polynomial function of MBL 
+                MBL: MBL is calculated based on the design load * the provided factor of safety for the component
+                '''
+                if not cprops:
+                    cprops = Props["ConnectProps"] 
 
-        # point MBL calc for now using max FOS of components
-        pointmbl = design_load * pointfos 
+                props = cprops[key[6:]] # Error checking of valid keys is already done in loadPointProps
+                if props['MBL'] > 0.0:
+                    mbl_kN = props['MBL'] # if user provided default to this MBL (in kN)
+                else:
+                    mbl_kN = design_load * props['FOS'] # MBL in kN (for use wiuth the cost curves, which are functions of MBL in kN)
+
+                # dtype[key] is the number of this connection
+                pointmass = pointmass + ( dtype[key] * (props['mass'] + props['mass_mbl'] * mbl_kN) )
+                pointvol = pointvol + ( dtype[key] * (props['vol'] + props['v_mbl'] * mbl_kN) )
+                pointcost = pointcost + ( dtype[key] * (props['cost'] + props['cost_MBL'] * mbl_kN + props['cost_MBL2'] * mbl_kN**2 + props['cost_MBL3'] * mbl_kN**3) )
+
+                pointmbl_list.append(mbl_kN * 1000) # convert from kN to N
+
+        # point MBL is the min of all the components
+        if len(pointmbl_list) > 0:
+            pointmbl = np.min(pointmbl_list)
+        else:
+            pointmbl = 0.0
+            pointinfo["Design"] = "MBL not calculated as no data was provided"
 
         # overwrite the relevant properties for this specific point design if provided
 
-        if ptype['mass'] != 0.0:  # user input overwrites 
+        if dtype['mass'] != 0.0:  # user input overwrites 
             try:
-                pointmass = float(ptype['mass'])
+                pointmass = float(dtype['mass'])
             except:
                 raise Exception("Invalid user input for Point mass")
         
-        if ptype['volume'] != 0.0:  # user input overwrites 
+        if dtype['volume'] != 0.0:  # user input overwrites 
             try:
-                pointvol = float(ptype['volume'])
+                pointvol = float(dtype['volume'])
             except:
                 raise Exception("Invalid user input for Point volume")
         
-        if ptype['mbl'] != 0.0:  # user input overwrites 
+        if dtype['mbl'] != 0.0:  # user input overwrites 
             try:
-                pointmbl = float(ptype['mbl'])
+                pointmbl = float(dtype['mbl'])
             except:
                 raise Exception("Invalid user input for Point mbl")
         
-        if ptype['cost'] != 0.0:  # user input overwrites 
+        if dtype['cost'] != 0.0:  # user input overwrites 
             try:
-                pointcost = float(ptype['cost'])
+                pointcost = float(dtype['cost'])
             except:
                 raise Exception("Invalid user input for Point cost") 
 
-    return dict(type=pointtype, m=pointmass, v=pointvol, mbl=pointmbl, cost=pointcost)
+    return dict(type=pointtype, m=pointmass, v=pointvol, cost=pointcost, mbl=pointmbl, info=pointinfo)
 
 
 def loadPointProps(source):
@@ -1039,22 +1090,54 @@ def loadPointProps(source):
     else:
         raise Exception("loadPointProps supplied with invalid source")
     
-    # # read the Anchor dict
-    # if 'AnchorProps' in source:
-    #     AnchorProps = source['AnchorProps']
-    # else:
-    #     raise Exception("YAML file or dictionary must have a 'AnchorProps' field containing the data") # We might want to remove this requirement becasue if a user just gives point mass volume and cost they wont need a anchor dict
+    # read the Anchor dict
+    if 'AnchorProps' in source:
+        AnchorProps = source['AnchorProps']
+    else:
+        raise Exception("YAML file or dictionary must have a 'AnchorProps' field containing the data") # We might want to remove this requirement becasue if a user just gives point mass volume and cost they wont need a anchor dict
     
-    # anchor = dict()  # output dictionary combining default values with loaded coefficients
+    anchor = dict()  # output dictionary combining default values with loaded coefficients
     
-    #  # combine loaded coefficients and default values into dictionary that will be saved for each material
-    # for atype, props in AnchorProps.items():  
-    #     anchor[atype] = {}
-    #     anchor[atype]['mass'     ] = getFromDict(props, 'mass'     , default=0.0)
-    #     anchor[atype]['cost_m'   ] = getFromDict(props, 'cost_m'   , default=0.0)
-    #     anchor[atype]['cost_m2'  ]= getFromDict(props,  'cost_m2'  , default=0.0)
-    #     anchor[atype]['cost_m3'  ] = getFromDict(props, 'cost_m3'  , default=0.0)
-    #     anchor[atype]['cost'     ] = getFromDict(props, 'cost'     , default=0.0)
+     # combine loaded coefficients and default values into dictionary that will be saved for each material
+    for atype, props in AnchorProps.items():  
+        anchor[atype] = {}
+
+                # # these are not yet supported, but will hold the coeficients currently in MoorProps.getAnchorCost and MoorProps.getAnchorMass
+                # anchor[atype]['a_softclay'  ] = getFromDict(props, 'a_softclay'  , default=0.0)
+                # anchor[atype]['b_softclay'  ] = getFromDict(props, 'b_softclay'  , default=0.0)
+                # anchor[atype]['c_softclay'  ] = getFromDict(props, 'c_softclay'  , default=0.0)
+                # anchor[atype]['d_softclay'  ] = getFromDict(props, 'd_softclay'  , default=0.0)
+                # anchor[atype]['a_medclay'   ] = getFromDict(props, 'a_medclay'   , default=0.0)
+                # anchor[atype]['b_medclay'   ] = getFromDict(props, 'b_medclay'   , default=0.0)
+                # anchor[atype]['c_medclay'   ] = getFromDict(props, 'c_medclay'   , default=0.0)
+                # anchor[atype]['d_medclay'   ] = getFromDict(props, 'd_medclay'   , default=0.0)
+                # anchor[atype]['a_hardclay'  ] = getFromDict(props, 'a_hardclay'  , default=0.0)
+                # anchor[atype]['b_hardclay'  ] = getFromDict(props, 'b_hardclay'  , default=0.0)
+                # anchor[atype]['c_hardclay'  ] = getFromDict(props, 'c_hardclay'  , default=0.0)
+                # anchor[atype]['d_hardclay'  ] = getFromDict(props, 'd_hardclay'  , default=0.0)
+                # anchor[atype]['a_sand'      ] = getFromDict(props, 'a_sand'      , default=0.0)
+                # anchor[atype]['b_sand'      ] = getFromDict(props, 'b_sand'      , default=0.0)
+                # anchor[atype]['c_sand'      ] = getFromDict(props, 'c_sand'      , default=0.0)
+                # anchor[atype]['d_sand'      ] = getFromDict(props, 'd_sand'      , default=0.0)
+                # anchor[atype]['t2_m_ratio'  ] = getFromDict(props, 't2_m_ratio'  , default=0.0)
+                # anchor[atype]['t2_m_ratio'  ] = getFromDict(props, 't2_m_ratio'  , default=0.0)
+                # anchor[atype]['fos_x'       ] = getFromDict(props, 'fos_x'       , default=0.0)
+                # anchor[atype]['fos_x'       ] = getFromDict(props, 'fos_x'       , default=0.0)
+                # anchor[atype]['area'        ] = getFromDict(props, 'area'        , default=0.0)
+        anchor[atype]['UHC'         ] = getFromDict(props, 'UHC'         , default=0.0)
+        anchor[atype]['mass'        ] = getFromDict(props, 'mass'        , default=0.0)
+        anchor[atype]['matcost_m'   ] = getFromDict(props, 'matcost_m'   , default=0.0)
+        anchor[atype]['matcost_m2'  ] = getFromDict(props, 'matcost_m2'  , default=0.0)
+        anchor[atype]['matcost_m3'  ] = getFromDict(props, 'matcost_m3'  , default=0.0)
+        anchor[atype]['matcost'     ] = getFromDict(props, 'matcost'     , default=0.0)
+        anchor[atype]['instcost_m'  ] = getFromDict(props, 'instcost_m'  , default=0.0)
+        anchor[atype]['instcost_m2' ] = getFromDict(props, 'instcost_m2' , default=0.0)
+        anchor[atype]['instcost_m3' ] = getFromDict(props, 'instcost_m3' , default=0.0)
+        anchor[atype]['instcost'    ] = getFromDict(props, 'instcost'    , default=0.0)
+        anchor[atype]['decomcost_m' ] = getFromDict(props, 'decomcost_m' , default=0.0)
+        anchor[atype]['decomcost_m2'] = getFromDict(props, 'decomcost_m2', default=0.0)
+        anchor[atype]['decomcost_m3'] = getFromDict(props, 'decomcost_m3', default=0.0)
+        anchor[atype]['decomcost'   ] = getFromDict(props, 'decomcost'   , default=0.0)
 
     # read the Buoy dict
     if 'BuoyProps' in source:
@@ -1089,43 +1172,43 @@ def loadPointProps(source):
     for ctype, props in ConnectProps.items():  
         connect[ctype] = {}
         connect[ctype]['mass'     ] = getFromDict(props, 'mass'     , default=0.0)
-        connect[ctype]['mass_d'   ] = getFromDict(props, 'mass_d'   , default=0.0)  
+        connect[ctype]['mass_mbl' ] = getFromDict(props, 'mass_mbl' , default=0.0)  
         connect[ctype]['vol'      ] = getFromDict(props, 'vol'      , default=0.0)
-        connect[ctype]['v_d'      ] = getFromDict(props, 'v_d'      , default=0.0)
-        connect[ctype]['MBL'      ] = getFromDict(props, 'MBL'      , default=0.0)
-        connect[ctype]['MBL_m'    ] = getFromDict(props, 'MBL_m'    , default=0.0)
-        connect[ctype]['FOS'      ] = getFromDict(props, 'FOS'      , default=1.0)
+        connect[ctype]['v_mbl'    ] = getFromDict(props, 'v_mbl'    , default=0.0)
+        connect[ctype]['MBL'      ] = getFromDict(props, 'MBL'      , default=0.0) # overrides FOS * design load if >0
+        connect[ctype]['FOS'      ] = getFromDict(props, 'FOS'      , default=1.0) # defaults to 1, to return design load as MBL
         connect[ctype]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
         connect[ctype]['cost_MBL2'] = getFromDict(props, 'cost_MBL2', default=0.0)
         connect[ctype]['cost_MBL3'] = getFromDict(props, 'cost_MBL3', default=0.0)
         connect[ctype]['cost'     ] = getFromDict(props, 'cost'     , default=0.0)
 
     # read the point design dict
-    if 'PointProps' in source:
-        PointProps = source['PointProps']
+    if 'DesignProps' in source:
+        DesignProps = source['DesignProps']
     else:
-        raise Exception("YAML file or dictionary must have a 'PointProps' field containing the data")
+        raise Exception("YAML file or dictionary must have a 'DesignProps' field containing the data")
 
     point = dict()  # output dictionary combining default values with loaded designs
     
     # combine loaded coefficients and default values into dictionary that will be saved for each material
-    for ptype, props in PointProps.items():  
-        point[ptype] = {}
+    for dtype, props in DesignProps.items():  
+        point[dtype] = {}
 
+        # load the number of each component in the design
         for key in props.keys():
-            # # handle the numbers of each Anchor type
-            # if 'num_a_' in key:
-            #     atype = key[6:]
-            #     if atype in AnchorProps.keys():
-            #         point[ptype][key] = getFromDict(props, key, default=0) 
-            #     else:
-            #         raise Exception(f'Anchor type {atype} not found in AnchorProps dictionary')
+            # handle the numbers of each Anchor type
+            if 'num_a_' in key:
+                atype = key[6:]
+                if atype in AnchorProps.keys():
+                    point[dtype][key] = getFromDict(props, key, default=0) 
+                else:
+                    raise Exception(f'Anchor type {atype} not found in AnchorProps dictionary')
                 
             # handle the numbers of each Buoy type
             if 'num_b_' in key:
                 btype = key[6:]
                 if btype in BuoyProps.keys():
-                    point[ptype][key] = getFromDict(props, key, default=0) 
+                    point[dtype][key] = getFromDict(props, key, default=0) 
                 else:
                     raise Exception(f'Buoy type {btype} not found in BuoyProps dictionary')
 
@@ -1133,22 +1216,18 @@ def loadPointProps(source):
             if 'num_c_' in key:
                 ctype = key[6:]
                 if ctype in ConnectProps.keys():
-                    point[ptype][key] = getFromDict(props, key, default=0) 
+                    point[dtype][key] = getFromDict(props, key, default=0) 
                 else:
                     raise Exception(f'Connection type {ctype} not found in ConnectProps dictionary')
 
-        point[ptype]['design_load'   ] = getFromDict(props, 'design_load'   , default=-1) # default of -1 indicates automatically size
-        # TODO: anchor mbl to auto size as well
-        point[ptype]['buoyancy'      ] = getFromDict(props, 'buoyancy'      , default=0.0)
-        point[ptype]['cost'          ] = getFromDict(props, 'cost'          , default=0.0) # these are written based on data from ConnectProps unless user provided
-        point[ptype]['mass'          ] = getFromDict(props, 'mass'          , default=0.0) # these are written based on data from ConnectProps unless user provided
-        point[ptype]['volume'        ] = getFromDict(props, 'volume'        , default=0.0) # these are written based on data from ConnectProps unless user provided
-        point[ptype]['mbl'           ] = getFromDict(props, 'mbl'           , default=0.0) # these are written based on data from ConnectProps unless user provided
+        # load general design properties
+        point[dtype]['design_load'   ] = getFromDict(props, 'design_load'   , default=0.0) # these are written based on data provided to getPointProps unless user provided
+        point[dtype]['mass'          ] = getFromDict(props, 'mass'          , default=0.0) # these are written based on data from ConnectProps unless user provided
+        point[dtype]['volume'        ] = getFromDict(props, 'volume'        , default=0.0) # these are written based on data from ConnectProps unless user provided
+        point[dtype]['mbl'           ] = getFromDict(props, 'mbl'           , default=0.0) # these are written based on data from ConnectProps unless user provided
+        point[dtype]['cost'          ] = getFromDict(props, 'cost'          , default=0.0) # these are written based on data from ConnectProps unless user provided
 
-    # Point ABC stuff
-    # output[ptype]['anchorProps' ] = anchor
-
-    return dict(BuoyProps = buoy, ConnectProps = connect, PointProps = point)
+    return dict(AnchorProps = anchor, BuoyProps = buoy, ConnectProps = connect, DesignProps = point)
 
 
 def getFromDict(dict, key, shape=0, dtype=float, default=None):
