@@ -121,8 +121,6 @@ lineProps:
     mass_d2   :  496       # linear mass density per diameter^2 [kg/m/m^2]
     MBL_d3    :  651e6     # minimum breaking load per diameter^3 [N/m^2]
     MBL_d2    :  580e6     # minimum breaking load per diameter^2 [N/m^2] 
-    MBL_dmin  :  0.05      # minimum valid diameter for the MBL curve (values < 0 ignored)
-    MBL_dmax  :  0.175     # maximum valid diameter for the MBL curve (values < 0 ignored) 
     EA_MBL    :  56        # quasi-static stiffness per MBL [N/N]
     EAd_MBL   :  59        # dynamic stiffness per MBL [N/N]
     EAd_MBL_Lm : 54.0      # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
