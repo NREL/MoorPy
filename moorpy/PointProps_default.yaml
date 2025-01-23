@@ -171,41 +171,41 @@ ConnectProps:
 DesignProps: # These are data structures that hold information of what is in a point. Any point can have any number of Acnhor, Buoy, and Connection types as described in the respective props section. 
 
   general         :  # TODO: This is a place holder, it should be replaced by more detailed designs. VA-02 design from pg 132 of Vryhof Manual in here for now. 
-    num_c_shackle   : 1  # number of shackles in this connection type
-    num_c_connector : 2  # number of pear or C connectors in this connection type
-    num_c_swivel    : 1  # number of swivels in this connection type
-    num_c_misc      : 3  # number of other hardware components in this connection type (typically chain links)
+    num_c_shackle   : 1  # number of shackles in this design
+    num_c_connector : 2  # number of pear or C connectors in this design
+    num_c_swivel    : 1  # number of swivels in this design
+    num_c_misc      : 3  # number of other hardware components in this design (typically chain links)
 
   # Chain2Chain     :
-  #   num_shackle    :   # number of shackles in this connection type
-  #   num_connector  :   # number of pear or C connectors in this connection type
-  #   num_swivel     :   # number of swivels in this connection type
-  #   num_triplate   :   # number of tri-plates in this connection type
-  #   num_other      :   # number of other hardware components in this connection type (typically chain links)
-  #   num_buoy       :   # number of buoys in this connection type
+  #   num_shackle    :   # number of shackles in this design
+  #   num_connector  :   # number of pear or C connectors in this design
+  #   num_swivel     :   # number of swivels in this design
+  #   num_triplate   :   # number of tri-plates in this design
+  #   num_other      :   # number of other hardware components in this design (typically chain links)
+  #   num_buoy       :   # number of buoys in this design
 
   # Chain2Rope      :
-  #   num_shackle    :   # number of shackles in this connection type
-  #   num_connector  :   # number of pear or C connectors in this connection type
-  #   num_swivel     :   # number of swivels in this connection type
-  #   num_triplate   :   # number of tri-plates in this connection type
-  #   num_other      :   # number of other hardware components in this connection type (typically chain links)
-  #   num_buoy       :   # number of buoys in this connection type
+  #   num_shackle    :   # number of shackles in this design
+  #   num_connector  :   # number of pear or C connectors in this design
+  #   num_swivel     :   # number of swivels in this design
+  #   num_triplate   :   # number of tri-plates in this design
+  #   num_other      :   # number of other hardware components in this design (typically chain links)
+  #   num_buoy       :   # number of buoys in this design
 
   # Rope2Rope       :
-  #   num_shackle    :   # number of shackles in this connection type
-  #   num_connector  :   # number of pear or C connectors in this connection type
-  #   num_swivel     :   # number of swivels in this connection type
-  #   num_triplate   :   # number of tri-plates in this connection type
-  #   num_other      :   # number of other hardware components in this connection type (typically chain links)
-  #   num_buoy       :   # number of buoys in this connection type
+  #   num_shackle    :   # number of shackles in this design
+  #   num_connector  :   # number of pear or C connectors in this design
+  #   num_swivel     :   # number of swivels in this design
+  #   num_triplate   :   # number of tri-plates in this design
+  #   num_other      :   # number of other hardware components in this design (typically chain links)
+  #   num_buoy       :   # number of buoys in this design
 
   # Chain2Anchor    :
-  #   num_shackle    :   # number of shackles in this connection type
-  #   num_connector  :   # number of pear or C connectors in this connection type
-  #   num_swivel     :   # number of swivels in this connection type
-  #   num_triplate   :   # number of tri-plates in this connection type
-  #   num_other      :   # number of other hardware components in this connection type (typically chain links)
-  #   num_buoy       :   # number of buoys in this connection type
+  #   num_shackle    :   # number of shackles in this design
+  #   num_connector  :   # number of pear or C connectors in this design
+  #   num_swivel     :   # number of swivels in this design
+  #   num_triplate   :   # number of tri-plates in this design
+  #   num_other      :   # number of other hardware components in this design (typically chain links)
+  #   num_buoy       :   # number of buoys in this design
   
   # # etc.
