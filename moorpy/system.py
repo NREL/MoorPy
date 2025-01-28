@@ -11,8 +11,7 @@ import warnings
 from os import path
 
 from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import spsolve
-from scipy.sparse.linalg.dsolve import MatrixRankWarning
+from scipy.sparse.linalg import spsolve, MatrixRankWarning
 
 from moorpy.body import Body
 from moorpy.point import Point
