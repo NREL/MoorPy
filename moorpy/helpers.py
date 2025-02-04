@@ -960,19 +960,22 @@ def getPointProps(weight = None, rho = 1025.0, g = 9.81, design_load = None, des
 
                 props = aprops[key[6:]] # Error checking of valid keys is already done in loadPointProps
                 
-                m = props['mass'] # + <some curve>
-                cost = getAnchorCost(type = key[6:], mass = m, aprops = aprops) # other function defaults are ignored becasue mass is passed into the function
-                if sum(cost[:3]) == 0.0 and m > 0.0:
-                    raise ValueError(f"{key[6:]} anchor costs are not yet supported")
+                m = props['mass']
+                a = props['area']
+                cost = getAnchorCost(type = key[6:], mass = m, area = a, aprops = aprops) # other function defaults are ignored becasue mass is passed into the function
+                if sum(cost[:3]) == 0.0 and (m > 0.0 or a > 0.0):
+                    raise ValueError(f"{key[6:]} anchor costs are not yet supported when mass = {m} kg and area = {a} m^2")
                 
                 # dtype[key] is the number of this anchor
                 pointmass = pointmass + ( dtype[key] * m )                
                 pointcost = pointcost + ( dtype[key] * sum(cost[:3])) 
+                if a > 0.0:
+                    pointinfo["Anchors - Area"] = a
 
                 if props["UHC"] > 0:
                     pointmbl_list.append(props["UHC"] * 1000) # convert UHC from kN to N
                 else:
-                    pointinfo["Anchors"] = "UHC not included in point MBL calc as no data was provided"
+                    pointinfo["Anchors - Note"] = "UHC not included in point MBL calc as no data was provided"
 
             # buoys
             if 'num_b_' in key:
@@ -1102,41 +1105,29 @@ def loadPointProps(source):
     for atype, props in AnchorProps.items():  
         anchor[atype] = {}
 
-                # # these are not yet supported, but will hold the coeficients currently in MoorProps.getAnchorCost and MoorProps.getAnchorMass
-                # anchor[atype]['a_softclay'  ] = getFromDict(props, 'a_softclay'  , default=0.0)
-                # anchor[atype]['b_softclay'  ] = getFromDict(props, 'b_softclay'  , default=0.0)
-                # anchor[atype]['c_softclay'  ] = getFromDict(props, 'c_softclay'  , default=0.0)
-                # anchor[atype]['d_softclay'  ] = getFromDict(props, 'd_softclay'  , default=0.0)
-                # anchor[atype]['a_medclay'   ] = getFromDict(props, 'a_medclay'   , default=0.0)
-                # anchor[atype]['b_medclay'   ] = getFromDict(props, 'b_medclay'   , default=0.0)
-                # anchor[atype]['c_medclay'   ] = getFromDict(props, 'c_medclay'   , default=0.0)
-                # anchor[atype]['d_medclay'   ] = getFromDict(props, 'd_medclay'   , default=0.0)
-                # anchor[atype]['a_hardclay'  ] = getFromDict(props, 'a_hardclay'  , default=0.0)
-                # anchor[atype]['b_hardclay'  ] = getFromDict(props, 'b_hardclay'  , default=0.0)
-                # anchor[atype]['c_hardclay'  ] = getFromDict(props, 'c_hardclay'  , default=0.0)
-                # anchor[atype]['d_hardclay'  ] = getFromDict(props, 'd_hardclay'  , default=0.0)
-                # anchor[atype]['a_sand'      ] = getFromDict(props, 'a_sand'      , default=0.0)
-                # anchor[atype]['b_sand'      ] = getFromDict(props, 'b_sand'      , default=0.0)
-                # anchor[atype]['c_sand'      ] = getFromDict(props, 'c_sand'      , default=0.0)
-                # anchor[atype]['d_sand'      ] = getFromDict(props, 'd_sand'      , default=0.0)
-                # anchor[atype]['t2_m_ratio'  ] = getFromDict(props, 't2_m_ratio'  , default=0.0)
-                # anchor[atype]['t2_m_ratio'  ] = getFromDict(props, 't2_m_ratio'  , default=0.0)
-                # anchor[atype]['fos_x'       ] = getFromDict(props, 'fos_x'       , default=0.0)
-                # anchor[atype]['fos_x'       ] = getFromDict(props, 'fos_x'       , default=0.0)
-                # anchor[atype]['area'        ] = getFromDict(props, 'area'        , default=0.0)
         anchor[atype]['UHC'         ] = getFromDict(props, 'UHC'         , default=0.0)
         anchor[atype]['mass'        ] = getFromDict(props, 'mass'        , default=0.0)
+        anchor[atype]['area'        ] = getFromDict(props, 'area'        , default=0.0)
         anchor[atype]['matcost_m'   ] = getFromDict(props, 'matcost_m'   , default=0.0)
         anchor[atype]['matcost_m2'  ] = getFromDict(props, 'matcost_m2'  , default=0.0)
         anchor[atype]['matcost_m3'  ] = getFromDict(props, 'matcost_m3'  , default=0.0)
+        anchor[atype]['matcost_a'   ] = getFromDict(props, 'matcost_a'   , default=0.0)
+        anchor[atype]['matcost_a2'  ] = getFromDict(props, 'matcost_a2'  , default=0.0)
+        anchor[atype]['matcost_a3'  ] = getFromDict(props, 'matcost_a3'  , default=0.0)
         anchor[atype]['matcost'     ] = getFromDict(props, 'matcost'     , default=0.0)
         anchor[atype]['instcost_m'  ] = getFromDict(props, 'instcost_m'  , default=0.0)
         anchor[atype]['instcost_m2' ] = getFromDict(props, 'instcost_m2' , default=0.0)
         anchor[atype]['instcost_m3' ] = getFromDict(props, 'instcost_m3' , default=0.0)
+        anchor[atype]['instcost_a'  ] = getFromDict(props, 'instcost_a'  , default=0.0)
+        anchor[atype]['instcost_a2' ] = getFromDict(props, 'instcost_a2' , default=0.0)
+        anchor[atype]['instcost_a3' ] = getFromDict(props, 'instcost_a3' , default=0.0)
         anchor[atype]['instcost'    ] = getFromDict(props, 'instcost'    , default=0.0)
         anchor[atype]['decomcost_m' ] = getFromDict(props, 'decomcost_m' , default=0.0)
         anchor[atype]['decomcost_m2'] = getFromDict(props, 'decomcost_m2', default=0.0)
         anchor[atype]['decomcost_m3'] = getFromDict(props, 'decomcost_m3', default=0.0)
+        anchor[atype]['decomcost_a' ] = getFromDict(props, 'decomcost_a' , default=0.0)
+        anchor[atype]['decomcost_a2'] = getFromDict(props, 'decomcost_a2', default=0.0)
+        anchor[atype]['decomcost_a3'] = getFromDict(props, 'decomcost_a3', default=0.0)
         anchor[atype]['decomcost'   ] = getFromDict(props, 'decomcost'   , default=0.0)
 
     # read the Buoy dict
