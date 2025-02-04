@@ -1122,19 +1122,20 @@ def eval_func_cat(X, args):
     SQRT1VFMinWL_HF2 = np.sqrt( 1.0 + VFMinWL_HF2 )
     
     # simple inelastic approximation of arc lenght of a parabola with exactly zero laid length
-    s = np.sqrt(4*XF**2 + 16*ZF**2)  # some constanst
-    lp = s/4 + XF**2/4/ZF*np.log((4*ZF + s)/2/ZF)  # length of parabola (slight underestimate vs lenght of catenary)
+    mm = ZF/XF**2  # parabola coefficient z = mx^2
+    lp = (2*mm*XF*np.sqrt(4*mm**2*XF**2 + 1) + np.arcsinh(2*mm*XF))/(4*mm)  # arc length
+    
     d = np.linalg.norm([XF, ZF])  # distance from points 
     
     alpha_rad = np.radians(alpha)  # convert to radians for convenience
     sin_alpha = np.sin(alpha_rad)
     cos_alpha = np.cos(alpha_rad)
     
-    # this is a crude check that nothing should be laying along the seabed:ZF/HF >> 0 and L-d << (lp-d)
-
     # determine line profile type
-    if (hA > 0.0  or  W < 0.0  or  VFMinWL > sin_alpha/cos_alpha
-        or (ZF/XF > 0.1 and L-d < 0.001*(lp-d)) ): # no portion of the line rests on the seabed
+    if (hA > 0.0                    # no portion of the line rests on the seabed
+        or W < 0.0  
+        or VFMinWL > sin_alpha/cos_alpha
+        or (ZF/XF > 0.1 and L-d < 0.001*(lp-d)) ): # crude check that nothing should be laying along the seabed
         ProfileType = 1
     elif not alpha==0:              # a portion of line rests along a *sloped* seabed
         ProfileType = 7
@@ -1535,12 +1536,17 @@ if __name__ == "__main__":
     #   CB=-897.8894086817654, alpha=0, HF0=1045436.0319202082, VF0=4280849.602990574, Tol=0.0001, MaxIter=100, depth=800, plots=1)
     
     
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(239.68133374054617, 5.572397767284315, 239.67708907645783, 2003669644.0239, 3993.8681384566403, CB=0.0, alpha=0.7703995482284995, HF0=265897.4720034979, VF0=3575.475193332911, Tol=0.0001, MaxIter=100, depth=835.6052666569179, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(239.68133374054617, 5.572397767284315, 239.67708907645783, 2003669644.0239, 3993.8681384566403, CB=0.0, alpha=0.7703995482284995, HF0=265897.4720034979, VF0=3575.475193332911, Tol=0.0001, MaxIter=100, depth=835.6052666569179, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(242.43063215088046, 16.438515754164882, 242.94180148966598, 1977564385.9456, 3941.831324315529, CB=0.0, alpha=3.879122219600495, HF0=400446.3427158061, VF0=26452.686481212237, Tol=0.0001, MaxIter=100, depth=820.2155229016184, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(113.98763202381406, 135.64003587014417, 222.9088982113214, 1799620189.0374997, 3587.1279256290677, CB=0.0, alpha=-1.6131140432335964, HF0=737382.1987996304, VF0=1014826.8890259801, Tol=0.0001, MaxIter=100, depth=914.6515127916663, plots=1)
     
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(274.9, 15.6, 328.5, 528887323., -121., 
     #         CB=-48., alpha=0, HF0=17939., VF0=20596., Tol=2e-05, MaxIter=100, plots=1)
+    
+    
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(997.547, 186.0, 1016.97134, 799738627.1597824, 1594.059185077651, CB=0.0, alpha=0.0, HF0=314561.120450163, VF0=523671.07753570913, Tol=2e-05, MaxIter=100, depth=200, nNodes=100, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(997.5168, 186.0, 1016.97134, 801228558.5672204, 1597.0290198975624, CB=0.0, alpha=0.0, HF0=315147.1684089979, VF0=524646.7105467543, Tol=2e-05, MaxIter=100, depth=200, nNodes=100, plots=1)
+    
     
     
     # First attempt's iterations are as follows:
