@@ -378,16 +378,8 @@ class Subsystem(System, Line):
         for i, line in enumerate(self.lineList):
             
             # color and width settings
-            if color == 'self':
-                colorplot = line.color  # attempt to allow custom colors
-                lw = line.lw
-            elif color == None:
-                colorplot = [0.3, 0.3, 0.3]  # if no color, default to grey
-                lw = 1
-            else:
-                colorplot = color
-                lw = 1
-            
+            colorplot, lw = Subsystem.getLineColor(self, line, color = color)
+                
             # get the Line's local coordinates
             Xs0, Ys0, Zs, tensions = line.getLineCoords(Time)
             
@@ -419,20 +411,38 @@ class Subsystem(System, Line):
                 ax.scatter([Xs2d[0], Xs2d[-1]], [Ys2d[0], Ys2d[-1]], color = colorplot)
 
 
+    def getLineColor(self, line, color = 'k'):
+        # color and width settings
+        if 'chain' in line.type['material']:
+            color = [.1,.0,.0]  # attempt to allow custom colors
+            lw = line.lw
+        elif 'rope' in line.type['material'] or 'polyester' in line.type['material']:
+            color = [.3,.5,.5]  # attempt to allow custom colors
+            lw = line.lw
+        elif 'nylon' in line.type['material']:
+            color = [.8,.8,.2]  # attempt to allow custom colors
+            lw = line.lw
+        elif 'buoy' in line.type['material']:
+            color = [.6,.6,.0]   # attempt to allow custom colors
+            lw = line.lw
+        elif color == 'self':
+            color = line.color  # attempt to allow custom colors
+            lw = line.lw
+        elif color == None:
+            color = [0.3, 0.3, 0.3]  # if no color, default to grey
+            lw = 1
+        else:
+            lw = 1
+        
+        return color, lw
+    
     def drawLine(self, Time, ax, color="k", endpoints=False, shadow=True, colortension=False, cmap_tension='rainbow'):
         '''wrapper to System.plot with some transformation applied'''
         
         for i, line in enumerate(self.lineList):
             
             # color and width settings
-            if color == 'self':
-                color = line.color  # attempt to allow custom colors
-                lw = line.lw
-            elif color == None:
-                color = [0.3, 0.3, 0.3]  # if no color, default to grey
-                lw = 1
-            else:
-                lw = 1
+            color, lw = Subsystem.getLineColor(self, line, color = color)
             
             # get the Line's local coordinates
             Xs0, Ys0, Zs, tensions = line.getLineCoords(Time)
