@@ -447,6 +447,7 @@ class Line():
         linebit = []  # make empty list to hold plotted lines, however many there are
         
         Xs, Ys, Zs, Ts = self.getLineCoords(Time)
+        color, lw = Line.getLineColor(self, color)
         
         if self.isRod > 0:
             
@@ -455,9 +456,9 @@ class Line():
             Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] 
         
             for i in range(int(len(Xs)/2-1)):
-                linebit.append(ax.plot(Xs2d[2*i:2*i+2]    ,Ys2d[2*i:2*i+2]    , lw=0.5, color=color))  # side edges
-                linebit.append(ax.plot(Xs2d[[2*i,2*i+2]]  ,Ys2d[[2*i,2*i+2]]  , lw=0.5, color=color))  # end A edges
-                linebit.append(ax.plot(Xs2d[[2*i+1,2*i+3]],Ys2d[[2*i+1,2*i+3]], lw=0.5, color=color))  # end B edges
+                linebit.append(ax.plot(Xs2d[2*i:2*i+2]    ,Ys2d[2*i:2*i+2]    , lw=lw, color=color))  # side edges
+                linebit.append(ax.plot(Xs2d[[2*i,2*i+2]]  ,Ys2d[[2*i,2*i+2]]  , lw=lw, color=color))  # end A edges
+                linebit.append(ax.plot(Xs2d[[2*i+1,2*i+3]],Ys2d[[2*i+1,2*i+3]], lw=lw, color=color))  # end B edges
         
         # drawing lines...
         else:            
@@ -477,7 +478,7 @@ class Line():
                     rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
                     linebit.append(ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba))
             else:
-                linebit.append(ax.plot(Xs2d, Ys2d, lw=linewidth, color=color, label=label, alpha=alpha)) # previously had lw=1 (linewidth)
+                linebit.append(ax.plot(Xs2d, Ys2d, lw=lw, color=color, label=label, alpha=alpha)) # previously had lw=1 (linewidth)
             
             if len(plotnodes) > 0:
                 for i,node in enumerate(plotnodes):
@@ -490,7 +491,30 @@ class Line():
             
         return linebit
 
-    
+    def getLineColor(self, color):
+        # color and width settings
+        if 'chain' in self.type['material']:
+            color = [.1,.0,.0]  # attempt to allow custom colors
+            lw = self.lw
+        elif 'rope' in self.type['material'] or 'polyester' in self.type['material']:
+            color = [.3,.5,.5]  # attempt to allow custom colors
+            lw = self.lw
+        elif 'nylon' in self.type['material']:
+            color = [.8,.8,.2]  # attempt to allow custom colors
+            lw = self.lw
+        elif 'buoy' in self.type['material']:
+            color = [.6,.6,.0]   # attempt to allow custom colors
+            lw = self.lw
+        elif color == 'self':
+            color = self.color  # attempt to allow custom colors
+            lw = self.lw
+        elif color == None:
+            color = [0.3, 0.3, 0.3]  # if no color, default to grey
+            lw = 1
+        else:
+            lw = 1
+        
+        return color, lw
 
     def drawLine(self, Time, ax, color="k", endpoints=False, shadow=True, colortension=False, cmap_tension='rainbow'):
         '''Draw the line in 3D
@@ -521,14 +545,7 @@ class Line():
         if not self.show:  # exit if this line isn't set to be shown
             return 0
         
-        if color == 'self':
-            color = self.color  # attempt to allow custom colors
-            lw = self.lw
-        elif color == None:
-            color = [0.3, 0.3, 0.3]  # if no color, default to grey
-            lw = 1
-        else:
-            lw = 1
+        color, lw = Line.getLineColor(self, color)
         
         linebit = []  # make empty list to hold plotted lines, however many there are
         
