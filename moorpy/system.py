@@ -14,6 +14,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 from scipy.sparse.linalg.dsolve import MatrixRankWarning
 
+import moorpy
 from moorpy.body import Body
 from moorpy.point import Point
 from moorpy.line import Line
@@ -1405,16 +1406,24 @@ class System():
             L.append("ID    LineType      AttachA  AttachB  UnstrLen  NumSegs  LineOutputs")
             L.append("(#)    (name)        (#)      (#)       (m)       (-)     (-)")
             
-            for i,line in enumerate(self.lineList):
+            def Lines_append(line_dL, flag, connection_points, line, L, i, rod_ends):
                 nSegs = int(np.ceil(line.L/line_dL)) if line_dL>0 else line.nNodes-1  # if target dL given, set nSegs based on it instead of line.nNodes
                 if connection_points[i,0] < 0:
                     attach = ['A', 'B']
                     L.append("{:<4d} {:<15} {}   {}   {:8.3f}   {:4d}       {}".format(
-                        line.number, line.number - 1, 'R'+str(int(-connection_points[i,0]))+attach[int(rod_ends[i,0])], 'R' +str(int(-connection_points[i,1])) +attach[int(rod_ends[i,1])], line.L, nSegs, flag))
-                  
+                                    line.number, line.number - 1, 'R'+str(int(-connection_points[i,0]))+attach[int(rod_ends[i,0])], 'R' +str(int(-connection_points[i,1])) +attach[int(rod_ends[i,1])], line.L, nSegs, flag))
+                            
                 else:
                     L.append("{:<4d} {:<15} {:^5d}   {:^5d}   {:8.3f}   {:4d}       {}".format(
-                             line.number, line.type['name'], int(connection_points[i,0]), int(connection_points[i,1]), line.L, nSegs, flag))
+                                        line.number, line.type['name'], int(connection_points[i,0]), int(connection_points[i,1]), line.L, nSegs, flag))
+                return L
+            
+            for i, possible_line in enumerate(self.lineList):
+                if isinstance(possible_line, type(moorpy.subsystem.Subsystem())): # is a subsystem
+                    for line in possible_line.lineList:
+                        L = Lines_append(line_dL, flag, connection_points, line, L, i, rod_ends)
+                else: # is a line
+                    L = Lines_append(line_dL, flag, connection_points, possible_line, L, i, rod_ends)
                 
             
             L.append("---------------------- OPTIONS ------------------------------------------------------")
@@ -1443,9 +1452,7 @@ class System():
                     out.write(L[x])
                     out.write('\n')
         
-            print('Successfully written '+fileName +' input file using MoorDyn v2')
-    
-    
+            print('Successfully written '+fileName +' input file using MoorDyn v2')  
     
     def getDOFs(self):
         '''returns updated nDOFs and nCpldDOFs if the body and point types ever change
@@ -1503,10 +1510,10 @@ class System():
             
         for point in self.pointList:
             point.setPosition(point.r)
-            
+        
         for line in self.lineList:
             line.staticSolve(profiles=1)  # flag to enable additional line outputs used for plotting, tension results, etc.
-            
+          
         for point in self.pointList:
             point.getForces()
             
@@ -1515,10 +1522,9 @@ class System():
             
         # draw initial mooring system if desired
         if plots==1:
-            self.plot(title="Mooring system at initialization")
-    
+            self.plot(title="Mooring system at initialization")  
  
- 
+
     def transform(self, trans=[0,0], rot=0, scale=[1,1,1]):
         '''Applies scaling (can flip if negative), rotation, and translations (in that order) to the mooring system positions
 
@@ -3355,20 +3361,9 @@ class System():
             if self.qs==0 and len(line.Tdata) == 0:
                 pass
             else:
+                
                 j = j + 1
-                if color==None and 'material' in line.type:
-                    if 'chain' in line.type['material']:
-                        line.drawLine(time, ax, color=[.1, 0, 0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                    elif 'rope' in line.type['material'] or 'polyester' in line.type['material']:
-                        line.drawLine(time, ax, color=[.3,.5,.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                    elif 'nylon' in line.type['material']:
-                        line.drawLine(time, ax, color=[.8,.8,.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                    elif 'buoy' in line.type['material']:
-                        line.drawLine(time, ax, color=[.6,.6,.0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                    else:
-                        line.drawLine(time, ax, color=[0.5,0.5,0.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
-                else:
-                    line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                line.drawLine(time, ax, color=color, endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 
                 # Add line labels 
                 if linelabels == True:
