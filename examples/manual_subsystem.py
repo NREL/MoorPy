@@ -27,7 +27,7 @@ ss = Subsystem(depth=depth, spacing=rAnchor, rBfair=[10,0,-20])
 
 # set up the line types
 ss.setLineType(180, 'chain', name='one')
-ss.setLineType( 50, 'chain', name='two')
+ss.setLineType( 50, 'nylon', name='two')
 
 # set up the lines and points and stuff
 lengths = [350, 300]
@@ -46,7 +46,6 @@ ss.plot2d()
 fig = plt.figure()
 ax = plt.axes(projection='3d')
 ss.drawLine(0, ax, color='r')
-
 
 # ===== Now a Subsystem in a larger System with a floating body =====
 
@@ -73,19 +72,19 @@ for i, angle in enumerate(angles):
     ms.addLine(lineLength, typeName, pointA=2*i+1, pointB=2*i+2)
 
 # ----- Now add a SubSystem line! -----
-ss = Subsystem(mooringSys=ms, depth=depth, spacing=rAnchor, rBfair=[10,0,-20])
+ss = Subsystem(mooringSys=ms, depth=depth, spacing=rAnchor, rBfair=[10, 0,-20])
 
 # set up the line types
 ms.setLineType(180, 'chain', name='one')
-ms.setLineType( 50, 'chain', name='two')
+ms.setLineType( 100, 'nylon', name='two')
 
 # set up the lines and points and stuff
-ls = [350, 300]
+ls = [550, 100]
 ts = ['one', 'two']
 ss.makeGeneric(lengths=ls, types=ts)
 
 # add points that the subSystem will attach to...
-ms.addPoint(1, [-rAnchor, 100, -depth])   # Point 5 - create anchor point (type 0, fixed)
+ms.addPoint(1, [-rAnchor, 0, -depth])   # Point 5 - create anchor point (type 0, fixed)
 ms.addPoint(1, [ -rFair ,   0,  zFair])   # Point 6 - create fairlead point (type 0, fixed)
 ms.bodyList[0].attachPoint(6, [-rFair, 0, zFair])  # attach the fairlead Point to the Body 
 
@@ -112,5 +111,4 @@ print(f"Body offset position is {ms.bodyList[0].r6}")
 
 plt.show()
 
-
-
+ms.unload("sample_from_manual_sub.txt")   
