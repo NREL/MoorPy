@@ -411,7 +411,7 @@ class System():
         # <<< the "name" keyword in this method is confusing in that it isn't the index key. Does it have a purpose? <<<
 
 
-    def setLineType(self, dnommm, material, source=None, name="", stud="studless", **kwargs):
+    def setLineType(self, dnommm, material, source=None, name="", **kwargs):
         '''Add or update a System lineType using the new dictionary-based method.
 
         Parameters
@@ -433,9 +433,9 @@ class System():
  
         # compute the actual values for this line type
         if source==None:
-            lineType = getLineProps(dnommm, material, lineProps=self.lineProps, name=name, rho=self.rho, g=self.gm, stud = stud)  
+            lineType = getLineProps(dnommm, material, lineProps=self.lineProps, name=name, rho=self.rho, g=self.gm)  
         else:
-            lineType = getLineProps(dnommm, material, source=source, name=name, rho=self.rho, g=self.g, stud = stud) 
+            lineType = getLineProps(dnommm, material, source=source, name=name, rho=self.rho, g=self.g) 
         
         lineType.update(kwargs)                      # add any custom arguments provided in the call to the lineType's dictionary
         
