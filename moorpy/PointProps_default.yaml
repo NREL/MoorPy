@@ -103,12 +103,12 @@ AnchorProps: # TODO: do we even want the old installation and decommissioning co
   gravity       :
     matcost_m    :  5.7611e-1   # material cost per mass [2024$/kg]
 
-  suction       :
+  suction       : # not in OMAE2025-156384 because old data
     matcost_m    :  10.25       # material cost per mass [$/kg] - from old number in MoorProps.py
     # instcost     :  211610.58   # baseline installation cost offset [$] - from 179331*euros2dollars(1.18) in MoorProps.py
     # decomcost    :  148127.76   # baseline decommissioning cost offset [$] - from 125532*euros2dollars(1.18) in MoorProps.py
 
-  SEPLA         :
+  SEPLA         :  # not in OMAE2025-156384 because only 3 data points
     matcost_m    :  7.1064      # material cost per mass [2024$/kg]
 
   VLA           :
@@ -162,9 +162,7 @@ ConnectProps:
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  6            # the factor of safety between WLL and MBL
-    cost_MBL  :  9.0499e-2    # cost per MBL [2024$/kN]
-    cost_MBL2 : -1.1632e-5    # cost per MBL^2 [2024$/kN^2]
-    cost_MBL3 :  3.6484e-9    # cost per MBL^3 [2024$/kN^3]
+    cost_MBL  :  0.22821      # cost per MBL [2024$/kN]
 
   connector  :  
     # mass      :     # mass offset [kg]   
@@ -174,9 +172,7 @@ ConnectProps:
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  6            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
-    cost_MBL  :  1.3492       # cost per MBL [2024$/kN]
-    cost_MBL2 : -1.1512e-4    # cost per MBL^2 [2024$/kN^2]
-    cost_MBL3 :  3.3701e-9    # cost per MBL^3 [2024$/kN^3]
+    cost_MBL  :  0.18151      # cost per MBL [2024$/kN]
 
   swivel     :  
     # mass      :     # mass offset [kg]   
@@ -186,9 +182,7 @@ ConnectProps:
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  5            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
-    cost_MBL  :  2.2756    # cost per MBL [2024$/kN]
-    cost_MBL2 :  0        # cost per MBL^2 [2024$/kN^2]
-    cost_MBL3 :  0        # cost per MBL^3 [2024$/kN^3]
+    cost_MBL  :  0.91024      # cost per MBL [2024$/kN]
 
   triplate   :   
     # mass      :     # mass offset [kg]  
@@ -199,8 +193,16 @@ ConnectProps:
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  5          # the factor of safety between WLL and MBL
     cost_MBL  :  4.0647e-1  # cost per MBL [2024$/kN]
-    cost_MBL2 :  0   # cost per MBL^2 [2024$/kN^2]
-    cost_MBL3 :  0   # cost per MBL^3 [2024$/kN^3]
+
+  h-link     :  # not in OMAE2025-156384 because only 4 data points
+    # mass      :     # mass offset [kg]  
+    # mass_d    :     # mass as a function of nominal size [kg/m]   
+    # vol       :     # volume offset [m^3]
+    # v_d       :     # volume as a function of nominal size [m^3/m]  
+    # MBL       :     # MBL offset [kN]
+    # MBL_m     :     # minimum breaking load per mass [kN/kg]
+    FOS       :  4          # the factor of safety between WLL and MBL per (https://www.irizarforge.com/en/products/other-connectors/h-link)
+    cost_MBL  :  22.267     # cost per MBL [2024$/kN]
 
   misc       :     
     # mass      :     # mass offset [kg]
@@ -209,10 +211,8 @@ ConnectProps:
     # v_d       :     # volume as a function of nominal size [m^3/m]   
     # MBL       :     # MBL offset [kN]
     # MBL_m     :     # minimum breaking load per mass [kN/kg]
-    FOS       :  6            # the factor of safety between WLL and MBL
-    cost_MBL  :  6.9072e-1    # cost per MBL [2024$/kN]
-    cost_MBL2 : -4.4545e-5    # cost per MBL^2 [2024$/kN^2]
-    cost_MBL3 :  1.5231e-9    # cost per MBL^3 [2024$/kN^3]
+    FOS       :  5            # the factor of safety between WLL and MBL
+    cost_MBL  :  0.19975      # cost per MBL [2024$/kN]
 
 DesignProps: # These are data structures that hold information of what is in a point. Any point can have any number of Acnhor, Buoy, and Connection types as described in the respective props section. 
 
