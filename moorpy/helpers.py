@@ -713,7 +713,7 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     notes = f"made with getLineProps"
 
     lineType = dict(name=typestring, d_vol=d_vol, m=mass, EA=EA, w=w,
-                    MBL=MBL, EAd=EAd, EAd_Lm=EAd_Lm, input_d=d,
+                    MBL=MBL, EAd=EAd, EAd_Lm=EAd_Lm, d_nom=d,
                     cost=cost, notes=notes, material=material, 
                     Cd=Cd, CdAx=CdAx, Ca=Ca, CaAx=CaAx)
     
