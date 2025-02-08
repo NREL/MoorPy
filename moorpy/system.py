@@ -433,7 +433,7 @@ class System():
  
         # compute the actual values for this line type
         if source==None:
-            lineType = getLineProps(dnommm, material, lineProps=self.lineProps, name=name, rho=self.rho, g=self.gm)  
+            lineType = getLineProps(dnommm, material, lineProps=self.lineProps, name=name, rho=self.rho, g=self.g)  
         else:
             lineType = getLineProps(dnommm, material, source=source, name=name, rho=self.rho, g=self.g) 
         
