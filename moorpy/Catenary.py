@@ -1071,7 +1071,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
         FzA = -FzA
         FzB = -FzB
         
-        info["stiffnessA"], info["stiffnessB"] = info["stiffnessB"], info["stiffnessA"]  # swap A and BB
         # note: diagonals of AB matrix do not change 
         
         info["stiffnessA"][0,1] = -info["stiffnessA"][0,1]  # reverse off-diagonal signs
