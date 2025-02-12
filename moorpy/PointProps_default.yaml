@@ -9,9 +9,6 @@
 # DesignProps  -> [point design name]         -> [number and size of components]
 
 # All possible AnchorProps coefficients are as follows: IN PROGRESS - Only the cost coefficients, mass, area are currently used from this structure 
-    # UHC          :     # ultimate holding capacity [kN]
-    # mass         :     # mass [kg]
-    # area         :     # area [m^2]
     # matcost_m    :     # material cost per mass [$/kg]
     # matcost_m2   :     # material cost per mass^2 [$/kg^2]
     # matcost_m3   :     # material cost per mass^3 [$/kg^3]
@@ -35,44 +32,32 @@
     # decomcost    :     # baseline decommissioning cost offset [$]
 
 # All possible Buoy coefficients are as follows:
-    # buoyancy  :     # the buoyancy [kN]
-    # mass      :     # mass offset [kg]
-    # mass_b    :     # mass as a function of buoyancy [kg/kN]
-    # vol       :     # volume offset [m^3]
-    # v_b       :     # volume as a function of buoyancy [m^3/kN]   
-    # cost_b    :     # cost per buoyancy [$/kN]
+    # mass_b    :     # mass as a function of buoyancy [kg/kN] NOT YET SUPPORTED
+    # v_b       :     # volume as a function of buoyancy [m^3/kN] NOT YET SUPPORTED
+    # cost_b0    :    # cost offset [$]
+    # cost_b1    :    # cost per buoyancy [$/kN]
     # cost_b2   :     # cost per buoyancy^2 [$/kN^2]
     # cost_b3   :     # cost per buoyancy^3 [$/kN^3]
-    # cost      :     # baseline cost offset [$]
 
 # All possible ConnectProps coefficients are as follows:
-    # mass      :     # mass offset [kg]
-    # mass_mbl  :     # mass as a function of nominal size (bar diameter) [kg/kN]
-    # vol       :     # volume offset [m^3]
-    # v_mbl     :     # volume as a function of MBL [m^3/kN] 
-    # MBL       :     # MBL. This overrides the FOS * design load calculation [kN] 
+    # mass_mbl  :     # mass as a function of nominal size (bar diameter) [kg/kN] NOT YET SUPPORTED
+    # v_mbl     :     # volume as a function of MBL [m^3/kN] NOT YET SUPPORTED
     # FOS       :     # the factor of safety between WLL and MBL
-    # cost_MBL  :     # cost per MBL [$/kN]
+    # cost_MBL0 :     # cost offset [$]
+    # cost_MBL1 :     # cost per MBL [$/kN]
     # cost_MBL2 :     # cost per MBL^2 [$/kN^2]
     # cost_MBL3 :     # cost per MBL^3 [$/kN^3]
-    # cost      :     # baseline cost offset [$]
 
 # All possible DesignProps coefficients are as follows: 
     # num_a_<anchor name> :   # number of this anchor type where <anchor name> matches the name of a AnchorProps entry (case sensistive). If no value is give num of component is assumed zero
     # num_b_<buoy name>   :   # number of this buoy type where <buoy name> matches the name of a BuoyProps entry (case sensistive). If no value is give num of component is assumed zero
     # num_c_<connect name>:   # number of this connection type where <connect name> matches the name of a ConnectProps entry (case sensistive). If no value is give num of component is assumed zero
-    # design_load         :   # the design load applied to the connections. This is used along with the FOS to compute connection component MBL [kN]
-    # mass                :   # mass to overwrite the calculated mass (this is not used in cost calcs) [kg]
-    # volume              :   # volume to overwrite the calculated volume (this is not used in cost calcs) [m^3]
-    # mbl                 :   # mbl to overwrite the calculated mbl (this is not used in cost calcs) [kN]
-    # cost                :   # cost to overwrite the calculated cost [$]
+    # frac_a_<anchor name>:   # fraction of total anchor size per anchor of this type. Default is 1/total number of anchors.
+    # frac_b_<buoy name>  :   # fraction of total buoyancy per buoy of this type. Default is 1/total number of buoys.
 
 AnchorProps: # TODO: do we even want the old installation and decommissioning costs here?
 
   # example       :
-    # UHC          :     # ultimate holding capacity [kN]
-    # mass         :     # mass [kg]
-    # area         :     # area [m^2]
     # matcost_m    :     # material cost per mass [$/kg]
     # matcost_m2   :     # material cost per mass^2 [$/kg^2]
     # matcost_m3   :     # material cost per mass^3 [$/kg^3]
@@ -120,99 +105,54 @@ AnchorProps: # TODO: do we even want the old installation and decommissioning co
 BuoyProps:
 
   # example     :
-    # buoyancy  :     # the buoyancy [kN]
-    # mass      :     # mass offset [kg]
     # mass_b    :     # mass as a function of buoyancy [kg/kN]
-    # vol       :     # volume offset [m^3]
-    # v_b       :     # volume as a function of buoyancy [m^3/kN]   
-    # cost_b    :     # cost per buoyancy [$/kN]
+    # v_b       :     # volume as a function of buoyancy [m^3/kN]  
+    # cost_b0   :     # cost offset [$] 
+    # cost_b1   :     # cost per buoyancy [$/kN]
     # cost_b2   :     # cost per buoyancy^2 [$/kN^2]
     # cost_b3   :     # cost per buoyancy^3 [$/kN^3]
-    # cost      :     # baseline cost offset [$]
 
   general      : # general buoy based on input from industry
-    # mass      :     # mass offset [kg]
     # mass_b    :     # mass as a function of buoyancy [kg/kN]
-    # vol       :     # volume offset [m^3]
     # v_b       :     # volume as a function of buoyancy [m^3/kN]   
-    cost_b  :  5.2761e2  # cost per buoyancy [2024$/kN]
+    cost_b1 :  5.2761e2  # cost per buoyancy [2024$/kN]
     cost_b2 : -1.1863    # cost per buoyancy^2 [2024$/kN^2]
-    cost_b3 :  0         # cost per buoyancy^3 [2024$/kN^3]
 
 ConnectProps: 
   # TODO: mass, v, and MBL relationships from the tables on pg 132 in the Vryhof Manual. Size to MBL relationships can also be derived from the data gathered in WEC cost modeling outreach. 
 
   # example    :
-    # mass      :     # mass offset [kg]
     # mass_mbl  :     # mass as a function of nominal size (bar diameter) [kg/kN]
-    # vol       :     # volume offset [m^3]
     # v_mbl     :     # volume as a function of MBL [m^3/kN] 
-    # MBL       :     # MBL. This overrides the FOS * design load calculation [kN] 
     # FOS       :     # the factor of safety between WLL and MBL
-    # cost_MBL  :     # cost per MBL [$/kN]
+    # cost_MBL0 :     # cost offset [$]
+    # cost_MBL1 :     # cost per MBL [$/kN]
     # cost_MBL2 :     # cost per MBL^2 [$/kN^2]
     # cost_MBL3 :     # cost per MBL^3 [$/kN^3]
-    # cost      :     # baseline cost offset [$]
 
   shackle    :     
-    # mass      :     # mass offset [kg]
-    # mass_d    :     # mass as a function of nominal size (bar diameter) [kg/m]
-    # vol       :     # volume offset [m^3]
-    # v_d       :     # volume as a function of nominal size [m^3/m]     
-    # MBL       :     # MBL offset [kN]
-    # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  6            # the factor of safety between WLL and MBL
-    cost_MBL  :  0.22821      # cost per MBL [2024$/kN]
+    cost_MBL1 :  0.22821      # cost per MBL [2024$/kN]
 
   connector  :  
-    # mass      :     # mass offset [kg]   
-    # mass_d    :     # mass as a function of nominal size [kg/m]   
-    # vol       :     # volume offset [m^3]
-    # v_d       :     # volume as a function of nominal size [m^3/m]  
-    # MBL       :     # MBL offset [kN]
-    # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  6            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
-    cost_MBL  :  0.18151      # cost per MBL [2024$/kN]
+    cost_MBL1 :  0.18151      # cost per MBL [2024$/kN]
 
   swivel     :  
-    # mass      :     # mass offset [kg]   
-    # mass_d    :     # mass as a function of nominal size [kg/m]   
-    # vol       :     # volume offset [m^3]
-    # v_d       :     # volume as a function of nominal size [m^3/m]  
-    # MBL       :     # MBL offset [kN]
-    # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  5            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
-    cost_MBL  :  0.91024      # cost per MBL [2024$/kN]
+    cost_MBL1 :  0.91024      # cost per MBL [2024$/kN]
 
   triplate   :   
-    # mass      :     # mass offset [kg]  
-    # mass_d    :     # mass as a function of nominal size [kg/m]   
-    # vol       :     # volume offset [m^3]
-    # v_d       :     # volume as a function of nominal size [m^3/m]  
-    # MBL       :     # MBL offset [kN]
-    # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  5          # the factor of safety between WLL and MBL
-    cost_MBL  :  4.0647e-1  # cost per MBL [2024$/kN]
+    cost_MBL1 :  4.0647e-1  # cost per MBL [2024$/kN]
 
   h-link     :  # not in OMAE2025-156384 because only 4 data points
-    # mass      :     # mass offset [kg]  
-    # mass_d    :     # mass as a function of nominal size [kg/m]   
-    # vol       :     # volume offset [m^3]
-    # v_d       :     # volume as a function of nominal size [m^3/m]  
-    # MBL       :     # MBL offset [kN]
-    # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  4          # the factor of safety between WLL and MBL per (https://www.irizarforge.com/en/products/other-connectors/h-link)
-    cost_MBL  :  22.267     # cost per MBL [2024$/kN]
+    cost_MBL1 :  22.267     # cost per MBL [2024$/kN]
 
   misc       :     
-    # mass      :     # mass offset [kg]
-    # mass_d    :     # mass as a function of nominal size [kg/m]  
-    # vol       :     # volume offset [m^3]
-    # v_d       :     # volume as a function of nominal size [m^3/m]   
-    # MBL       :     # MBL offset [kN]
-    # MBL_m     :     # minimum breaking load per mass [kN/kg]
     FOS       :  5            # the factor of safety between WLL and MBL
-    cost_MBL  :  0.19975      # cost per MBL [2024$/kN]
+    cost_MBL1 :  0.19975      # cost per MBL [2024$/kN]
 
 DesignProps: # These are data structures that hold information of what is in a point. Any point can have any number of Acnhor, Buoy, and Connection types as described in the respective props section. 
 
@@ -220,48 +160,9 @@ DesignProps: # These are data structures that hold information of what is in a p
     # num_a_<anchor name> :   # number of this anchor type where <anchor name> matches the name of a AnchorProps entry (case sensistive). If no value is give num of component is assumed zero
     # num_b_<buoy name>   :   # number of this buoy type where <buoy name> matches the name of a BuoyProps entry (case sensistive). If no value is give num of component is assumed zero
     # num_c_<connect name>:   # number of this connection type where <connect name> matches the name of a ConnectProps entry (case sensistive). If no value is give num of component is assumed zero
-    # design_load         :   # the design load applied to the connections. This is used along with the FOS to compute connection component MBL [kN]
-    # mass                :   # mass to overwrite the calculated mass (this is not used in cost calcs) [kg]
-    # volume              :   # volume to overwrite the calculated volume (this is not used in cost calcs) [m^3]
-    # mbl                 :   # mbl to overwrite the calculated mbl (this is not used in cost calcs) [kN]
-    # cost                :   # cost to overwrite the calculated cost [$]
+    # frac_a_<anchor name>:   # fraction of total anchor size per anchor of this type. Default is 1/total number of anchors.
+    # frac_b_<buoy name>  :   # fraction of total buoyancy per buoy of this type. Default is 1/total number of buoys.
 
-  general         :  # TODO: This is a place holder, it should be replaced by more detailed designs. VA-02 design from pg 132 of Vryhof Manual in here for now. 
-    num_c_shackle   : 1  # number of shackles in this design
-    num_c_connector : 2  # number of pear or C connectors in this design
-    num_c_swivel    : 1  # number of swivels in this design
-    num_c_misc      : 3  # number of other hardware components in this design (typically chain links)
-
-  # Chain2Chain     :
-  #   num_shackle    :   # number of shackles in this design
-  #   num_connector  :   # number of pear or C connectors in this design
-  #   num_swivel     :   # number of swivels in this design
-  #   num_triplate   :   # number of tri-plates in this design
-  #   num_other      :   # number of other hardware components in this design (typically chain links)
-  #   num_buoy       :   # number of buoys in this design
-
-  # Chain2Rope      :
-  #   num_shackle    :   # number of shackles in this design
-  #   num_connector  :   # number of pear or C connectors in this design
-  #   num_swivel     :   # number of swivels in this design
-  #   num_triplate   :   # number of tri-plates in this design
-  #   num_other      :   # number of other hardware components in this design (typically chain links)
-  #   num_buoy       :   # number of buoys in this design
-
-  # Rope2Rope       :
-  #   num_shackle    :   # number of shackles in this design
-  #   num_connector  :   # number of pear or C connectors in this design
-  #   num_swivel     :   # number of swivels in this design
-  #   num_triplate   :   # number of tri-plates in this design
-  #   num_other      :   # number of other hardware components in this design (typically chain links)
-  #   num_buoy       :   # number of buoys in this design
-
-  # Chain2Anchor    :
-  #   num_shackle    :   # number of shackles in this design
-  #   num_connector  :   # number of pear or C connectors in this design
-  #   num_swivel     :   # number of swivels in this design
-  #   num_triplate   :   # number of tri-plates in this design
-  #   num_other      :   # number of other hardware components in this design (typically chain links)
-  #   num_buoy       :   # number of buoys in this design
-  
-  # # etc.
+  general         :  # TODO: This is a place holder, it should be replaced by more detailed designs. 
+    num_c_shackle   : 2  # number of shackles in this design
+    num_c_misc      : 1  # number of other hardware components in this design (typically chain links)

@@ -21,7 +21,7 @@ import matplotlib as mpl
 #import moorpy.MoorSolve as msolve
 from moorpy.helpers import (rotationMatrix, rotatePosition, getH, printVec, 
                             set_axes_equal, dsolve2, SolveError, MoorPyError, 
-                            loadLineProps, getLineProps, read_mooring_file, 
+                            loadLineProps, loadPointProps, getLineProps, getPointProps, read_mooring_file, 
                             printMat, printVec, getInterpNums, unitVector,
                             getFromDict, addToDict, readBathymetryFile)
 
@@ -33,7 +33,7 @@ class System():
     # >>> note: system module will need to import Line, Point, Body for its add/creation routines 
     #     (but line/point/body modules shouldn't import system) <<<
     
-    def __init__(self, file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1, Fortran=True, lineProps=None, **kwargs):
+    def __init__(self, file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1, Fortran=True, lineProps=None, pointProps = None, **kwargs):
         '''Creates an empty MoorPy mooring system data structure and will read an input file if provided.
 
         Parameters
@@ -62,10 +62,14 @@ class System():
         self.pointList = []
         self.lineList = []
         self.lineTypes = {}
+        self.pointTypes = {}
         self.rodTypes = {}
         
         # load mooring line property scaling coefficients for easy use when creating line types
         self.lineProps = loadLineProps(lineProps)
+
+        # load point property scaling coefficients for easy use when creating point types
+        self.pointProps = loadPointProps(pointProps)
         
         # the ground body (number 0, type 1[fixed]) never moves but is the parent of all anchored things
         self.groundBody = Body(self, 0, 1, np.zeros(6))   # <<< implementation not complete <<<< be careful here if/when MoorPy is split up
@@ -456,6 +460,41 @@ class System():
 
         return lineType                              # return the dictionary in case it's useful separately
 
+    def setPointType(self, design, source = None, name = "", **kwargs):
+        '''Add or update a System pointType using the new dictionary-based method. 
+
+        Parameters
+        ----------
+        design : string or dict
+            design keyword from DesignProps or dictionary with num_a_<anchor key>, num_b_<buoy key>, num_c_<connect key> entries
+        source : dict or filename (optional)
+            YAML file name or dictionary containing point property scaling coefficients and 
+            design properties. If not provided, whatever has already been loaded into the 
+            MoorPy system will be used.
+        name : string (optional)
+            Identifier for the point type (otherwise wll be generated automatically).
+
+        Returns
+        -------
+        pointType : dict
+            A pointType structure agnostic of point size
+        '''
+ 
+        # compute the actual values for this point type
+        if source==None:
+            pointType = getPointProps(design=design, Props=self.pointProps, name=name)  
+        else:
+            pointType = getPointProps(design=design, source=source, name=name)  
+        
+        pointType.update(kwargs)                      # add any custom arguments provided in the call to the pointType's dictionary
+        
+        # add the dictionary to the System's pointTypes master dictionary
+        if pointType['name'] in self.pointTypes:                                # if there is already a point type with this name
+            self.pointTypes[pointType['name']].update(pointType)                 # update the existing dictionary values rather than overwriting with a new dictionary
+        else:
+            self.pointTypes[pointType['name']] = pointType                       # otherwise save a new entry
+
+        return pointType                              # return the dictionary in case it's useful separately
 
     def setRodType(self, d, name="", **kwargs):
         '''hasty replication of setLineType for rods'''
@@ -748,12 +787,12 @@ class System():
                         
                         
                         if ("anch" in entry1) or ("fix" in entry1):
-                            pointType = 1
+                            pType = 1
                             # attach to ground body for ease of identifying anchors
                             self.groundBody.attachPoint(num,entries[2:5]) 
                             
                         elif ("body" in entry1) or ("turbine" in entry1):
-                            pointType = 1
+                            pType = 1
                             # attach to body here
                             BodyID = int("".join(filter(str.isdigit, entry1)))
                             if len(self.bodyList) < BodyID:
@@ -765,7 +804,7 @@ class System():
                             
                         elif ("fair" in entry1) or ("ves" in entry1) or ("couple" in entry1):
                             # for coupled point type, just set it up that same way in MoorPy (attachment to a body not needed, right?)
-                            pointType = -1                            
+                            pType = -1                            
                             '''
                             # attach to a generic platform body (and make it if it doesn't exist)
                             if len(self.bodyList) > 1:
@@ -779,7 +818,7 @@ class System():
                             '''
                                 
                         elif ("con" in entry1) or ("free" in entry1):
-                            pointType = 0
+                            pType = 0
                         else:
                             print("Point type not recognized")
                         
@@ -790,7 +829,7 @@ class System():
                         v  = float(entries[6])
                         CdA= float(entries[7])
                         Ca = float(entries[8])
-                        self.pointList.append( Point(self, num, pointType, r, m=m, v=v, CdA=CdA, Ca=Ca) )
+                        self.pointList.append( Point(self, num, pType, r, m=m, v=v, CdA=CdA, Ca=Ca) )
                         line = next(f)
                         
                         
@@ -962,19 +1001,19 @@ class System():
             num = i+1   # not counting on things being numbered in YAML files
             
             if ("anch" in entry1) or ("fix" in entry1):
-                pointType = 1
+                pType = 1
                 # attach to ground body for ease of identifying anchors
                 self.groundBody.attachPoint(num, d['location']) 
                 
             elif ("body" in entry1):
-                pointType = 1
+                pType = 1
                 # attach to body here
                 BodyID = int("".join(filter(str.isdigit, entry1)))
                 rRel = np.array(d['location'], dtype=float)
                 self.bodyList[BodyID-1].attachPoint(num, rRel)
                 
             elif ("fair" in entry1) or ("ves" in entry1):
-                pointType = 1   # <<< this used to be -1.  I need to figure out a better way to deal with this for different uses! <<<<<<
+                pType = 1   # <<< this used to be -1.  I need to figure out a better way to deal with this for different uses! <<<<<<
                 # attach to a generic platform body (and make it if it doesn't exist)
                 if len(self.bodyList) > 1:
                     raise ValueError("Generic Fairlead/Vessel-type points aren't supported when bodies are defined.")
@@ -986,7 +1025,7 @@ class System():
                 self.bodyList[0].attachPoint(num, rRel)    
                     
             elif ("con" in entry1) or ("free" in entry1):
-                pointType = 0
+                pType = 0
             else:
                 print("Point type not recognized")
             
@@ -1002,7 +1041,7 @@ class System():
             else:
                 v = 0.0
                                 
-            self.pointList.append( Point(self, num, pointType, r, m=m, v=v) )
+            self.pointList.append( Point(self, num, pType, r, m=m, v=v) )
                         
                     
         # lines
