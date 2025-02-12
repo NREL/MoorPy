@@ -81,7 +81,8 @@ lineProps:
     Ca        :  1.0       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
     Ca_ax     :  0.5       # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07      
 
-  chain3 : # R3 grade chain, studless and studlink. Not included in OMAE2025-156384 in interest of brevity 
+  chainR3 : # R3 grade chain, studless and studlink. Not included in OMAE2025-156384 in interest of brevity 
+    mass_d2   :  21e3    # linear mass density per diameter^2 [kg/m/m^2] - avg R4 studlink and R4 studless  
     cost_d    : -2.3403e2  # cost per meter per diameter [2024$/m^2]
     cost_d2   :  5.9473e4  # cost per meter per diameter^2 [2024$/m^3]
 

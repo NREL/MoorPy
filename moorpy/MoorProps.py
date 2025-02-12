@@ -525,7 +525,7 @@ def getAnchorCostOld(fx, fz, type="drag-embedment",soil_type='medium clay', meth
 
 def getAnchorCost(fx = None, fz = None, type="drag-embedment", mass = None, area = None, soil_type='medium clay', method = 'static', aprops = None):
     '''Calculates anchor cost, and calls getAnchorMass if mass is not provided and design forces are. 
-    Costs based on the WEC mooring cost modeling work. updated 1-15-2025 using 2024$
+    Costs based on the WEC mooring cost modeling work. 
     
     Parameters
     ----------
