@@ -878,13 +878,13 @@ def getPointProps(design, Props = None, source = None, name="", **kwargs):
         dtype = design
 
     # Check that fractions of anchor size and buoy size are realistic (and create them as num * 1/total num object if they dont exist)
-    num_anchs = 0
-    num_buoys = 0
-    for key,value in dtype.items(): # count total num anchors and buoys
+    num_aTypes = 0
+    num_bTypes = 0
+    for key in dtype.keys(): # count total num anchors and buoys
         if 'num_a_' in key:
-            num_anchs += value
+            num_aTypes += 1
         if 'num_b_' in key:
-            num_buoys += value
+            num_bTypes += 1
 
     aFrac_sum = 0.0
     bFrac_sum = 0.0
@@ -893,16 +893,16 @@ def getPointProps(design, Props = None, source = None, name="", **kwargs):
         if 'num_a_' in key:
             if not (f"frac_a_{key[6:]}" in dtype.keys()): # if we dont have frac_a_<key>. This only can happen if design is passed in as dict and not keyword
                 # set frac as 1/total num anchs
-                dtype[f"frac_a_{key[6:]}"] = 1/num_anchs
+                dtype[f"frac_a_{key[6:]}"] = 1/num_aTypes
 
-            aFrac_sum += dtype[key] * dtype[f"frac_a_{key[6:]}"]
+            aFrac_sum += dtype[f"frac_a_{key[6:]}"]
 
         if 'num_b_' in key:
             if not (f"frac_b_{key[6:]}" in dtype.keys()): # if we dont have frac_a_<key>. This only can happen if design is passed in as dict and not keyword
                 # set frac as 1/total num buoys
-                dtype[f"frac_b_{key[6:]}"] = 1/num_buoys
+                dtype[f"frac_b_{key[6:]}"] = 1/num_bTypes
 
-            bFrac_sum += dtype[key] * dtype[f"frac_b_{key[6:]}"]
+            bFrac_sum += dtype[f"frac_b_{key[6:]}"]
 
     if aFrac_sum > 1:
         raise MoorPyError(f"Anchor fractions sum to {aFrac_sum}, which is greater than 1") 
@@ -950,17 +950,17 @@ def getPointProps(design, Props = None, source = None, name="", **kwargs):
             Each buoy has a buoyancy of (total buoyancy of point * % of buoyancy). 
 
             Note: 
-            This assumes if there are multiple buoys of the same type they share the same % of buoyancy. 
+            This assumes if there are multiple buoys of the same type they share the same % of buoyancy. I.e. frac_b_key / num_b_key
 
             Note:
             Num of type * (unit cost) = Num of type * (B1 * (buoyancy * % of buoyancy ) + B2 * (buoyancy * % of buoyancy )^2 + ...) = Num of type * B1 * % of buoyancy * buoyancy + Num of type * B2 * % of buoyancy^2 * buoyancy^2 + ...
             '''
 
             b_bool = True
-            Bcost["cost_b0"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b0']                                   # Error checking of valid keys is already done in loadPointProps
-            Bcost["cost_b1"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b1'] * (dtype[f"frac_b_{key[6:]}"])    # Error checking of valid keys is already done in loadPointProps
-            Bcost["cost_b2"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b2'] * (dtype[f"frac_b_{key[6:]}"])**2 # Error checking of valid keys is already done in loadPointProps
-            Bcost["cost_b3"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b3'] * (dtype[f"frac_b_{key[6:]}"])**3 # Error checking of valid keys is already done in loadPointProps
+            Bcost["cost_b0"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b0']                                                # Error checking of valid keys is already done in loadPointProps
+            Bcost["cost_b1"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b1'] * (dtype[f"frac_b_{key[6:]}"] / dtype[key])    # Error checking of valid keys is already done in loadPointProps
+            Bcost["cost_b2"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b2'] * (dtype[f"frac_b_{key[6:]}"] / dtype[key])**2 # Error checking of valid keys is already done in loadPointProps
+            Bcost["cost_b3"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b3'] * (dtype[f"frac_b_{key[6:]}"] / dtype[key])**3 # Error checking of valid keys is already done in loadPointProps
 
         # connections
         if 'num_c_' in key:
