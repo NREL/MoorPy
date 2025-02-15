@@ -439,14 +439,14 @@ class Point():
 
                         aUHC_list.append(aCost[-1]["UHC"]) # extract UHC from the info dict
                         
-                    else: # use the point mass or area as defined by user. Mass and area multiplied by fraction of total size per anchor type. Default is 1/(total number of anchor types in the point)
+                    else: # use the point mass or area as defined by user. Mass and area multiplied by fraction of total size per anchor type. Default is frac_a_key/num_a_key where frac_a_key is 1/total number of anchor types in point
 
-                        aCost = getAnchorCost(type = anchor["name"], mass = self.m * anchor["frac"], area = self.a * anchor["frac"], aprops = self.entity["aprops"]) # not looking for anchor UHC
+                        aCost = getAnchorCost(type = anchor["name"], mass = self.m * (anchor["frac"] / anchor["num"]), area = self.a * (anchor["frac"] / anchor["num"]), aprops = self.entity["aprops"]) # not looking for anchor UHC
 
                         self.entity['INFO']["Anchors - Note"] = "UHC not included in point MBL calc as no data was provided"
 
                     if sum(aCost[:3]) == 0.0 and (self.m > 0.0 or self.a > 0.0):
-                        raise ValueError(f"{anchor['name']} anchor costs are not yet supported when mass = {self.m * anchor['frac']} kg and area = {self.a  * anchor['frac']} m^2")
+                        raise ValueError(f"{anchor['name']} anchor costs are not yet supported when mass = {self.m * (anchor['frac'] / anchor['num'])} kg and area = {self.a  * (anchor['frac'] / anchor['num'])} m^2")
                     
                     self.cost += anchor["num"]*np.sum(aCost[:3]) # number of these anchors * unit cost, where aCost[:3] is the mat, inst, and decom costs
 
