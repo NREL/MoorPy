@@ -32,21 +32,21 @@
     # decomcost    :     # baseline decommissioning cost offset [$]
 
 # All possible Buoy coefficients are as follows:
-    # mass_b    :     # mass as a function of buoyancy [kg/kN] NOT YET SUPPORTED
-    # v_b       :     # volume as a function of buoyancy [m^3/kN] NOT YET SUPPORTED
+    # mass_b    :     # mass as a function of buoyancy [kg/N] NOT YET SUPPORTED
+    # v_b       :     # volume as a function of buoyancy [m^3/N] NOT YET SUPPORTED
     # cost_b0    :    # cost offset [$]
-    # cost_b1    :    # cost per buoyancy [$/kN]
-    # cost_b2   :     # cost per buoyancy^2 [$/kN^2]
-    # cost_b3   :     # cost per buoyancy^3 [$/kN^3]
+    # cost_b1    :    # cost per buoyancy [$/N]
+    # cost_b2   :     # cost per buoyancy^2 [$/N^2]
+    # cost_b3   :     # cost per buoyancy^3 [$/N^3]
 
 # All possible ConnectProps coefficients are as follows:
-    # mass_mbl  :     # mass as a function of nominal size (bar diameter) [kg/kN] NOT YET SUPPORTED
-    # v_mbl     :     # volume as a function of MBL [m^3/kN] NOT YET SUPPORTED
+    # mass_mbl  :     # mass as a function of nominal size (bar diameter) [kg/N] NOT YET SUPPORTED
+    # v_mbl     :     # volume as a function of MBL [m^3/N] NOT YET SUPPORTED
     # FOS       :     # the factor of safety between WLL and MBL
     # cost_MBL0 :     # cost offset [$]
-    # cost_MBL1 :     # cost per MBL [$/kN]
-    # cost_MBL2 :     # cost per MBL^2 [$/kN^2]
-    # cost_MBL3 :     # cost per MBL^3 [$/kN^3]
+    # cost_MBL1 :     # cost per MBL [$/N]
+    # cost_MBL2 :     # cost per MBL^2 [$/N^2]
+    # cost_MBL3 :     # cost per MBL^3 [$/N^3]
 
 # All possible DesignProps coefficients are as follows: 
     # num_a_<anchor name> :   # number of this anchor type where <anchor name> matches the name of a AnchorProps entry (case sensistive). If no value is give num of component is assumed zero
@@ -81,12 +81,12 @@ AnchorProps: # TODO: do we even want the old installation and decommissioning co
     # decomcost    :     # baseline decommissioning cost offset [$]
 
   drag-embedment: 
-    matcost_m    :  4.1513      # material cost per mass [2024$/kg]
+    matcost_m    :  4.15      # material cost per mass [2024$/kg]
     # instcost     :  192986.64   # baseline installation cost offset [$] - from 163548*euros2dollars(1.18) in MoorProps.py
     # decomcost    :  270181.06   # baseline decommissioning cost offset [$] - from 228967*euros2dollars(1.18) in MoorProps.py
 
   gravity       :
-    matcost_m    :  5.7611e-1   # material cost per mass [2024$/kg]
+    matcost_m    :  5.76e-1   # material cost per mass [2024$/kg]
 
   suction       : # not in OMAE2025-156384 because old data
     matcost_m    :  10.25       # material cost per mass [$/kg] - from old number in MoorProps.py
@@ -94,65 +94,65 @@ AnchorProps: # TODO: do we even want the old installation and decommissioning co
     # decomcost    :  148127.76   # baseline decommissioning cost offset [$] - from 125532*euros2dollars(1.18) in MoorProps.py
 
   SEPLA         :  # not in OMAE2025-156384 because only 3 data points
-    matcost_m    :  7.1064      # material cost per mass [2024$/kg]
+    matcost_m    :  7.11      # material cost per mass [2024$/kg]
 
   VLA           :
-    matcost_a    :  16420       # material cost per area [2024$/m^2]
+    matcost_a    :  1.64e4      # material cost per area [2024$/m^2]
 
   driven        : # driven piles
-    matcost_m    :  3.8136      # material cost per mass [2024$/kg]
+    matcost_m    :  3.81        # material cost per mass [2024$/kg]
 
 BuoyProps:
 
   # example     :
-    # mass_b    :     # mass as a function of buoyancy [kg/kN]
-    # v_b       :     # volume as a function of buoyancy [m^3/kN]  
+    # mass_b    :     # mass as a function of buoyancy [kg/N]
+    # v_b       :     # volume as a function of buoyancy [m^3/N]  
     # cost_b0   :     # cost offset [$] 
-    # cost_b1   :     # cost per buoyancy [$/kN]
-    # cost_b2   :     # cost per buoyancy^2 [$/kN^2]
-    # cost_b3   :     # cost per buoyancy^3 [$/kN^3]
+    # cost_b1   :     # cost per buoyancy [$/N]
+    # cost_b2   :     # cost per buoyancy^2 [$/N^2]
+    # cost_b3   :     # cost per buoyancy^3 [$/N^3]
 
   general      : # general buoy based on input from industry
-    # mass_b    :     # mass as a function of buoyancy [kg/kN]
-    # v_b       :     # volume as a function of buoyancy [m^3/kN]   
-    cost_b1 :  5.2761e2  # cost per buoyancy [2024$/kN]
-    cost_b2 : -1.1863    # cost per buoyancy^2 [2024$/kN^2]
+    # mass_b    :     # mass as a function of buoyancy [kg/N]
+    # v_b       :     # volume as a function of buoyancy [m^3/N]   
+    cost_b1 :  5.28e-1  # cost per buoyancy [2024$/N]
+    cost_b2 : -1.19e-6  # cost per buoyancy^2 [2024$/N^2]
 
 ConnectProps: 
   # TODO: mass, v, and MBL relationships from the tables on pg 132 in the Vryhof Manual. Size to MBL relationships can also be derived from the data gathered in WEC cost modeling outreach. 
 
   # example    :
-    # mass_mbl  :     # mass as a function of nominal size (bar diameter) [kg/kN]
-    # v_mbl     :     # volume as a function of MBL [m^3/kN] 
+    # mass_mbl  :     # mass as a function of nominal size (bar diameter) [kg/N]
+    # v_mbl     :     # volume as a function of MBL [m^3/N] 
     # FOS       :     # the factor of safety between WLL and MBL
     # cost_MBL0 :     # cost offset [$]
-    # cost_MBL1 :     # cost per MBL [$/kN]
-    # cost_MBL2 :     # cost per MBL^2 [$/kN^2]
-    # cost_MBL3 :     # cost per MBL^3 [$/kN^3]
+    # cost_MBL1 :     # cost per MBL [$/N]
+    # cost_MBL2 :     # cost per MBL^2 [$/N^2]
+    # cost_MBL3 :     # cost per MBL^3 [$/N^3]
 
   shackle    :     
     FOS       :  6            # the factor of safety between WLL and MBL
-    cost_MBL1 :  0.22821      # cost per MBL [2024$/kN]
+    cost_MBL1 :  0.23e-3      # cost per MBL [2024$/k]
 
   connector  :  
     FOS       :  6            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
-    cost_MBL1 :  0.18151      # cost per MBL [2024$/kN]
+    cost_MBL1 :  0.18e-3      # cost per MBL [2024$/k]
 
   swivel     :  
     FOS       :  5            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
-    cost_MBL1 :  0.91024      # cost per MBL [2024$/kN]
+    cost_MBL1 :  0.91e-3      # cost per MBL [2024$/k]
 
   triplate   :   
-    FOS       :  5          # the factor of safety between WLL and MBL
-    cost_MBL1 :  4.0647e-1  # cost per MBL [2024$/kN]
+    FOS       :  5            # the factor of safety between WLL and MBL
+    cost_MBL1 :  0.41e-3      # cost per MBL [2024$/k]
 
   h-link     :  # not in OMAE2025-156384 because only 4 data points
-    FOS       :  4          # the factor of safety between WLL and MBL per (https://www.irizarforge.com/en/products/other-connectors/h-link)
-    cost_MBL1 :  22.267     # cost per MBL [2024$/kN]
+    FOS       :  4            # the factor of safety between WLL and MBL per (https://www.irizarforge.com/en/products/other-connectors/h-link)
+    cost_MBL1 :  22e-3        # cost per MBL [2024$/k]
 
   misc       :     
     FOS       :  5            # the factor of safety between WLL and MBL
-    cost_MBL1 :  0.19975      # cost per MBL [2024$/kN]
+    cost_MBL1 :  0.20e-3      # cost per MBL [2024$/k]
 
 DesignProps: # These are data structures that hold information of what is in a point. Any point can have any number of Acnhor, Buoy, and Connection types as described in the respective props section. 
 

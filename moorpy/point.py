@@ -400,9 +400,9 @@ class Point():
         fz : float (optional)
             The maximum vertical force on the point [N]
         peak_tension : float (optional)
-            The peak tension seen at the point. Used for calculating the MBL of points. If not given, vector sum of fx and fz is used. [kN]
+            The peak tension seen at the point. Used for calculating the MBL of points. If not given, vector sum of fx and fz is used. [N]
         buoyancy : float (optional) 
-            The total buoyancy of the point used for buoy costs. This is divided amoung the buoys using frac_b_key. [kN]
+            The total buoyancy of the point used for buoy costs. This is divided amoung the buoys using frac_b_key. [N]
 
         Returns
         -------
@@ -476,13 +476,13 @@ class Point():
             if self.entity["Connections"]: 
                 if peak_tension == None:
                     if fx > 0.0 or fz > 0.0: # if forces are provided use those to find peak tension
-                        peak_tension = np.sqrt(fx**2 + fz**2) / 1000 # convert from N to kN
+                        peak_tension = np.sqrt(fx**2 + fz**2)
                     else:
                         raise ValueError("Peak tension or fx and fz is required to find the cost of a point with connection hardware")
                 
                 self.cost += self.entity["connector_cost"]["cost_load0"] + self.entity["connector_cost"]["cost_load1"] * peak_tension + self.entity["connector_cost"]["cost_load2"] * peak_tension**2 + self.entity["connector_cost"]["cost_load3"] * peak_tension**3
 
-                cMBL = self.entity["FOS"]*peak_tension*1000 # convert peak_tension from kN to N for MBL
+                cMBL = self.entity["FOS"]*peak_tension
 
             # MBL of point is smallest capacity between component MBL and anchor UHC
             if aUHC == 0 and cMBL > 0:
