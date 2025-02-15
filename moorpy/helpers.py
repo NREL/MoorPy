@@ -947,11 +947,13 @@ def getPointProps(design, Props = None, source = None, name="", **kwargs):
         if 'num_b_' in key:
             '''
             Number of this buoy type * the cost coefficient to get our general cost coefficients for the point
-            Note this assumes if there are multiple buoys of the same type they share the same % of buoyancy. 
-            I.e. each buoy has a buoyancy of (total buoyancy of point * % of buoyancy). 
+            Each buoy has a buoyancy of (total buoyancy of point * % of buoyancy). 
+
+            Note: 
+            This assumes if there are multiple buoys of the same type they share the same % of buoyancy. 
 
             Note:
-            Num of type * (unit cost) = Num of type * (B1 * (buoyancy * % of buoyancy ) + B2 * (buoyancy * % of buoyancy )**2 + ...) = Num of type * B1 * % of buoyancy * buoyancy + Num of type * B2 * % of buoyancy^2 * buoyancy^2 + ...
+            Num of type * (unit cost) = Num of type * (B1 * (buoyancy * % of buoyancy ) + B2 * (buoyancy * % of buoyancy )^2 + ...) = Num of type * B1 * % of buoyancy * buoyancy + Num of type * B2 * % of buoyancy^2 * buoyancy^2 + ...
             '''
 
             b_bool = True
@@ -1147,6 +1149,7 @@ def loadPointProps(source):
                     # handle the fractions for each Buoy type
                     point[dtype][f'frac_b_{key[6:]}'] = getFromDict(props, f'frac_b_{key[6:]}', default = 1/num_buoys)
 
+    # return ABCD dict
     return dict(AnchorProps = anchor, BuoyProps = buoy, ConnectProps = connect, DesignProps = point)
 
 def getFromDict(dict, key, shape=0, dtype=float, default=None):
