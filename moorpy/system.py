@@ -1020,7 +1020,7 @@ class System():
 
 
     def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', 
-               outputList=[], Lm=[0], T_half=42):
+               outputList=[], Lm=[0], T_half=42, phiV=None, MDoptionsDict={}):
         '''Unloads a MoorPy system into a MoorDyn-style input file
 
         Parameters
@@ -1040,7 +1040,10 @@ class System():
         T_half : float, optional
             For tuning response of viscoelastic model, the period when EA is
             half way between the static and dynamic values [s]. Default is 42.
-            
+        phiV : list of floats, optional 
+            platform's rotations variables [deg]. Defaults to None and platforms are not unrotated.
+        MDoptionsDict: dictionary, optional
+            MoorDyn Options. If not given, default options are considered.
         Returns
         -------
         None.
@@ -1052,7 +1055,8 @@ class System():
             #Collection of default values, each can be customized when the method is called
             
             # Set up the dictionary that will be used to write the OPTIONS section
-            MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
+            if not MDoptionsDict:
+                MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
             # Other available options: Echo=False, dtIC=2, CdScaleIC=10, threshIC=0.01
             MDoptionsDict.update(self.MDoptions)                                  # update the dict with any settings saved from an input file
             MDoptionsDict.update(dict(g=self.g, WtrDepth=self.depth, rho=self.rho))  # lastly, apply any settings used by MoorPy
@@ -1125,13 +1129,20 @@ class System():
                     point_type = 'Fixed'
                     
                     #Check if the point is attached to body
-                    for body in self.bodyList:
+                    for i, body in enumerate(self.bodyList):
                         for attached_Point in body.attachedP:
                             
                             if attached_Point == point.number:
                                 #point_type = "Body" + str(body.number)
-                                point_type = "Vessel"
-                                point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
+                                point_type = "Vessel"                                
+                                if phiV:
+                                    c, s = np.cos(np.radians(-phiV[i])), np.sin(np.radians(-phiV[i]))
+                                    R = np.array([[c, -s, 0],
+                                                  [s,  c, 0],
+                                                  [0,  0, 1]])
+                                    point_pos = R @ body.rPointRel[body.attachedP.index(attached_Point)]                                    
+                                else:
+                                    point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
                     
                 elif point.type == 0:           # point is coupled externally (con, free)
                     point_type = 'Connect'
@@ -1209,7 +1220,8 @@ class System():
             #description = 
             
             # Set up the dictionary that will be used to write the OPTIONS section
-            MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
+            if not MDoptionsDict:
+                MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
             MDoptionsDict.update(self.MDoptions)                                  # update the dict with any settings saved from an input file
             MDoptionsDict.update(dict(g=self.g, depth=self.depth, rho=self.rho))  # lastly, apply any settings used by MoorPy
             
@@ -1407,11 +1419,19 @@ class System():
                         point_type = 'Fixed'
                         
                         #Check if the point is attached to body
-                        for body in self.bodyList:
+                        for i, body in enumerate(self.bodyList):
                             for attached_Point in body.attachedP:
+
                                 if attached_Point == point.number:
                                     point_type = "Body" + str(body.number)
-                                    point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
+                                    if phiV:
+                                        c, s = np.cos(np.radians(-phiV[i])), np.sin(np.radians(-phiV[i]))
+                                        R = np.array([[c, -s, 0],
+                                                    [s,  c, 0],
+                                                    [0,  0, 1]])
+                                        point_pos = R @ body.rPointRel[body.attachedP.index(attached_Point)]                    
+                                    else:
+                                        point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
                         
                     elif point.type == 0:           # point is coupled externally (con, free)
                         point_type = 'Free'
