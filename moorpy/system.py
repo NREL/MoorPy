@@ -1641,16 +1641,28 @@ class System():
             X = np.hstack([Xrot + tVec, X[3], X[4], X[5]])
             return X
 
-        # update positions of all objects
-        for body in self.bodyList:
-            body.r6 = transform6(body.r6)
-        for point in self.pointList:
-            point.r = transform3(point.r)
+        if self.qs==1:
+
+            # update positions of all objects
             for body in self.bodyList:
-                if point.number in body.attachedP:
-                    i = body.attachedP.index(point.number)
-                    rRel = body.rPointRel[i]                            # get relative location of point on body
-                    body.rPointRel[i] = np.matmul(rotMat, rRel*scale)   # apply rotation to relative location
+                body.r6 = transform6(body.r6)
+            for point in self.pointList:
+                point.r = transform3(point.r)
+                for body in self.bodyList:
+                    if point.number in body.attachedP:
+                        i = body.attachedP.index(point.number)
+                        rRel = body.rPointRel[i]                            # get relative location of point on body
+                        body.rPointRel[i] = np.matmul(rotMat, rRel*scale)   # apply rotation to relative location
+        
+        elif self.qs==0:
+
+            for line in self.lineList:
+                for it in range(len(line.xp)):
+                    for node in range(len(line.xp[0])):
+                        line.xp[it,node], line.yp[it,node], line.zp[it,node] = transform3([line.xp[it,node], line.yp[it,node], line.zp[it,node]])
+
+                #for node in [line.xp, line.yp, line.zp]:
+                    #line.xp = transform3(node)
     
     
     def getPositions(self, DOFtype="free", dXvals=[]):

@@ -701,10 +701,10 @@ class Subsystem(System, Line):
             height_off_seabed = self.pointList[iPoint].r[2] + self.depth # measure the height of the rope-chain connecting point
 
         # if it's on the seabed, include some other factor to avoid a zero jacobian
-        if height_off_seabed <= 0:
-            fudge_factor = -self.lineList[iPoint].LBot       # add the negative of the contact length of the next line
-        else:
-            fudge_factor = 0.0
+        #if height_off_seabed <= 0:
+        fudge_factor = -self.lineList[iPoint].LBot       # add the negative of the contact length of the next line
+        #else:
+            #fudge_factor = 0.0
 
         if height_off_seabed < 0:
             print("Something is wrong")
