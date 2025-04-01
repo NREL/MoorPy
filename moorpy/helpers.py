@@ -41,36 +41,31 @@ class MoorPyError(Error):
 
 
 def printMat(mat):
-    '''Prints a matrix to a format that is specified
+    '''Prints the provided matrix with elements separated by tabs.
 
     Parameters
     ----------
     mat : array
         Any matrix that is to be printed.
-
-    Returns
-    -------
-    None.
-
     '''
-    for i in range(mat.shape[0]):
-        print( "\t".join(["{:+8.3e}"]*mat.shape[1]).format( *mat[i,:] ))
-        
+    
+    if mat.dtype in [int, bool]:
+        for i in range(mat.shape[0]):
+            print( "\t".join(["{}"]*mat.shape[1]).format( *mat[i,:] ))
+    else:
+        for i in range(mat.shape[0]):
+            print( "\t".join(["{:+8.3e}"]*mat.shape[1]).format( *mat[i,:] ))
+
+
 def printVec(vec):
-    '''Prints a vector to a format that is specified
+    '''Prints a vector with 4 decimal scientific notation and consisten spaces
 
     Parameters
     ----------
     vec : array
         Any vector that is to be printed.
-
-    Returns
-    -------
-    None.
-
     '''
     print( "\t".join(["{:+9.4e}"]*len(vec)).format( *vec ))
-
 
 
 def unitVector(r):

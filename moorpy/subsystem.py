@@ -99,6 +99,8 @@ class Subsystem(System, Line):
         # the old rAFair input for the position of a second fairlead of a shaerd mooring line is gone
         # currently we assume rad_fair and z_fair are same for both ends of a shared line...
         
+        self.offset = 0  # used for debugging
+        
         # seabed bathymetry - seabedMod 0 = flat; 1 = uniform slope, 2 = grid
         self.seabedMod = 0
         
@@ -547,6 +549,8 @@ class Subsystem(System, Line):
         rad_fair/z_fair setting. Optional argument z can be added for a z offset.
         '''
         
+        self.offset = float(offset)
+        
         # Use static EA values and unstretched lengths
         self.revertToStaticStiffness()
 
@@ -585,6 +589,8 @@ class Subsystem(System, Line):
         and B is set based on offset and the rad_fair/z_fair setting. 
         Optional argument z can be added for a z offset.
         '''
+        
+        self.offset = float(offset)
         
         if not self.dynamic_stiffness_activated: # if not already using them,
             System.activateDynamicStiffness(self)  # switch to dynamic EA values

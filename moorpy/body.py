@@ -195,13 +195,8 @@ class Body():
             k = np.matmul(self.R, r6Rel[3:])
             self.sys.rodList[rodID-1].rA = rA
             self.sys.rodList[rodID-1].rB = rA + k*self.sys.rodList[rodID-1].L
-   
-        if self.sys.display > 3:     
-            printVec(rPoint)
-            breakpoint()
-            
-        
-   
+    
+    
     def getForces(self, lines_only=False, all_DOFs=False):
         '''Sums the forces and moments on the Body, including its own plus those from any attached objects.
         Forces and moments are aligned with global x/y/z directions but are relative 
