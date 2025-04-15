@@ -1020,7 +1020,7 @@ class System():
 
 
     def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', 
-               outputList=[], Lm=[0], T_half=42, phiV=None, MDoptionsDict={}):
+               outputList=[], Lm=[0], T_half=42, phi=None, MDoptionsDict={}):
         '''Unloads a MoorPy system into a MoorDyn-style input file
 
         Parameters
@@ -1040,7 +1040,7 @@ class System():
         T_half : float, optional
             For tuning response of viscoelastic model, the period when EA is
             half way between the static and dynamic values [s]. Default is 42.
-        phiV : list of floats, optional 
+        phi : list of floats, optional 
             platform's rotations variables [deg]. Defaults to None and platforms are not unrotated.
         MDoptionsDict: dictionary, optional
             MoorDyn Options. If not given, default options are considered.
@@ -1135,8 +1135,8 @@ class System():
                             if attached_Point == point.number:
                                 #point_type = "Body" + str(body.number)
                                 point_type = "Vessel"                                
-                                if phiV:
-                                    c, s = np.cos(np.radians(-phiV[i])), np.sin(np.radians(-phiV[i]))
+                                if phi:
+                                    c, s = np.cos(np.radians(-phi[i])), np.sin(np.radians(-phi[i]))
                                     R = np.array([[c, -s, 0],
                                                   [s,  c, 0],
                                                   [0,  0, 1]])
@@ -1219,6 +1219,12 @@ class System():
             #version = 
             #description = 
             
+            # Check length of phi if given
+            if phi:
+                if len(phi) != len(self.bodyList):
+                    raise ValueError(f"Inconsistency in the size of the given platform rotation angle phi. 
+                                     There are {len(self.bodyList)} bodies in MS but only {len(phi)} angles are given.")
+                
             # Set up the dictionary that will be used to write the OPTIONS section
             if not MDoptionsDict:
                 MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
@@ -1424,8 +1430,8 @@ class System():
 
                                 if attached_Point == point.number:
                                     point_type = "Body" + str(body.number)
-                                    if phiV:
-                                        c, s = np.cos(np.radians(-phiV[i])), np.sin(np.radians(-phiV[i]))
+                                    if phi:
+                                        c, s = np.cos(np.radians(-phi[i])), np.sin(np.radians(-phi[i]))
                                         R = np.array([[c, -s, 0],
                                                     [s,  c, 0],
                                                     [0,  0, 1]])
