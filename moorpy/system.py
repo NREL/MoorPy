@@ -1222,8 +1222,7 @@ class System():
             # Check length of phi if given
             if phi:
                 if len(phi) != len(self.bodyList):
-                    raise ValueError(f"Inconsistency in the size of the given platform rotation angle phi. 
-                                     There are {len(self.bodyList)} bodies in MS but only {len(phi)} angles are given.")
+                    raise ValueError(f"Inconsistency in the size of the given platform rotation angle phi. There are {len(self.bodyList)} bodies in MS but only {len(phi)} angles are given.")
                 
             # Set up the dictionary that will be used to write the OPTIONS section
             if not MDoptionsDict:
