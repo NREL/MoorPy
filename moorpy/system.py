@@ -1035,6 +1035,13 @@ class System():
         None.
 
         '''
+
+        subsystem_idxs = [i for i, possible_line in enumerate(self.lineList) if isinstance(possible_line, type(moorpy.subsystem.Subsystem()))]
+        if len(subsystem_idxs) != 0:
+            subsystem_idxs.reverse()
+            for subsys_idx in subsystem_idxs:
+                subsystem2Line(self, subsys_idx, 10)
+                 
         if MDversion==1:
             #For version MoorDyn v1
 
@@ -1406,35 +1413,25 @@ class System():
             L.append("ID    LineType      AttachA  AttachB  UnstrLen  NumSegs  LineOutputs")
             L.append("(#)    (name)        (#)      (#)       (m)       (-)     (-)")
             
-            def Lines_append(line_dL, flag, connection_points, line, L, i, rod_ends):
+            for i,line in enumerate(self.lineList):
                 nSegs = int(np.ceil(line.L/line_dL)) if line_dL>0 else line.nNodes-1  # if target dL given, set nSegs based on it instead of line.nNodes
                 if connection_points[i,0] < 0:
                     attach = ['A', 'B']
                     L.append("{:<4d} {:<15} {}   {}   {:8.3f}   {:4d}       {}".format(
-                                    line.number, line.number - 1, 'R'+str(int(-connection_points[i,0]))+attach[int(rod_ends[i,0])], 'R' +str(int(-connection_points[i,1])) +attach[int(rod_ends[i,1])], line.L, nSegs, flag))
-                            
+                        line.number, line.number - 1, 'R'+str(int(-connection_points[i,0]))+attach[int(rod_ends[i,0])], 'R' +str(int(-connection_points[i,1])) +attach[int(rod_ends[i,1])], line.L, nSegs, flag))
+                    
                 else:
                     L.append("{:<4d} {:<15} {:^5d}   {:^5d}   {:8.3f}   {:4d}       {}".format(
-                                        line.number, line.type['name'], int(connection_points[i,0]), int(connection_points[i,1]), line.L, nSegs, flag))
-                return L
-            
-            for i, possible_line in enumerate(self.lineList):
-                if isinstance(possible_line, type(moorpy.subsystem.Subsystem())): # is a subsystem
-                    for line in possible_line.lineList:
-                        L = Lines_append(line_dL, flag, connection_points, line, L, i, rod_ends)
-                else: # is a line
-                    L = Lines_append(line_dL, flag, connection_points, possible_line, L, i, rod_ends)
+                                line.number, line.type['name'], int(connection_points[i,0]), int(connection_points[i,1]), line.L, nSegs, flag))
                 
             
             L.append("---------------------- OPTIONS ------------------------------------------------------")
 
             for key, val in MDoptionsDict.items():
                 L.append(f"{val:<15}  {key}")
-            
-            
+
             #Failure Header
             #Failure Table
-            
             
             L.append("----------------------- OUTPUTS -----------------------------------------------------")
             
