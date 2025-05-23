@@ -1868,6 +1868,12 @@ def read_mooring_file(dirName,fileName):
     
     data2 = np.array(data)
     
+    # Check if *** characters in data2 and if so replace with 0
+    for i in range(len(data2)):
+        for j in range(len(data2[i])):
+            if data2[i][j].count('***') > 0:
+                data2[i][j] = '0.0'
+
     data3 = data2.astype(float)
     
     return data3, ch, channels, units    

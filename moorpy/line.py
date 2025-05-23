@@ -53,7 +53,8 @@ class Line():
         self.type = lineType    # dictionary of a System.lineTypes entry
         self.cost = {}          # empty dictionary to contain cost information
         
-        self.EA = self.type['EA']  # use the default stiffness value for now (may be modified if using nonlinear elasticity) [N]
+        if not self.isRod:
+            self.EA = self.type['EA']  # use the default stiffness value for now (may be modified if using nonlinear elasticity) [N]
         
         self.nNodes = int(nSegs) + 1
         self.cb = float(cb)    # friction coefficient (will automatically be set negative if line is fully suspended)
