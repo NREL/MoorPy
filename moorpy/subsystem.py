@@ -383,8 +383,8 @@ class Subsystem(System, Line):
         if LH > 0:
             self.cos_th = dr[0]/LH          # cos of line heading
             self.sin_th = dr[1]/LH          # sin of line heading
-            th = np.arctan2(dr[1],dr[0])    # heading (from A to B) [rad]
-            self.R = rotationMatrix(0,0,th)  # rotation matrix about z that goes from +x direction to heading
+            self.th = np.arctan2(dr[1],dr[0])    # heading (from A to B) [rad]
+            self.R = rotationMatrix(0,0,self.th)  # rotation matrix about z that goes from +x direction to heading
             
         else:   # special case of vertical line: line heading is undefined - use zero as default
             self.cos_th = 1.0
@@ -609,6 +609,7 @@ class Subsystem(System, Line):
     
     def activateDynamicStiffness(self, display=0):
         '''Calls the dynamic stiffness method from System rather than from Line.'''
+        #self.dynamic_stiffness_activated = False
         System.activateDynamicStiffness(self, display=display)
     
     
@@ -750,9 +751,12 @@ class Subsystem(System, Line):
         return dynamicTe 
     
     
-    def getTenSF(self, iLine):
+    def getTenSF(self, iLine, corrosion_mm=0):
         '''Compute MBL/tension for a specific line.'''
-        return self.lineList[iLine].type['MBL'] / self.getTen(iLine) 
+        #return self.lineList[iLine].type['MBL'] / self.getTen(iLine) 
+
+        MBL_cor = self.lineList[iLine].type['MBL'] * ( (self.lineList[iLine].type['d_nom']-(corrosion_mm/1000))/self.lineList[iLine].type['d_nom'] )**2
+        return MBL_cor / self.getTen(iLine) 
         
 
     def getMinTenSF(self, display=0):

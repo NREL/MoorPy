@@ -1641,28 +1641,16 @@ class System():
             X = np.hstack([Xrot + tVec, X[3], X[4], X[5]])
             return X
 
-        if self.qs==1:
-
-            # update positions of all objects
+        # update positions of all objects
+        for body in self.bodyList:
+            body.r6 = transform6(body.r6)
+        for point in self.pointList:
+            point.r = transform3(point.r)
             for body in self.bodyList:
-                body.r6 = transform6(body.r6)
-            for point in self.pointList:
-                point.r = transform3(point.r)
-                for body in self.bodyList:
-                    if point.number in body.attachedP:
-                        i = body.attachedP.index(point.number)
-                        rRel = body.rPointRel[i]                            # get relative location of point on body
-                        body.rPointRel[i] = np.matmul(rotMat, rRel*scale)   # apply rotation to relative location
-        
-        elif self.qs==0:
-
-            for line in self.lineList:
-                for it in range(len(line.xp)):
-                    for node in range(len(line.xp[0])):
-                        line.xp[it,node], line.yp[it,node], line.zp[it,node] = transform3([line.xp[it,node], line.yp[it,node], line.zp[it,node]])
-
-                #for node in [line.xp, line.yp, line.zp]:
-                    #line.xp = transform3(node)
+                if point.number in body.attachedP:
+                    i = body.attachedP.index(point.number)
+                    rRel = body.rPointRel[i]                            # get relative location of point on body
+                    body.rPointRel[i] = np.matmul(rotMat, rRel*scale)   # apply rotation to relative location
     
     
     def getPositions(self, DOFtype="free", dXvals=[]):
@@ -2118,7 +2106,7 @@ class System():
                 tols += point.nDOF*[tol]
                 
         tols = np.array(tols)
-        lineTol = 0.01*tol
+        lineTol = 0.01*tol          # <<< maybe trying 0.1 instead of 0.01
         n = len(X0)
         
         # if there are no DOFs, just update the mooring system force calculations then exit
@@ -2414,7 +2402,8 @@ class System():
             #    breakpoint()
             
             
-            if np.sum(np.isnan(dX)) > 0: breakpoint()
+            if np.sum(np.isnan(dX)) > 0:
+                raise ValueError("Something is wrong")
                     
             return dX
 
@@ -3379,12 +3368,20 @@ class System():
         # NOTE this function has very limited functionality because imported systems will not have line MBLs.... still thinking about the best way to handle this
         if self.qs == 1:
             ratios = []
-            for line in self.lineList:            
-                if hasattr(line.type,'MBL'):
-                     ratios.append(max(line.TA, line.TB)/line.type['MBL'])
+            for line in self.lineList:
+                if hasattr(line, 'lineList'):
+                    for linesec in line.lineList:
+                        if 'MBL' in linesec.type:
+                            ratios.append(max(linesec.TA, linesec.TB)/linesec.type['MBL'])
+                        else:
+                            print('Line does not have an MBL')
+                            return
                 else:
-                    print('Line does not have an MBL')
-                    return
+                    if 'MBL' in linesec.type:
+                        ratios.append(max(line.TA, line.TB)/line.type['MBL'])
+                    else:
+                        print('Line does not have an MBL')
+                        return
             return(ratios)
         else:
             ratios = []
@@ -3682,10 +3679,13 @@ class System():
         
         if draw_clumps:
             for point in self.pointList:
+                markersize = np.max([point.m, point.v*self.rho])**0.4094 * 0.065
                 if point.v*self.rho > point.m:   # if it has positive buoyancy
-                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='b', markeredgecolor='k', marker='o', markersize=5)
+                    #ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='b', markeredgecolor='k', marker='o', markersize=5)
+                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], color='y', marker='o', markersize=markersize)
                 elif point.m > 0:   # if it is a weight
-                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='r', markeredgecolor='k', marker='o', markersize=5)
+                    #ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='r', markeredgecolor='k', marker='o', markersize=5)
+                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], color='k', marker='o', markersize=markersize)
                     
         if draw_anchors:
             for line in self.lineList:
@@ -3713,6 +3713,10 @@ class System():
                         line.drawLine(time, ax, color=[.8,.8,.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                     elif 'buoy' in line.type['material']:
                         line.drawLine(time, ax, color=[.6,.6,.0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                    elif 'hmpe' in line.type['material']:
+                        line.drawLine(time, ax, color='tab:green', endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                    elif 'cable' in line.type['material']:
+                        line.drawLine(time, ax, color='y', endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                     else:
                         line.drawLine(time, ax, color=[0.5,0.5,0.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 else:
@@ -3835,8 +3839,8 @@ class System():
         plotnodesline    = kwargs.get('plotnodesline'   , []        )   # the list of line numbers that match up with the desired node to be plotted
         label            = kwargs.get('label'           , ""        )   # the label/marker name of a line in the System
         draw_fairlead    = kwargs.get('draw_fairlead'   , False     )   # toggle to draw large points for the fairleads
-        line_width       = kwargs.get('linewidth'       , 1         )   # toggle to set the mooring line width in "drawLine2d
-
+        line_width       = kwargs.get('linewidth'       , 5.0         )   # toggle to set the mooring line width in "drawLine2d
+        marker       = kwargs.get('marker'       , 'o'         )
         
         
         
@@ -3884,8 +3888,17 @@ class System():
                     else:
                         c=color
                     plt.plot(x, y, 'v', color=c, markersize=5)
-            
+
         
+        for point in self.pointList:
+            markersize = np.max([point.m, point.v*self.rho])**0.4094 * 0.065
+            if point.v*self.rho > point.m:   # if it has positive buoyancy
+                #ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='b', markeredgecolor='k', marker='o', markersize=5)
+                ax.plot(point.r[0],point.r[2], color='y', marker='o', markersize=markersize)
+            elif point.m > 0:   # if it is a weight
+                #ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='r', markeredgecolor='k', marker='o', markersize=5)
+                ax.plot(point.r[0],point.r[2], color='k', marker='o', markersize=markersize)
+
         j = 0
         for line in self.lineList:
             if line!=self.lineList[0]:
@@ -3898,7 +3911,10 @@ class System():
                     line.drawLine2d(time, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
                 elif 'buoy' in line.type['material']:
                     line.drawLine2d(time, ax, color=[.6,.6,.0], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
-                 
+                elif 'cable' in line.type['material']:
+                    line.drawLine2d(time, ax, color='y', Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
+                elif 'hmpe' in line.type['material']:
+                    line.drawLine2d(time, ax, color='tab:green', Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
                 else:
                     line.drawLine2d(time, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
             else:

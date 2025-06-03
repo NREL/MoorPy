@@ -336,7 +336,8 @@ class Point():
             # if on seabed, apply a large stiffness to help out system equilibrium solve (if it's transitioning off, keep it a small step to start with)    
             if self.r[2] == -self.sys.depth:
                 K[2,2] += 1.0e12
-        if sum(np.isnan(K).ravel()) > 0: breakpoint()
+        if sum(np.isnan(K).ravel()) > 0:
+            raise ValueError("Something is wrong")
         if xyz:                     # if asked to output all DOFs, do it
             return K
         else:                       # otherwise only return rows/columns of active DOFs
