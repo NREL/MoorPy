@@ -3822,7 +3822,7 @@ class System():
         pointlabels      = kwargs.get('pointlabels'     , False     )   # toggle to include point number labels in the plot
         draw_body        = kwargs.get("draw_body"       , False     )   # toggle to draw the Bodies or not
         draw_anchors     = kwargs.get('draw_anchors'    , False     )   # toggle to draw the anchors of the mooring system or not   
-        draw_seabed     = kwargs.get('draw_seabed'    , True      )     # toggle to draw the seabed bathymetry or not
+        draw_seabed      = kwargs.get('draw_seabed'     , True      )   # toggle to draw the seabed bathymetry or not
         cmap_bath        = kwargs.get("cmap_bath"       , 'ocean'   )   # matplotlib colormap specification
         alpha            = kwargs.get("opacity"         , 1.0       )   # the transparency of the bathymetry plot_surface
         rang             = kwargs.get('rang'            , 'hold'    )   # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
@@ -3839,8 +3839,8 @@ class System():
         plotnodesline    = kwargs.get('plotnodesline'   , []        )   # the list of line numbers that match up with the desired node to be plotted
         label            = kwargs.get('label'           , ""        )   # the label/marker name of a line in the System
         draw_fairlead    = kwargs.get('draw_fairlead'   , False     )   # toggle to draw large points for the fairleads
-        line_width       = kwargs.get('linewidth'       , 5.0         )   # toggle to set the mooring line width in "drawLine2d
-        marker       = kwargs.get('marker'       , 'o'         )
+        line_width       = kwargs.get('linewidth'       , 1         )   # toggle to set the mooring line width in "drawLine2d
+        marker           = kwargs.get('marker'          , 'o'       )   # the symbol used to represent points with a nonzero mass or volume
         
         
         
