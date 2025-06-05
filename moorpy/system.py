@@ -4176,7 +4176,7 @@ class System():
         # Animation: update the figure with the updated coordinates from update_Coords function
         # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()
         line_ani = animation.FuncAnimation(fig, self.updateCoords, np.arange(1, nFrames-1, speed), fargs=(colortension, cmap_tension, label, dt),
-                                           interval=1, repeat=repeat, repeat_delay=delay, blit=False)
+                                           interval=interval, repeat=repeat, repeat_delay=delay, blit=False)
                                             # works well when np.arange(...nFrames...) is used. Others iterable ways to do this
         
         return line_ani
