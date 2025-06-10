@@ -505,6 +505,7 @@ class Subsystem(System, Line):
                 line.lw = 1
             else:
                 line.lw = 1
+                line.color = color
             
             # get the Line's local coordinates
             Xs0, Ys0, Zs, tensions = line.getLineCoords(Time)
