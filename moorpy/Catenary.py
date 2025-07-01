@@ -584,8 +584,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         X2 = np.linspace(0, d, nNodes)
                         Z2 = W2/T0*X2**2 + b*X2
                         
-                        Xs_parabola = X2*np.cos(theta) - Z2*np.sin(theta) # put in global frame
-                        Zs_parabola = X2*np.sin(theta) + Z2*np.cos(theta)
+                        Xs_backup = X2*np.cos(theta) - Z2*np.sin(theta) # put in global frame
+                        Zs_backup = X2*np.sin(theta) + Z2*np.cos(theta)
                         
                         # Now get the forces and stiffnesses, again assuming it's just based on elasticity
                         # This is back in the regular orientation - should we add weight in?
@@ -617,7 +617,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         info4['oths']['error'] = False
                         info4['oths']['message'] = 'Approximated as a straight massless spring as a last resort.'
                         
-                        
                         info.update(info4['oths'])  # <<< hopefully I modified enough in info4 for this to work
                         info['catenary'] = info4
                     
@@ -626,12 +625,26 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         L_bot = (d**2 - L**2)/(2*(XF-L))  # length on seabed
                         Ls = L - L_bot
                         VF = Ls*W                   # weight of suspended length
+                        VA = 0
                         HF = (XF - L_bot)/ZF * VF
-                   
+                        HA = HF
+                        T0 = np.sqrt(HF*HF+VF*VF)
+                        
+                        R = np.array([[XF/d, -ZF/d],[ZF/d, XF/d]]) # rotation matrix
+                        Kl = EA/L # inline stiffness (rough guess)
+                        Kt = T0/d # transverse stiffness
+                        K = np.matmul(R, np.matmul( np.array([[Kl,0],[0,Kt]]), R.T) ) # stiffness matrix (should check some of the math)
+                        
+                        
                         # put things in the format expected for later parts of the code
                         X = np.zeros(2)
                         X[0] = HF
                         X[1] = VF
+                        
+                        X2 = np.linspace(0, d, nNodes)  # straight line profile approximation
+                        Xs_backup = X2*XF/d
+                        Zs_backup = X2*ZF/d
+                        Ts_backup = np.linspace(0, T0, nNodes) # linear tension profile approximation
                         
                         info4['oths']['HF'] = HF
                         info4['oths']['VF'] = VF
@@ -646,6 +659,9 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         info4['oths']['ProfileType'] = -2 # flag for the bilinear solution for the coordinates...
                         info4['oths']['error'] = False
                         info4['oths']['message'] = 'Approximated as bilinear with seabed contact as a last resort.'
+                        
+                        info.update(info4['oths'])  # <<< hopefully I modified enough in info4 for this to work
+                        info['catenary'] = info4
                         
                     # Otherwise, we'd need an iterative solve of tension, curvature, and distributed load.
                     # It could potentially be with a parabola. We don't have that yet, so fail.
@@ -922,10 +938,14 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         Zs[I] = ( SQRT1VFMinWLs_HF2 - SQRT1VFMinWL_HF2 )*HF_W + s_EA*( VFMinWL + 0.5*Ws );
                         Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs );
                     
-                    if ProfileType==-1:  # new last-ditch solution attempt for taut lines 
-                        Xs[I] = Xs_parabola[I]
-                        Zs[I] = Zs_parabola[I]
+                    elif ProfileType == -1:  # new last-ditch solution attempt for taut lines 
+                        Xs[I] = Xs_backup[I]
+                        Zs[I] = Zs_backup[I]
                         Te[I] = T0
+                    elif ProfileType == -2:  # new last-ditch solution attempt for almost-taut lines 
+                        Xs[I] = Xs_backup[I]
+                        Zs[I] = Zs_backup[I]
+                        Te[I] = Ts_backup[I]
                     
                     
                     # A portion of the line must rest on the seabed
@@ -1543,9 +1563,11 @@ if __name__ == "__main__":
     #         CB=-48., alpha=0, HF0=17939., VF0=20596., Tol=2e-05, MaxIter=100, plots=1)
     
     
-    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(997.547, 186.0, 1016.97134, 799738627.1597824, 1594.059185077651, CB=0.0, alpha=0.0, HF0=314561.120450163, VF0=523671.07753570913, Tol=2e-05, MaxIter=100, depth=200, nNodes=100, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(997.547, 186.0, 1016.97134, 799738627.1597824, 1594.059185077651, CB=0.0, alpha=0.0, HF0=314561.120450163, VF0=523671.07753570913, Tol=2e-05, MaxIter=100, depth=200, nNodes=100, plots=1)
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(997.5168, 186.0, 1016.97134, 801228558.5672204, 1597.0290198975624, CB=0.0, alpha=0.0, HF0=315147.1684089979, VF0=524646.7105467543, Tol=2e-05, MaxIter=100, depth=200, nNodes=100, plots=1)
     
+    
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(36.8677299586167, -20.0, 41.943170938142885, 720564398.5432665, 4.790651494763263, CB=-20.0, alpha=0, HF0=0, VF0=0, Tol=0.00025, MaxIter=100, depth=0, plots=1)
     
     
     # First attempt's iterations are as follows:
