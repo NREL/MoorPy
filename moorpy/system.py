@@ -25,7 +25,7 @@ from moorpy.helpers import (rotationMatrix, rotatePosition, getH, printVec,
                             set_axes_equal, dsolve2, SolveError, MoorPyError, 
                             loadLineProps, getLineProps, read_mooring_file, 
                             printMat, printVec, getInterpNums, unitVector,
-                            getFromDict, addToDict, readBathymetryFile)
+                            getFromDict, addToDict, readBathymetryFile, subsystem2Line)
 
 
 
@@ -3035,7 +3035,7 @@ class System():
         if self.qs == 1:
             ratios = []
             for line in self.lineList:            
-                if hasattr(line.type,'MBL'):
+                if 'MBL' in line.type:
                      ratios.append(max(line.TA, line.TB)/line.type['MBL'])
                 else:
                     print('Line does not have an MBL')
@@ -3851,4 +3851,3 @@ class System():
             for x in range(len(L)):
                 out.write(L[x])
                 out.write('\n')    
-
