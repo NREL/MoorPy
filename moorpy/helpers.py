@@ -1114,12 +1114,11 @@ def lines2ss(ms):
             subsys_lines = subsys_line_id - 1 # no need to rearrange because it could work from either end
             subsys_points = subsys_point_id - 1
 
-        
         lines = list(subsys_lines)
         points = list(subsys_points)
         ms = lines2subsystem(lines, ms, span=None, case=case)
-        ms.initialize()
-        ms.solveEquilibrium()
+        #ms.initialize()
+        #ms.solveEquilibrium()
         i += 1
         if i >= len(ms.pointList):
             break
@@ -1244,13 +1243,17 @@ def lines2subsystem(lines,ms,span=None,case=0):
     
     # print('Replacing lines ',originalList,' with a subsystem appended to the end of the lineList ')
     # append subsystem to ms
+    
+    ss.initialize()
+    ss.solveEquilibrium()
+    
     ms.lineList.append(ss)
     ssNum = len(ms.lineList)
     # attach subystem line to the end points
     ms.pointList[pt[0]].attachLine(ssNum,0) # rA
     ms.pointList[pt[-1]].attachLine(ssNum,1) # rB     
         
-    return(ms)
+    return ms
 
 def deleteLine(ms,ln,delpts=0):
     '''
