@@ -86,7 +86,7 @@ AnchorProps: # TODO: do we even want the old installation and decommissioning co
     # decomcost    :  270181.06   # baseline decommissioning cost offset [$] - from 228967*euros2dollars(1.18) in MoorProps.py
 
   gravity       :
-    matcost_m    :  5.76e-1   # material cost per mass [2024$/kg]
+    matcost_m    :  5.40e-1   # material cost per mass [2024$/kg]
 
   suction       : # not in OMAE2025-156384 because old data
     matcost_m    :  10.25       # material cost per mass [$/kg] - from old number in MoorProps.py
