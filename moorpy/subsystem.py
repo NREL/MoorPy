@@ -703,10 +703,10 @@ class Subsystem(System, Line):
             height_off_seabed = self.pointList[iPoint].r[2] + self.depth # measure the height of the rope-chain connecting point
 
         # if it's on the seabed, include some other factor to avoid a zero jacobian
-        #if height_off_seabed <= 0:
-        fudge_factor = -self.lineList[iPoint].LBot       # add the negative of the contact length of the next line
-        #else:
-            #fudge_factor = 0.0
+        if height_off_seabed <= 0:
+            fudge_factor = -self.lineList[iPoint].LBot       # add the negative of the contact length of the next line
+        else:
+            fudge_factor = 0.0
 
         if height_off_seabed < 0:
             print("Something is wrong")
@@ -754,10 +754,7 @@ class Subsystem(System, Line):
     
     def getTenSF(self, iLine, corrosion_mm=0):
         '''Compute MBL/tension for a specific line.'''
-        #return self.lineList[iLine].type['MBL'] / self.getTen(iLine) 
-
-        MBL_cor = self.lineList[iLine].type['MBL'] * ( (self.lineList[iLine].type['d_nom']-(corrosion_mm/1000))/self.lineList[iLine].type['d_nom'] )**2
-        return MBL_cor / self.getTen(iLine) 
+        return self.lineList[iLine].type['MBL'] / self.getTen(iLine) 
         
 
     def getMinTenSF(self, display=0):

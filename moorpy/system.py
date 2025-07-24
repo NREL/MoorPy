@@ -2807,32 +2807,27 @@ class System():
         if self.nDOF == 0:
             return K_all
         
-        # invert matrix
-        try:
-            K_inv_all = np.linalg.inv(K_all)
-        except:
-            K_inv_all = np.linalg.pinv(K_all)
-        
-        # remove free DOFs (this corresponds to saying that the sum of forces on these DOFs will remain zero)
-        #indices = list(range(n))                # list of DOF indices that will remain active for this step
-        mask = [True]*n                         # this is a mask to be applied to the array K indices
-        
-        for i in range(n-1, -1, -1):            # go through DOFs and flag free ones for exclusion
+        # Go through DOFs and make a list of all coupled indices then free indices
+        i_arrange = []
+        for i in range(n):  
+            if DOFtypes[i] == -1:
+                i_arrange.append(i)
+        for i in range(n):  
             if DOFtypes[i] == 0:
-                mask[i] = False
-                #del indices[i]
+                i_arrange.append(i)
         
-        K_inv_coupled = K_inv_all[mask,:][:,mask]
+        # Arrange the matrix with coupled DOFs first
+        K_rearranged = K_all[:,i_arrange][i_arrange,:]
         
-        # invert reduced matrix to get coupled stiffness matrix (with free DOFs assumed to equilibrate linearly)
-        try:
-            K_coupled = np.linalg.inv(K_inv_coupled)
-        except:
-            K_coupled = np.linalg.pinv(K_inv_coupled)
         
-        #if tensions:
-        #    return K_coupled, J
-        #else:
+        # Do the reduction stuff... (use self.nCpldDOF for where to split)
+        # >>> TBD <<< K_reduced = 
+        
+        
+        # Arrange the answer back into the right order (if needed)
+        i_rearrange = [n-i for i in i_arrange] 
+        K_coupled = K_reduced[:,i_rearrange][i_rearrange,:]
+        
         return K_coupled    
             
     
