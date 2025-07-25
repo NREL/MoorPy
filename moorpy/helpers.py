@@ -1976,6 +1976,25 @@ def get_horizontal_oop_vec(p1,p2):
     return n_op
 
 
+def guyan_reduce(K, n_coupled):
+    """
+    Perform Guyan reduction on stiffness matrix K, keeping the first n_coupled DOFs as the loaded dofs.
+    Returns the reduced stiffness matrix with dimensions (n_coupled, n_coupled).
+    See https://hal.science/hal-01711552v1/document
+    """
+ 
+    # Partitions of the stiffness matrix
+    Kcc = K[:n_coupled, :n_coupled]
+    Kcu = K[:n_coupled, n_coupled:]
+    Kuc = K[n_coupled:, :n_coupled]
+    Kuu = K[n_coupled:, n_coupled:]
+
+    # Using the partitions to compute the reduced matrix
+    Kuu_inv = np.linalg.inv(Kuu)
+    K_reduced = Kcc - Kcu @ Kuu_inv @ Kuc
+    return K_reduced
+
+
 def get_dynamic_matrices(Line, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_tol=1e-4):
     """
     Evaluates dynamic matrices for a Line object.
