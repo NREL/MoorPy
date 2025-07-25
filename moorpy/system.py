@@ -23,7 +23,7 @@ from moorpy.helpers import (rotationMatrix, rotatePosition, getH, printVec,
                             set_axes_equal, dsolve2, SolveError, MoorPyError, 
                             loadLineProps, loadPointProps, getLineProps, getPointProps, read_mooring_file, 
                             printMat, printVec, getInterpNums, unitVector,
-                            getFromDict, addToDict, readBathymetryFile)
+                            getFromDict, addToDict, readBathymetryFile, guyan_reduce)
 
 
 
@@ -2822,15 +2822,11 @@ class System():
         
         # Arrange the matrix with coupled DOFs first
         K_rearranged = K_all[:,i_arrange][i_arrange,:]
+        K_coupled = guyan_reduce(K_rearranged, self.nCpldDOF)
         
-        
-        # Do the reduction stuff... (use self.nCpldDOF for where to split)
-        # >>> TBD <<< K_reduced = 
-        
-        
-        # Arrange the answer back into the right order (if needed)
-        i_rearrange = [n-i for i in i_arrange] 
-        K_coupled = K_reduced[:,i_rearrange][i_rearrange,:]
+        # # Arrange the answer back into the right order (if needed)
+        # i_rearrange = [n-i for i in i_arrange] 
+        # K_coupled = K_reduced[:,i_rearrange][i_rearrange,:]
         
         return K_coupled    
             
