@@ -178,14 +178,13 @@ class System():
 
         Returns
         -------
-        None.
-
+        Body
         '''
         
         self.bodyList.append( Body(self, len(self.bodyList)+1, mytype, r6, m=m,
             v=v, rCG=rCG, AWP=AWP, rM=rM, f6Ext=f6Ext, DOFs=DOFs) )
         
-        # handle display message if/when MoorPy is reorganized by classes
+        return self.bodyList[-1]  # pass back reference to the created object
         
         
     def addRod(self, rodType, rA, rB, nSegs=1, bodyID=0):
@@ -213,7 +212,9 @@ class System():
             else: # (in progress - unsure if htis works) <<<
                 self.rodList[-1].rA = rA  #.setEndPosition(rA, 0)  # set initial end A position
                 self.rodList[-1].rB = rB  #.setEndPosition(rB, 1)  # set initial end B position
-
+        
+        return self.rodList[-1]  # pass back reference to the created object
+        
     
     def addPoint(self, mytype, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0, body=0):
         '''Convenience function to add a Point to a mooring system
@@ -237,12 +238,10 @@ class System():
 
         Returns
         -------
-        None.
-
+        Point
         '''
 
         self.pointList.append( Point(self, len(self.pointList)+1, mytype, r, m=m, v=v, fExt=fExt, DOFs=DOFs, d=d) )
-        
         
         if body > 0:
             if body <= len(self.bodyList):
@@ -250,11 +249,9 @@ class System():
             else:
                 raise Exception(f"Provided body ID of {body} exceeds number of bodies in the system.")
         
-        
-        return len(self.pointList)  # return the index of the added point
-        #print("Created Point "+str(self.pointList[-1].number))
-        # handle display message if/when MoorPy is reorganized by classes
-
+        return self.pointList[-1]  # pass back reference to the created object
+    
+    
     def addLine(self, lUnstr, lineType, nSegs=40, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
 
@@ -273,8 +270,7 @@ class System():
 
         Returns
         -------
-        None.
-
+        Line
         '''
         
         if not isinstance(lineType, dict):                      # If lineType is not a dict, presumably it is a key for System.LineTypes.
@@ -296,8 +292,8 @@ class System():
             else:
                 raise Exception(f"Provided pointB of {pointB} exceeds number of points.")
         
-        #print("Created Line "+str(self.lineList[-1].number))
-        # handle display message if/when MoorPy is reorganized by classes
+        return self.lineList[-1]  # pass back reference to the created object
+    
     
     """
     def addSubsystem(self, lengths, lineTypes, pointA=0, pointB=0):
