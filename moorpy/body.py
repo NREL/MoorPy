@@ -110,6 +110,9 @@ class Body():
         self.attachedP.append(pointID)
         self.rPointRel.append(np.array(rAttach))
         
+        # Set point type to fixed
+        self.sys.pointList[pointID-1].type = 1
+        
         if self.sys.display > 1:
             print("attached Point "+str(pointID)+" to Body "+str(self.number))
     
