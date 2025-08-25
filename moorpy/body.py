@@ -240,7 +240,7 @@ class Body():
         # add forces from any attached Points (and their attached lines)
         for PointID,rPointRel in zip(self.attachedP,self.rPointRel):
         
-            fPoint = self.sys.pointList[PointID-1].getForces(lines_only=lines_only) # get net force on attached Point
+            fPoint = self.sys.pointList[PointID-1].getForces(lines_only=lines_only, xyz=True) # get net force on attached Point
             rPoint_rotated = rotatePosition(rPointRel, self.r6[3:])                 # relative position of Point about body ref point in unrotated reference frame  
             f6 += translateForce3to6DOF(rPoint_rotated, fPoint)                     # add net force and moment resulting from its position to the Body
             
@@ -343,8 +343,8 @@ class Body():
         for PointID,rPointRel in zip(self.attachedP,self.rPointRel):
             
             r = rotatePosition(rPointRel, self.r6[3:])          # relative position of Point about body ref point in unrotated reference frame  
-            f3 = self.sys.pointList[PointID-1].getForces()      # total force on point (for additional rotational stiffness term due to change in moment arm)
-            K3 = self.sys.pointList[PointID-1].getStiffnessA()  # local 3D stiffness matrix of the point
+            f3 = self.sys.pointList[PointID-1].getForces(xyz=True)      # total force on point (for additional rotational stiffness term due to change in moment arm)
+            K3 = self.sys.pointList[PointID-1].getStiffnessA(xyz=True)  # local 3D stiffness matrix of the point
             
             # following are from functions translateMatrix3to6
             H = getH(r)
