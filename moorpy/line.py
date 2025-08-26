@@ -450,6 +450,11 @@ class Line():
         
         linebit = []  # make empty list to hold plotted lines, however many there are
         
+        if color == 'self':
+            colorplot = self.color  # attempt to allow custom colors
+        else:
+            colorplot = color
+        
         Xs, Ys, Zs, Ts = self.getLineCoords(Time)
         
         if self.isRod > 0:
@@ -459,9 +464,9 @@ class Line():
             Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] 
         
             for i in range(int(len(Xs)/2-1)):
-                linebit.append(ax.plot(Xs2d[2*i:2*i+2]    ,Ys2d[2*i:2*i+2]    , lw=0.5, color=color))  # side edges
-                linebit.append(ax.plot(Xs2d[[2*i,2*i+2]]  ,Ys2d[[2*i,2*i+2]]  , lw=0.5, color=color))  # end A edges
-                linebit.append(ax.plot(Xs2d[[2*i+1,2*i+3]],Ys2d[[2*i+1,2*i+3]], lw=0.5, color=color))  # end B edges
+                linebit.append(ax.plot(Xs2d[2*i:2*i+2]    ,Ys2d[2*i:2*i+2]    , lw=0.5, color=colorplot))  # side edges
+                linebit.append(ax.plot(Xs2d[[2*i,2*i+2]]  ,Ys2d[[2*i,2*i+2]]  , lw=0.5, color=colorplot))  # end A edges
+                linebit.append(ax.plot(Xs2d[[2*i+1,2*i+3]],Ys2d[[2*i+1,2*i+3]], lw=0.5, color=colorplot))  # end B edges
         
         # drawing lines...
         else:            
