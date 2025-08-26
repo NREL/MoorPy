@@ -448,7 +448,10 @@ class Subsystem(System, Line):
         '''wrapper to System.plot2d with some transformation applied'''
         
         for i, line in enumerate(self.lineList):
-            
+            if isinstance(label,list) and len(label)==len(self.lineList):
+                lab = label[i]
+            else:
+                lab = label
             # color and width settings
             if color == 'self':
                 colorplot = line.color  # attempt to allow custom colors
@@ -480,7 +483,7 @@ class Subsystem(System, Line):
                     rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
                     ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba, zorder=100)
             else:
-                ax.plot(Xs2d, Ys2d, color=colorplot, lw=lw, zorder=100, label=label, alpha=alpha)
+                ax.plot(Xs2d, Ys2d, color=colorplot, lw=lw, zorder=100, label=lab, alpha=alpha)
             
             if len(plotnodes) > 0:
                 for i,node in enumerate(plotnodes):
