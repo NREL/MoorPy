@@ -3022,32 +3022,33 @@ class System():
 
         # get full system stiffness matrix
         M_all, A_all, B_all, K_all = self.getSystemDynamicMatrices(DOFtype="both", lines_only=lines_only)
+                
+        # If there are no free DOFs, then _all is _coupled, so return the _all matrices
+        if self.nDOF == 0:
+            return M_all, A_all, B_all, K_all
         
-        # invert matrix
-        M_inv_all = np.linalg.pinv(M_all)
-        A_inv_all = np.linalg.pinv(A_all)
-        B_inv_all = np.linalg.pinv(B_all)
-        K_inv_all = np.linalg.pinv(K_all)
-        
-        # remove free DOFs (this corresponds to saying that the sum of forces on these DOFs will remain zero)
-        #indices = list(range(n))                # list of DOF indices that will remain active for this step
-        mask = [True]*n                         # this is a mask to be applied to the array K indices
-        
-        for i in range(n-1, -1, -1):            # go through DOFs and flag free ones for exclusion
+        # Go through DOFs and make a list of all coupled indices then free indices
+        i_arrange = []
+        for i in range(n):  
+            if DOFtypes[i] == -1:
+                i_arrange.append(i)
+        for i in range(n):  
             if DOFtypes[i] == 0:
-                mask[i] = False
-                #del indices[i]
-        
-        M_inv_coupled = M_inv_all[mask,:][:,mask]
-        A_inv_coupled = A_inv_all[mask,:][:,mask]
-        B_inv_coupled = B_inv_all[mask,:][:,mask]        
-        K_inv_coupled = K_inv_all[mask,:][:,mask]
-        
-        # invert reduced matrix to get coupled stiffness matrix (with free DOFs assumed to equilibrate linearly)
-        M_coupled = np.linalg.pinv(M_inv_coupled)
-        A_coupled = np.linalg.pinv(A_inv_coupled)
-        B_coupled = np.linalg.pinv(B_inv_coupled)
-        K_coupled = np.linalg.pinv(K_inv_coupled)
+                i_arrange.append(i)
+
+        # Arrange the matrix with coupled DOFs first and then do guyan reduction
+        # TODO: This is preliminary! guyan_reduce only works for stiffness now. Need to change the function to work with other matrices
+        K_rearranged = K_all[:,i_arrange][i_arrange,:]
+        K_coupled = guyan_reduce(K_rearranged, self.nCpldDOF)
+
+        M_rearranged = M_all[:,i_arrange][i_arrange,:]
+        M_coupled = guyan_reduce(M_rearranged, self.nCpldDOF)
+
+        A_rearranged = A_all[:,i_arrange][i_arrange,:]
+        A_coupled = guyan_reduce(A_rearranged, self.nCpldDOF)
+
+        B_rearranged = B_all[:,i_arrange][i_arrange,:]
+        B_coupled = guyan_reduce(B_rearranged, self.nCpldDOF)
 
         return M_coupled, A_coupled, B_coupled, K_coupled
         

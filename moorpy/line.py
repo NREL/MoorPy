@@ -7,7 +7,7 @@ from moorpy.nonlinear import nonlinear
 from moorpy.helpers import (unitVector, LineError, CatenaryError, 
                      rotationMatrix, makeTower, read_mooring_file, 
                      quiver_data_to_segments, printVec, printMat,
-                     get_dynamic_matrices, get_dynamic_tension, get_modes)
+                     get_dynamic_matrices, get_dynamic_tension, get_modes, guyan_reduce)
 
 from os import path
 
@@ -1090,7 +1090,6 @@ class Line():
             # The matrices should be symmetrical, but they can be slightly off due to numerical errors.
             # Because we are going to invert them twice, we force them to be symmetrical to avoid amplifying the errors. 
             matrix = (matrix + matrix.T)/2
-            zeros = np.zeros((3,3))
 
             # Empty nodes2remove is the same thing as not removing any nodes
             if nodes2remove is not None and nodes2remove.size==0:
@@ -1107,28 +1106,32 @@ class Line():
                 mask = np.ones(matrix.shape[0], dtype=bool)
                 mask[dofs2remove] = False
                 # Remove the rows and columns
-                matrix = matrix[mask][:, mask]
+                matrix = matrix[mask][:, mask]           
 
-            matrix_inv = np.linalg.pinv(matrix)
-
-            top_left     = matrix_inv[:3, :3]
-            top_right    = matrix_inv[:3, -3:]
-            bottom_left  = matrix_inv[-3:, :3]
-            bottom_right = matrix_inv[-3:, -3:]
+            n = matrix.shape[0]
 
             # If we are not removing the extremities, we fill the whole 6x6 matrix_inv_coupled
-            if nodes2remove is None or (nodes2remove[0] !=0 and nodes2remove[-1] != self.nNodes-1):
-                matrix_inv_coupled = np.block([[top_left, top_right], [bottom_left, bottom_right]])
+            if nodes2remove is None or (nodes2remove[0] !=0 and nodes2remove[-1] != self.nNodes-1):                
+                keep = list(range(3)) + list(range(n-3, n))
+                free = [i for i in range(n) if i not in keep]
+                i_arrange = keep + free
+                matrix_coupled = guyan_reduce(matrix[:,i_arrange][i_arrange,:], len(keep))
             
             # if we are removing the first node, we fill the bottom right 3x3 matrix
-            if nodes2remove is not None and nodes2remove[0] == 0:                
-                    matrix_inv_coupled = np.block([[np.zeros((3,3)), np.zeros((3,3))], [np.zeros((3,3)), bottom_right]])
+            if nodes2remove is not None and nodes2remove[0] == 0:
+                keep = list(range(n-3, n))
+                free = [i for i in range(n) if i not in keep]
+                i_arrange = keep + free
+                matrix_coupled = np.block([[np.zeros((3,3)), np.zeros((3,3))], [np.zeros((3,3)), guyan_reduce(matrix[:,i_arrange][i_arrange,:], len(keep))]])
             
             # if we are removing the last node, we fill the top left 3x3 matrix
             if nodes2remove is not None and nodes2remove[-1] == self.nNodes-1:
-                matrix_inv_coupled = np.block([[top_left, np.zeros((3,3))], [np.zeros((3,3)), np.zeros((3,3))]])
+                keep = list(range(3))
+                free = [i for i in range(n) if i not in keep]
+                i_arrange = keep + free
+                matrix_coupled = np.block([[guyan_reduce(matrix[:,i_arrange][i_arrange,:], len(keep)), np.zeros((3,3))], [np.zeros((3,3)), np.zeros((3,3))]])
 
-            return np.linalg.pinv(matrix_inv_coupled)
+            return matrix_coupled
        
         # Remove the nodes that are lying on the seabed
         if not hasattr(self, 'lineList'):
@@ -1152,25 +1155,7 @@ class Line():
                     Z_mean[idxNodeA:idxNodeA+n-1] = z[1:]
                     idxNodeA += (n - 1)
         idx2remove = np.where(Z_mean <= -depth+1e-06)[0]
-        # idx2remove = None
-        
-        # # Keep two of the nodes to remove, which are the ones in the interface with the nodes to keep
-        # is_seabed = Z_mean <= -depth + 1e-06
-        # transition_indices = np.where(np.abs(np.diff(is_seabed.astype(int))) == 1)[0]
-        
-        # # # Adjust to keep an additional node at each transition
-        # # # For True to False transitions, keep the transition index and the one before it
-        # # # For False to True transitions, keep the transition index and the one after it
-        # additional_indices = []
-        # for idx in transition_indices:
-        #     if is_seabed[idx]:  # True to False transition
-        #         additional_indices.append(idx - 1 if idx > 0 else idx)  # Ensure idx-1 is not negative
-        #     else:  # False to True transition
-        #         additional_indices.append(idx + 1 if idx + 1 < len(is_seabed) else idx)  # Ensure idx+1 is within bounds        
-        # transition_and_additional_indices = np.unique(transition_indices.tolist() + additional_indices) # Combine transition indices with their additional indices
-        # idx2remove_all = np.where(is_seabed)[0]  # Get all indices where is_seabed is True
-        # idx2remove = np.setdiff1d(idx2remove_all, transition_and_additional_indices)  # Remove transition and additional indices from idx2remove_all
-        
+                
         # If we have the motions of the extremities of the lines, we can iterate the quadratic drag to compute the damping matrix.
         # Otherwise, we use the default values for the motion amplitude (unitary displacement for all nodes) to linearize the quadratic drag. This is clearly wrong, but affects only drag.
         if RAO_A is None and RAO_B is None:
@@ -1186,8 +1171,7 @@ class Line():
         self.Ml = lump_matrix(self.Ml_allNodes, nodes2remove=idx2remove)
         self.Al = lump_matrix(self.Al_allNodes, nodes2remove=idx2remove)
         self.Bl = lump_matrix(self.Bl_allNodes, nodes2remove=idx2remove)
-        self.Kl = lump_matrix(self.Kl_allNodes, nodes2remove=idx2remove)
-        
+        self.Kl = lump_matrix(self.Kl_allNodes, nodes2remove=idx2remove)       
 
     def getDynamicMatricesLumped(self):
         '''Return the lumped M,A,B,K matrices for the Line object.'''

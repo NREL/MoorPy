@@ -1990,7 +1990,10 @@ def guyan_reduce(K, n_coupled):
     Kuu = K[n_coupled:, n_coupled:]
 
     # Using the partitions to compute the reduced matrix
-    Kuu_inv = np.linalg.inv(Kuu)
+    try:
+        Kuu_inv = np.linalg.inv(Kuu)
+    except:
+        Kuu_inv = np.linalg.pinv(Kuu)
     K_reduced = Kcc - Kcu @ Kuu_inv @ Kuc
     return K_reduced
 
