@@ -1,4 +1,10 @@
-# Default mooring line property coefficients for MoorPy with updated cost curves based on work presented in OMAE2025-156384
+# Default line properties with cost curves based on work presented in:
+  # Davies, R, Baca, E, & Hall, M. "An Updated Mooring Cost Modeling Tool Set With Application to a Reference Model
+  # Wave Energy Converter." Proceedings of the ASME 2025 44th International Conference on Ocean, Offshore and Arctic 
+  # Engineering. Volume 5: Ocean Renewable Energy. Vancouver, British Columbia, Canada. June 22–27, 2025. V005T09A066. 
+  # ASME. https://doi.org/10.1115/OMAE2025-156384
+
+
 # The following is YAML syntax and follows a heirarchy of
 # lineProps -> [line material name] -> [line material coefficients]
 
@@ -26,13 +32,13 @@
 #    density   :     # density of the line material [kg/m^3] (e.g., chain density = 7850 kg/m^3)
 #    NOTE: Only one of the above three variables can be used as input!
 #    
-#    cost_0    :     # cost offset [2024$/m]
-#    cost_d    :     # cost per meter per diameter [2024$/m^2]
-#    cost_d2   :     # cost per meter per diameter^2 [2024$/m^3]
-#    cost_d3   :     # cost per meter per diameter^2 [2024$/m^4]
-#    cost_mass :     # cost per mass [2024$/kg]
-#    cost_EA   :     # cost per stiffness [2024$/m/N] 
-#    cost_MBL  :     # cost per MBL [2024$/m/N] 
+#    cost_0    :     # cost offset [$/m]
+#    cost_d    :     # cost per meter per diameter [$/m^2]
+#    cost_d2   :     # cost per meter per diameter^2 [$/m^3]
+#    cost_d3   :     # cost per meter per diameter^2 [$/m^4]
+#    cost_mass :     # cost per mass [$/kg]
+#    cost_EA   :     # cost per meter per stiffness [$/m/N] 
+#    cost_MBL  :     # cost per meter per MBL [$/m/N] 
 #
 #    Cd        :     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
 #    Cd_ax     :     # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
@@ -47,8 +53,8 @@
 # - The chain MBL uses a cubic function, so be aware if you are researching theoretical chains with diameters greater than about 360mm, as the MBL will then decrease
 # - Chain EA values not provided in manufacturer catalogs, so the below coefficients are taken from DNV-OS-E301 2013
 
-# Note costs combine all provided coefficients. If a coefficient is not provided it is assumed zero. All provided values will be used according to: 
-# cost = 'cost_0' + 'cost_d'*d + 'cost_d2'*d**2 + 'cost_d3'*d**3 + 'cost_mass'*mass + 'cost_EA'*EA + 'cost_MBL'*MBL
+# Note: costs combine all provided coefficients. If a coefficient is not provided it is assumed zero. All provided values will be used according to: 
+# cost per meter = 'cost_0' + 'cost_d' * d + 'cost_d2' * d**2 + 'cost_d3' * d**3 + 'cost_mass' * mass per meter + 'cost_EA' * EA + 'cost_MBL' * MBL
 
 lineProps: 
 
@@ -135,8 +141,3 @@ lineProps:
     Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
     cost_d    : -2.27e3    # cost per meter per diameter [2024$/m^2]
     cost_d2   :  1.10e5    # cost per meter per diameter^2 [2024$/m^3]
-
-
-
-
-
