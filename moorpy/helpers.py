@@ -2078,9 +2078,9 @@ def get_dynamic_matrices(Line, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_t
     uh_e1 = np.einsum('ij,j->i',v_dynamic[:,0,:],h_op) # normal horizontal out of plane velocity
     up_e1 = np.einsum('ij,j->i',v_dynamic[:,0,:],p_e1) # normal in plane velocity
 
-    sigma_ut_e1 = np.sqrt(np.trapz(np.abs(ut_e1)**2*S_zeta,omegas))
-    sigma_uh_e1 = np.sqrt(np.trapz(np.abs(uh_e1)**2*S_zeta,omegas))
-    sigma_up_e1 = np.sqrt(np.trapz(np.abs(up_e1)**2*S_zeta,omegas))
+    sigma_ut_e1 = np.sqrt(np.trapezoid(np.abs(ut_e1)**2*S_zeta,omegas))
+    sigma_uh_e1 = np.sqrt(np.trapezoid(np.abs(uh_e1)**2*S_zeta,omegas))
+    sigma_up_e1 = np.sqrt(np.trapezoid(np.abs(up_e1)**2*S_zeta,omegas))
 
     tt_e1 = np.outer(t_e1,t_e1) # local tangential to global components transformation matrix
     pp_e1 = np.outer(p_e1,p_e1) # local normal inplane to global components transformation matrix
@@ -2118,9 +2118,9 @@ def get_dynamic_matrices(Line, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_t
         uh_bw = np.einsum('ij,j->i',v_dynamic[:,n,:],h_op) # normal horizontal out of plane velocity
         up_bw = np.einsum('ij,j->i',v_dynamic[:,n,:],p_bw) # normal in plane velocity
 
-        sigma_ut_bw = np.sqrt(np.trapz(np.abs(ut_bw)**2*S_zeta,omegas))
-        sigma_uh_bw = np.sqrt(np.trapz(np.abs(uh_bw)**2*S_zeta,omegas))
-        sigma_up_bw = np.sqrt(np.trapz(np.abs(up_bw)**2*S_zeta,omegas))
+        sigma_ut_bw = np.sqrt(np.trapezoid(np.abs(ut_bw)**2*S_zeta,omegas))
+        sigma_uh_bw = np.sqrt(np.trapezoid(np.abs(uh_bw)**2*S_zeta,omegas))
+        sigma_up_bw = np.sqrt(np.trapezoid(np.abs(up_bw)**2*S_zeta,omegas))
 
         tt_bw = np.outer(t_bw,t_bw) # local tangential to global components transformation matrix
         pp_bw = np.outer(p_bw,p_bw) # local normal inplane to global components transformation matrix
@@ -2145,9 +2145,9 @@ def get_dynamic_matrices(Line, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_t
         uh_fw = np.einsum('ij,j->i',v_dynamic[:,n,:],h_op) # normal horizontal out of plane velocity
         up_fw = np.einsum('ij,j->i',v_dynamic[:,n,:],p_fw) # normal in plane velocity
 
-        sigma_ut_fw = np.sqrt(np.trapz(np.abs(ut_fw)**2*S_zeta,omegas))
-        sigma_uh_fw = np.sqrt(np.trapz(np.abs(uh_fw)**2*S_zeta,omegas))
-        sigma_up_fw = np.sqrt(np.trapz(np.abs(up_fw)**2*S_zeta,omegas))
+        sigma_ut_fw = np.sqrt(np.trapezoid(np.abs(ut_fw)**2*S_zeta,omegas))
+        sigma_uh_fw = np.sqrt(np.trapezoid(np.abs(uh_fw)**2*S_zeta,omegas))
+        sigma_up_fw = np.sqrt(np.trapezoid(np.abs(up_fw)**2*S_zeta,omegas))
 
         tt_fw = np.outer(t_fw,t_fw) # local tangential to global components transformation matrix
         pp_fw = np.outer(p_fw,p_fw) # local normal inplane to global components transformation matrix
@@ -2183,9 +2183,9 @@ def get_dynamic_matrices(Line, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_t
     uh_eN = np.einsum('ij,j->i',v_dynamic[:,N-1,:],h_op) # normal horizontal out of plane velocity
     up_eN = np.einsum('ij,j->i',v_dynamic[:,N-1,:],p_eN) # normal in plane velocity
 
-    sigma_ut_eN = np.sqrt(np.trapz(np.abs(ut_eN)**2*S_zeta,omegas))
-    sigma_uh_eN = np.sqrt(np.trapz(np.abs(uh_eN)**2*S_zeta,omegas))
-    sigma_up_eN = np.sqrt(np.trapz(np.abs(up_eN)**2*S_zeta,omegas))
+    sigma_ut_eN = np.sqrt(np.trapezoid(np.abs(ut_eN)**2*S_zeta,omegas))
+    sigma_uh_eN = np.sqrt(np.trapezoid(np.abs(uh_eN)**2*S_zeta,omegas))
+    sigma_up_eN = np.sqrt(np.trapezoid(np.abs(up_eN)**2*S_zeta,omegas))
 
     tt_eN = np.outer(t_eN,t_eN) # local tangential to global components transformation matrix
     pp_eN = np.outer(p_eN,p_eN) # local normal inplane to global components transformation matrix
@@ -2307,7 +2307,7 @@ def get_dynamic_tension(line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
             X[i, 3:-3] = np.linalg.solve(H[i, 3:-3, 3:-3], F[i])
             
         S_Xd[:] = np.abs(1j*omegas[:,None]*X)**2*S_zeta[:,None]
-        sigma_Xd[:] = np.sqrt(np.trapz(S_Xd,omegas,axis=0)) 
+        sigma_Xd[:] = np.sqrt(np.trapezoid(S_Xd,omegas,axis=0)) 
         r_dynamic[:] = X.reshape(X.shape[0],int(X.shape[1]/3),3)
         if (np.abs(sigma_Xd-sigma_Xd0) <= tol*np.abs(sigma_Xd0)).all():
             break
@@ -2344,7 +2344,7 @@ def get_dynamic_tension(line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_to
     # S_T[:,0] = S_T[:,1]
 
     T_nodes_psd = np.abs(T_nodes_amp)**2/(2*dw[:,None])
-    T_nodes_std = np.sqrt(np.trapz(T_nodes_psd,omegas,axis=0))
+    T_nodes_std = np.sqrt(np.trapezoid(T_nodes_psd,omegas,axis=0))
 
 
     dr = np.diff(r_static,axis=0)

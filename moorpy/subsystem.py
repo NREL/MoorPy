@@ -657,7 +657,7 @@ class Subsystem(System, Line):
             # Attachment point properties
             attachment = self.pointList[line.attached[-1]-1] # attachment point
             attachment_idx = n2 - 1 # last node index
-            sigma_vp = np.sqrt(np.trapz(np.abs(v_dynamic[:,attachment_idx,:])**2*S_zeta[:,None],omegas,axis=0)) # standard deviations of the global components of the attachment point's velocity
+            sigma_vp = np.sqrt(np.trapezoid(np.abs(v_dynamic[:,attachment_idx,:])**2*S_zeta[:,None],omegas,axis=0)) # standard deviations of the global components of the attachment point's velocity
 
             M[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += attachment.m*np.eye(3) 
             A[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += attachment.Ca* self.rho * attachment.v * np.eye(3)
