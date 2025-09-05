@@ -1,8 +1,14 @@
 # The ABCD YAML
 
-# Default point properties with cost curves based on work presented in OMAE2025-156384
-# The following is YAML syntax and follows a heirarchy of
+# Default point properties with cost curves based on work presented in:
+  # Davies, R, Baca, E, & Hall, M. "An Updated Mooring Cost Modeling Tool Set With Application to a Reference Model
+  # Wave Energy Converter." Proceedings of the ASME 2025 44th International Conference on Ocean, Offshore and Arctic 
+  # Engineering. Volume 5: Ocean Renewable Energy. Vancouver, British Columbia, Canada. June 22–27, 2025. V005T09A066. 
+  # ASME. https://doi.org/10.1115/OMAE2025-156384
 
+
+
+# The following is YAML syntax and follows a heirarchy of
 # AnchorProps  -> [anchor type name]          -> [component coefficients] NOT SUPPORTED - potential approach
 # BuoyProps    -> [buoy type name]            -> [component coefficients]
 # ConnectProps -> [connection component name] -> [component coefficients]
@@ -55,7 +61,7 @@
     # frac_a_<anchor name>:   # fraction of total anchor size per anchor of this type. Default is 1/total number of anchors.
     # frac_b_<buoy name>  :   # fraction of total buoyancy per buoy of this type. Default is 1/total number of buoys.
 
-AnchorProps: # TODO: do we even want the old installation and decommissioning costs here?
+AnchorProps: 
 
   # example       :
     # matcost_m    :     # material cost per mass [$/kg]
