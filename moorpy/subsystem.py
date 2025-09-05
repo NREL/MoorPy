@@ -139,6 +139,8 @@ class Subsystem(System, Line):
         self.MDoptions = {} # dictionary that can hold any MoorDyn options read in from an input file, so they can be saved in a new MD file if need be
         self.qs = 1         # flag that it's a MoorPy analysis, so System methods don't complain. One day should replace this <<<
     
+        self.dynamic_stiffness_activated = False  # flag turned on when dynamic EA values are activate
+
     def setSSBathymetry(self):
         '''Provides global bathymetry data, but creates a 2D line corresponding to what's underneath the subsystem
 
@@ -613,7 +615,6 @@ class Subsystem(System, Line):
     
     def activateDynamicStiffness(self, display=0):
         '''Calls the dynamic stiffness method from System rather than from Line.'''
-        #self.dynamic_stiffness_activated = False
         System.activateDynamicStiffness(self, display=display)
     
     

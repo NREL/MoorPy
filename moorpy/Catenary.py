@@ -1154,7 +1154,7 @@ def eval_func_cat(X, args):
     if (hA > 0.0                    # no portion of the line rests on the seabed
         or W < 0.0  
         or VFMinWL > sin_alpha/cos_alpha
-        or (ZF/XF > 0.1 and L-d < 0.001*(lp-d)) ): # crude check that nothing should be laying along the seabed
+        or (ZF/XF > 0.2 and L-d < 0.001*(lp-d)) ): # crude check that nothing should be laying along the seabed
         ProfileType = 1
     elif not alpha==0:              # a portion of line rests along a *sloped* seabed
         ProfileType = 7
