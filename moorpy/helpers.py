@@ -1747,6 +1747,180 @@ def subsystem2Line(ms,ssNum,nsegs=10):
     if 'body' in points[-1]:
         ms.bodyList[points[-1]['body']].attachPoint(len(ms.pointList),[ms.pointList[-1].r[0]-ms.bodyList[points[-1]['body']].r6[0],ms.pointList[-1].r[1]-ms.bodyList[points[-1]['body']].r6[1],ms.pointList[-1].r[2]])
    
+def ss2lines(ms, nsegs=10):
+    '''Replace all subsystem in ms with equivalent set of lines
+
+    Parameters
+    ----------
+    ms : system object
+        MoorPy system object that contains the subsystem
+    nsegs : list OR int, optional
+        Number of segments per line for each line. Can be an integer (all line sections have the same # of segments)
+        OR can be a list (# of segments for each section of line in order from A to B)
+
+    Returns
+    -------
+    new mooring system object with all subsystems replaced with lines
+
+    '''
+    from copy import deepcopy
+    original_ms = deepcopy(ms)
+    subsystemCount = len(original_ms.lineList)
+    sub_idx = 0
+    newly_created_lines = []
+    shared_point_map = {}
+    # Use a stable key per original point (coordinates are fine if stable)
+    def _pt_key(P):
+        # round to avoid tiny float diffs; include type to be safer
+        return (round(P.r[0], 6), round(P.r[1], 6), round(P.r[2], 6), int(P.type))    
+    for _ in range(subsystemCount):
+        # get subsystem object
+        ss = ms.lineList[sub_idx]   
+        types = []
+        lengths = []
+        points = []
+        # record line types, lines, and points in the subsystem
+        for i in range(0,len(ss.lineList)):
+            types.append(ss.lineList[i].type)
+            lengths.append(ss.lineList[i].L)
+            if not types[-1]['name'] in ms.lineTypes:
+                # add type to lineTypes list
+                ms.lineTypes[types[-1]['name']] = types[-1]
+        for i,spt in enumerate(ss.pointList):
+            # gather all info about the points in the subsystem
+            points.append({'r':spt.r,'m':spt.m,'v':spt.v,'CdA':spt.CdA,'d':spt.d,'type':spt.type,'Ca':spt.Ca})
+        # points[0]['r'] = ss.rA
+        # points[-1]['r'] = ss.rB
+            if spt.attachedEndB[-1]:
+                endB = i
+                points[endB]['r'] = ss.rB
+            if spt.attachedEndB[0] == 0:
+                endA = i
+                points[endA]['r'] = ss.rA
+        # get actual r of end points (r in subsystem is not true location)
+        for i in range(0,len(ms.pointList)):
+            # check if point is attached to the subsystem line
+            for j in range(0,len(ms.pointList[i].attached)):
+                if ms.pointList[i].attached[j] == sub_idx+1:
+                    if ms.pointList[i].attachedEndB[j]:
+                        # for k in range(0,len(ms.bodyList)):
+                        #     if i+1 in ms.bodyList[k].attachedP:
+                        #         points[-1]['body'] = k    
+                        # update end B r
+                        points[endB]['r'] = ms.pointList[i].r
+                        points[endB]['type'] = ms.pointList[i].type
+                        # check if end points are attached to a body
+                        for k in range(0,len(ms.bodyList)):
+                            if i+1 in ms.bodyList[k].attachedP:
+                                points[endB]['body'] = k
+                    else:
+                        # update end A r
+                        points[endA]['r'] = ms.pointList[i].r
+                        points[endA]['type'] = ms.pointList[i].type 
+                        key = _pt_key(ms.pointList[i])
+                        if len(ms.pointList[i].attached) > 1:
+                            # This is a shared anchor
+                            other_attached_ss = []
+                            for att in ms.pointList[i].attached:
+                                if att != sub_idx + 1 and att not in newly_created_lines:
+                                    other_attached_ss.append(att - 1)
+
+                            # --- mark this endpoint as shared & key it for reuse later
+                            points[endA]['shared'] = True
+                            # build a stable key based on the ORIGINAL system's point data if possible
+                            key = _pt_key(ms.pointList[i])
+                            points[endA]['share_key'] = key
+                            points[endA]['shared_with'] = other_attached_ss
+                        # check if end points are attached to a body
+                        for k in range(0,len(ms.bodyList)):
+                            if i+1 in ms.bodyList[k].attachedP:
+                                points[endA]['body'] = k
+        # approximate midpoint r with depth of subsystem point r and angle from two end points
+        aang = np.arctan2(points[0]['r'][1] - points[-1]['r'][1],points[0]['r'][0] - points[-1]['r'][0])
+        # update x-y location of any midpoints if they exist
+        if len(points)>2:
+            for i in range(1,len(points)-1):
+                ll = np.sqrt(points[i]['r'][0]**2+points[i]['r'][1]**2)
+                points[i]['r'][0] = (ll)*np.cos(aang)+points[-1]['r'][0]# poits[-1]['r][0]
+                points[i]['r'][1] = (ll)*np.sin(aang)+points[-1]['r'][1]
+                #points[i]['r'][0] = (ll+np.abs(points[-1]['r'][0]))*np.cos(aang)
+                #points[i]['r'][1] = (ll+np.abs(points[-1]['r'][1]))*np.sin(aang)
+
+        from moorpy import helpers
+        for i in range(0, len(ms.pointList)):
+            key = _pt_key(ms.pointList[i])
+            if key in shared_point_map:
+                # This point has already been created for another subsystem - detach from current subsystem
+                if sub_idx + 1 in ms.pointList[i].attached:
+                    ms.pointList[i].attached.remove(sub_idx + 1)
+        # remove subsystem line, delete all associated points
+        helpers.deleteLine(ms,sub_idx,delpts=3)  # for some reason, in the delete line, it attached 19 to 13 again. Please investigate
+        # add in new lines to replace subsystem
+        for i in range(0,len(types)):
+            # determine # of segments for this line section
+            if isinstance(nsegs,list):
+                NSegs = nsegs[i]
+            elif isinstance(nsegs,int):
+                NSegs = nsegs
+            else:
+                raise Exception('Input nsegs must be either a list or an integer')
+            # add point A (if it wasn't added already by other subsystems since shared anchors are a possibility)
+            # --- Reuse shared anchors (do not add again)
+            use_existing = False
+            curr_pt_idx = None  # 1-based index in ms.pointList            
+            if points[i].get('shared', False):
+                key = points[i]['share_key']
+                if key in shared_point_map:
+                    # already created for another subsystem – find it then reuse it
+                    # find it
+                    for j, point in enumerate(ms.pointList):
+                        k_j = _pt_key(point)
+                        if k_j == key:
+                            curr_pt_idx = j + 1
+                            break
+                    use_existing = True            
+
+            if not use_existing:
+                # Not shared, or shared but not created yet -> create it now
+                ms.addPoint(points[i]['type'], points[i]['r'], points[i]['m'], points[i]['v'], d=points[i]['d'])
+                ms.pointList[-1].CdA = points[i]['CdA']
+                ms.pointList[-1].Ca  = points[i]['Ca']
+                curr_pt_idx = len(ms.pointList)
+                if points[i].get('shared', False):
+                    # This is a shared anchor, and has just been created so let's attach it to the other subsystems now
+                    for other_ss in points[i]['shared_with']:
+                        ms.pointList[curr_pt_idx - 1].attachLine(other_ss, endB=0)
+                    # remember it if this is a shared anchor
+                    shared_point_map[points[i]['share_key']] = curr_pt_idx
+
+            # add line
+            ms.addLine(lengths[i], types[i]['name'], nSegs=NSegs)
+            newly_created_lines.append(len(ms.lineList))
+            # attach point A to the just-created line
+            ms.pointList[curr_pt_idx - 1].attachLine(len(ms.lineList), endB=0)
+
+            # attach to any bodies the point was originally attached to
+            if (not use_existing) and ('body' in points[i]):
+                ms.bodyList[points[i]['body']].attachPoint(
+                    curr_pt_idx,
+                    [ms.pointList[curr_pt_idx - 1].r[0] - ms.bodyList[points[i]['body']].r6[0],
+                    ms.pointList[curr_pt_idx - 1].r[1] - ms.bodyList[points[i]['body']].r6[1],
+                    ms.pointList[curr_pt_idx - 1].r[2]]
+                )
+            if i > 0:
+                # this same point is end B for previous line
+                ms.pointList[curr_pt_idx - 1].attachLine(len(ms.lineList) - 1, endB=1)
+        
+        # add last point (should be the fairlead)
+        ms.addPoint(points[-1]['type'], points[-1]['r'], points[-1]['m'], points[-1]['v'], d=points[-1]['d'])
+        ms.pointList[-1].CdA = points[-1]['CdA']
+        ms.pointList[-1].Ca = points[-1]['Ca']
+        # attach to last line as point B
+        ms.pointList[-1].attachLine(len(ms.lineList),endB=1)
+        # attach to a body if applicable
+        if 'body' in points[-1]:
+            ms.bodyList[points[-1]['body']].attachPoint(len(ms.pointList),[ms.pointList[-1].r[0]-ms.bodyList[points[-1]['body']].r6[0],ms.pointList[-1].r[1]-ms.bodyList[points[-1]['body']].r6[1],ms.pointList[-1].r[2]])        
+    return ms
             
 def duplicateSyntheticLines(ms):
     '''reads in a MoorPy system and duplicates linetypes with nonzero EAd. needed for system unload to work with 
