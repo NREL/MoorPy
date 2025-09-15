@@ -1,13 +1,40 @@
 # MoorPy - Quasi-Static Mooring Analysis in Python
 
-MoorPy is a design-oriented mooring system library for Python based around a quasi-static modeling approach.
+MoorPy is an open-source Python library for mooring system modeling. It is 
+based around a quasi-static modeling approach and includes a variety of 
+design-oriented features to support a variety of application areas.
+It is primarily developed at NREL and is part of the 
+[WETO Software Stack](https://nrel.github.io/WETOStack). 
 
-### Part of the WETO Stack
+![Humboldt](docs/moorpy_example.png)
 
-MoorPy is primarily developed with the support of the U.S. Department of Energy and is part of the [WETO Software Stack](https://nrel.github.io/WETOStack). For more information and other integrated modeling software, see:
-- [Portfolio Overview](https://nrel.github.io/WETOStack/portfolio_analysis/overview.html)
-- [Entry Guide](https://nrel.github.io/WETOStack/_static/entry_guide/index.html)
-- [Systems Engineering Workshop](https://nrel.github.io/WETOStack/workshops/user_workshops_2024.html#systems-engineering)
+More information about MoorPy can be found in the 
+[MoorPy documentation](https://moorpy.readthedocs.io).
+
+
+### Overview
+
+MoorPy is a quasi-static mooring model and a suite of associated functions for mooring 
+system analysis. The core model supports quasi-static analysis of moored floating systems 
+including any arrangement of mooring lines and floating platforms. It solves the distributed 
+position and tension of each mooring line segment using standard catenary equations. 
+Floating platforms can be represented with linear hydrostatic characteristics. MoorPy 
+automatically computes a floating system's equilibrium state and can be queried to identify 
+a mooring system's nonlinear force-displacement relationships. Linearized stiffness matrices 
+are efficiently computed using semi-analytic Jacobians. MoorPy also includes plotting 
+functions and a library of mooring component property and cost coefficients. 
+
+MoorPy also contains reference property coefficients and utility functions for 
+common mooring line materials and anchor types. These data and functions help
+with setting appropriate mechanical and cost characteristics for mooring 
+components that are then modeled in MoorPy.
+
+MoorPy can be used directly from Python scripts to perform mooring design 
+and modeling tasks, or it can be coupled with other tools to compute 
+quasi-static mooring reactions as part of a larger simulation. For example, 
+MoorPy is used in the frequency-domain floating system simulator 
+[RAFT](https://github.com/WISDEM/RAFT).
+
 
 ### Prerequisites
 
@@ -43,11 +70,14 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 pip install .[docs]
 ```
 
-MoorPy's documentation website is under development at https://moorpy.readthedocs.io
 
 ### Citing
+
 The MoorPy software can be cited as:
 M. Hall, S. Housner, S. Sirnivas, and S. Wilson.
 *MoorPy: Quasi-Static Mooring Analysis in Python.*
 National Renewable Energy Laboratory, 2021.
 https://doi.org/10.11578/dc.20210726.1.
+
+Papers describing the theory behind MoorPy are listed in the
+[MoorPy documentation](https://moorpy.readthedocs.io).

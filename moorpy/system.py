@@ -3431,7 +3431,13 @@ class System():
         self.bathGrid_Xs = x 
         self.bathGrid_Ys = y
         self.bathGrid    = depth
+        
+        # Tell the System (and any Subsystems) that there is bathymetry
         self.seabedMod = 2
+        
+        for line in self.lineList:
+            if isinstance(line, Subsystem):
+                line.seabedMod = 2  # Ensure the Subsystem knows there's bathymetry
     
     
     def getDepthFromBathymetry(self, x, y):   #BathymetryGrid, BathGrid_Xs, BathGrid_Ys, LineX, LineY, depth, nvec)
