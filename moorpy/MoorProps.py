@@ -194,7 +194,7 @@ def getLineProps(dmm, type="chain", stud="studless", source="Orcaflex-altered", 
     notes = f"made with getLineProps - source: {source}"
     
 
-    return mp.LineType(typestring, d_vol, massden, EA, MBL=MBL, cost=cost, notes=notes, input_type=type, input_d=dmm)
+    return mp.LineType(typestring, d_vol, massden, EA, MBL=MBL, cost=cost, notes=notes, input_type=type, d_nom=dmm)
 
 
 #----NOTES----
