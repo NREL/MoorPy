@@ -153,9 +153,9 @@ class Subsystem(System, Line):
         dx = self.rB[0] - self.rA[0]
         dy = self.rB[1] - self.rA[1]
         
-        LH = np.hypot(self.rB[:2] - self.rA[:2])  # horizontal distance between ends
+        LH = np.hypot(dx, dy)  # horizontal distance between ends
         
-        if self.sys:  # only do this if there is a parent System
+        if self.sys and hasattr(self.sys, 'bathGrid_Xs'):  # only do this if there is a parent System AND bathymetry grid
             
             xs_loc = []  # local x value along subsystem from end A
             depths = []
@@ -166,11 +166,11 @@ class Subsystem(System, Line):
                     # Check if x is between rA and rB:
                     if (self.rA[0] < x and x < self.rB[0]) or (self.rA[0] > x and x > self.rB[0]):
                         
-                        y = rA[1] + (x - rA[0])*dy/dx  # corresponding y value
+                        y = self.rA[1] + (x - self.rA[0])*dy/dx  # corresponding y value
                         
                         depth, _ = self.sys.getDepthFromBathymetry(x, y) # depth
                         
-                        xs_loc.append( (x - rA[0])*LH/dx )  # hotizontal length along sybsystem
+                        xs_loc.append( (x - self.rA[0])*LH/dx )  # hotizontal length along sybsystem
                         depths.append(depth)
         
         
@@ -180,21 +180,25 @@ class Subsystem(System, Line):
                     # Check if x is between rA and rB:
                     if (self.rA[1] < y and y < self.rB[1]) or (self.rA[1] > y and y > self.rB[1]):
                         
-                        x = rA[1] + (y - rA[1])*dx/dy  # corresponding y value
+                        x = self.rA[1] + (y - self.rA[1])*dx/dy  # corresponding y value
                         
                         depth, _ = self.sys.getDepthFromBathymetry(x, y) # depth
                         
-                        xs_loc.append( (y - rA[1])*LH/dy )  # hotizontal length along sybsystem
+                        xs_loc.append( (y - self.rA[1])*LH/dy )  # hotizontal length along sybsystem
                         depths.append(depth)
         
             # Sort xs_loc and depths by increasing xs_loc values
-             
+            xs_loc = np.array(xs_loc)
+            depths = np.array(depths)
+            idx = np.argsort(xs_loc)
+            xs_loc_sorted = xs_loc[idx]
+            depths_sorted = depths[idx]
             # >>> TO DO <<<
             
             # Store the updated 1D representation in the Subsystem
-            self.bathGrid_Xs = np.array(xs_loc)
+            self.bathGrid_Xs = np.array(xs_loc_sorted)
             self.bathGrid_Ys = np.array([0])
-            self.bathGrid    = np.array([depths])
+            self.bathGrid    = np.array([depths_sorted])
             
         else:
             pass  # MH: can't think of anything to do for isolated subsystems at the moment...
@@ -344,7 +348,6 @@ class Subsystem(System, Line):
         LineError
             If the given endB value is not a 1 or 0
         '''
-        
         if sink: # set z coordinate on seabed
             if self.sys:  # If there is a parent system, query it's seabed info
                 z, _ = self.sys.getDepthFromBathymetry(r[0], r[1])
