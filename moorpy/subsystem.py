@@ -601,9 +601,10 @@ class Subsystem(System, Line):
         for i, line in enumerate(self.lineList):
             self.TeM[i,0] = np.linalg.norm(line.fA)
             self.TeM[i,1] = np.linalg.norm(line.fB)
-                
-        self.anchorFx0 = self.lineList[0].fA[0]
-        self.anchorFz0 = self.lineList[0].fA[2]
+               
+        # save anchor forces at mean offset    
+        self.anchorFxM = self.lineList[0].fA[0]
+        self.anchorFzM = self.lineList[0].fA[2]
     
         self.TeD = np.copy(self.TeM)  # set the dynamic values as well, in case they get queried right away
         self.TeDmin = np.copy(self.TeM)  # set the dynamic values as well, in case they get queried right away
@@ -634,7 +635,9 @@ class Subsystem(System, Line):
             self.TeD[i,:] = self.TeM[i,:] + self.DAFs[i]*( np.array([line.TA, line.TB]) - self.TeM[i,:] )
             self.TeDmin[i,:] = self.TeM[i,:] - self.DAFs[i]*( np.array([line.TA, line.TB]) - self.TeM[i,:] )
         
-        
+        # Store dynamic anchor forces
+        self.anchorFxD = self.anchorFxM + self.DAFs[-1]*(self.lineList[0].fA[0] - self.anchorFxM)
+        self.anchorFzD = self.anchorFzM + self.DAFs[-2]*(self.lineList[0].fA[2] - self.anchorFzM)
     
     def activateDynamicStiffness(self, display=0):
         '''Calls the dynamic stiffness method from System rather than from Line.'''
