@@ -626,8 +626,10 @@ class Subsystem(System, Line):
             System.activateDynamicStiffness(self)  # switch to dynamic EA values
         
         # adjust end B to the absolute offsets specified
-        self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
-        
+        if self.shared:
+            self.rB = np.array([-self.rad_fair + offset/2, 0, self.z_fair+z]) 
+        else:
+            self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
         self.staticSolve(tol=self.eqtol)  # solve the subsystem
         
         # Store dynamic values at this offset position that may be used later
