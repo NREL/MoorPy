@@ -11,7 +11,7 @@ import moorpy as mp
 import moorpy.helpers as helpers
 import math
 
-
+"""
 def getLineProps(dmm, type="chain", stud="studless", source="Orcaflex-altered", name=""):
     ''' getLineProps version 3.2: Restructuring v3.1 to 'Orcaflex-original' and 'Orcaflex-altered' 
     
@@ -195,7 +195,7 @@ def getLineProps(dmm, type="chain", stud="studless", source="Orcaflex-altered", 
     
 
     return mp.LineType(typestring, d_vol, massden, EA, MBL=MBL, cost=cost, notes=notes, input_type=type, input_d=dmm)
-
+"""
 
 #----NOTES----
 
@@ -557,6 +557,8 @@ def getAnchorCost(fx = None, fz = None, type="drag-embedment", mass = None, area
     info: dict
         dictionary
     '''
+    
+    # >>> This function can be moved into Point <<<
 
     # --- Load PointProps ---
     if not aprops:
@@ -586,7 +588,7 @@ def getAnchorCost(fx = None, fz = None, type="drag-embedment", mass = None, area
     return anchorMatCost, anchorInstCost, anchorDecomCost, info   # [USD]
 
 
-
+"""
 def getAnchorProps(fx, fz, type="drag-embedment", display=0):
     ''' ****OLD VERSION**** Calculates anchor required capacity and cost based on specified loadings and anchor type'''
     
@@ -671,4 +673,4 @@ def getAnchorProps(fx, fz, type="drag-embedment", display=0):
     
 
     return anchorMatCost, anchorInstCost, anchorDecomCost   # [USD]
-
+"""

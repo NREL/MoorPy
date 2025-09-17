@@ -4,7 +4,6 @@ import time
 import yaml
 import os
 import re
-from moorpy.MoorProps import getAnchorCost
 
  
 # base class for MoorPy exceptions
@@ -831,6 +830,7 @@ def loadLineProps(source):
 
     return output
 
+
 def getPointProps(design, Props = None, source = None, name="", **kwargs):
     '''Sets up a dictionary that represents a mooring point type based on the 
     specified design. Data used for determining these properties is a MoorPy
@@ -985,6 +985,7 @@ def getPointProps(design, Props = None, source = None, name="", **kwargs):
     pointType.update(kwargs)   # add any custom arguments provided in the call to the pointType's dictionary
 
     return pointType
+
 
 def loadPointProps(source):
     '''Loads a set of MoorPy point property scaling coefficients from
@@ -1151,6 +1152,23 @@ def loadPointProps(source):
 
     # return ABCD dict
     return dict(AnchorProps = anchor, BuoyProps = buoy, ConnectProps = connect, DesignProps = point)
+
+
+def getAnchorCost(fx, fz, type='drag-embedment'):
+    '''Simple interface function for getting the cost of an anchor given the
+    anchor load. Points to other functions in MoorPy that are in a state of 
+    flux.
+    Inputs: fx [N], fy [N], anchor type ('drag-embedment' or 'suction').
+    Returns: anchor material cost [$]
+    '''
+    
+    # Currently using the original cost function
+    from moorpy.MoorProps import getAnchorCostOld
+    
+    anchorMatCost, anchorInstCost, anchorDecomCost, info = getAnchorCostOld(fx, fz, type=type)
+    
+    return anchorMatCost
+
 
 def getFromDict(dict, key, shape=0, dtype=float, default=None):
     '''
