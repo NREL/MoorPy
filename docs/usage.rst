@@ -132,21 +132,11 @@ equations and translates that stiffness to whichever point (or body) the mooring
 The overall mooring system stiffness matrix is usually of interest to most users. This can be found by running one of the three 
 System stiffness matrix methods. The one best to use depends on the types of other objects in the MoorPy System.
 
-- The getSystemStiffness() method calculates the combined stiffness matrix of all "DOFtype" objects in the mooring system.
-  It has a default value of "free" to the "DOFtype" input, meaning that it will calculate the combined stiffness matrix of 
-  all "free" objects (e.g., points, bodies) in the system.
-   - For example, a three-line mooring system with two line types in each mooring line, where each connecting point between 
-     the two line types is a "free" floating Point object, and a free floating Body object on the surface, will result in a 
-     15x15 stiffness matrix (a 6x6 matrix for the body and 3 3x3 matrices for the connecting points)
-- The getCoupledStiffness() method calculates the system stiffness matrix for all "coupled" DOFs specifically, while 
-  equilibrating the free, uncoupled DOFs. This would be similar to running getSystemStiffness(DOFtype="coupled"), except this method 
-  solves for equilibrium in the free floating points while calculating the stiffness of the coupled DOFs, rather than only solving 
-  for the stiffness matrix of all "coupled" DOFs.
-   - For example, using the same setup described above, except that the body is a "coupled" DOFtype, the result of running 
-     getCoupledStiffness() will be a 6x6 matrix, since the body is the only "coupled" object in the mooring system.
-- The getSystemStiffnessA() method calculates the combined analytical stiffness matrix of all "DOFtype" objects in the mooring system. 
-  It calls the analytical stiffness calculation methods of other objects in the mooring system and combines their analytical stiffness 
-  matrices into one global system stiffness matrix. It has a default value of "free" to the "DOFtype" input.
+- The getSystemStiffness() method calculates the combined stiffness matrix of all "DOFtype" objects in the mooring system. It has a default value of "free" to the "DOFtype" input, meaning that it will calculate the combined stiffness matrix of all "free" objects (e.g., points, bodies) in the system.
+   - For example, a three-line mooring system with two line types in each mooring line, where each connecting point between the two line types is a "free" floating Point object, and a free floating Body object on the surface, will result in a 15x15 stiffness matrix (a 6x6 matrix for the body and 3 3x3 matrices for the connecting points)
+- The getCoupledStiffness() method calculates the system stiffness matrix for all "coupled" DOFs specifically, while equilibrating the free, uncoupled DOFs. This would be similar to running getSystemStiffness(DOFtype="coupled"), except this method solves for equilibrium in the free floating points while calculating the stiffness of the coupled DOFs, rather than only solving for the stiffness matrix of all "coupled" DOFs.
+   - For example, using the same setup described above, except that the body is a "coupled" DOFtype, the result of running getCoupledStiffness() will be a 6x6 matrix, since the body is the only "coupled" object in the mooring system.
+- The getSystemStiffnessA() method calculates the combined analytical stiffness matrix of all "DOFtype" objects in the mooring system. It calls the analytical stiffness calculation methods of other objects in the mooring system and combines their analytical stiffness matrices into one global system stiffness matrix. It has a default value of "free" to the "DOFtype" input.
 
 
 

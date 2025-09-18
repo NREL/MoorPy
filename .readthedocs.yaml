@@ -13,4 +13,7 @@ sphinx:
 # The python environment required to build the documentation
 python:
   install:
-    - requirements: docs/requirements.txt
+  - method: pip
+    path: .
+    extra_requirements:
+      - docs
