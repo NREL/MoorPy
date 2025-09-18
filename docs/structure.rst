@@ -2,6 +2,33 @@ Model Structure
 ===============
 
 
+General Concepts
+----------------
+
+Degrees of Freedom
+^^^^^^^^^^^^^^^^^^
+
+MoorPy has two types of objects with positional degrees of freedom (DOFs):
+Points and Bodies. Points have 3 DOFs (x/y/z translation), Bodies have 6 
+(translations and rotations). MoorPy concatenates all these DOFs and 
+looks at them simultaneously when solving for the system's equilibrium
+state. 
+
+Each Point or Body object can have three types: free, fixed, or coupled:
+
+- Fixed (1): the object's DOFs are held constant (it cannot move) or tied to another object that it is attached to.
+
+- Free (0): the object's DOFs are always free to move, and well settle to equilibrium.
+
+- Coupled (-1): the object's DOFs can be free to move depending on what function is called.
+
+Internally, each status has an integer value as listed above.
+A common situation is for a Point object to be attached to a Body object. 
+In such a case, the Point must be type 1/fixed so that it moves with
+the Body.
+
+
+
 MoorPy Objects
 ---------------
 
@@ -104,9 +131,20 @@ Subsystem
 ^^^^^^^^^
 
 The Subsystem object was introduced later in MoorPy to streamline the analysis
-of more complex mooring arrangements.
-It can be used independently like a System or act as a Line within a System as 
-part of its lineList.
+of more complex mooring arrangements. A Subsystem is meant to contain a series
+of connected Lines and Points that together make up a multi-section mooring line
+or dynamic power cable. The key assumption of a Subsystem is that it entirely
+lies in a vertical plane. This allows a two-dimensional solution process,
+significantly speeding up its internal equilibrium solution.
+
+A Subsystem can be part of a larger System and behaves just like a Line object
+in that context (it would be included in System.lineList). The Subsystem has 
+both a three-dimensional representation in the System, and its own internal
+two-dimensional representation for computational efficiency. Several helper
+functions are available for converting a MoorPy System to use Subsystem objects
+or to use only assemblies of Line and Point objects. The latter is necessary
+for outputing MoorDyn-style input files becauce MoorDyn does not support
+Subsystems.
 
 
 
@@ -119,16 +157,15 @@ Bathymetry
 MoorPy supports three different approaches to the seabed surface, which
 are defined by the seabedMod flag:
 
-0. Uniform flat seabed specified by a depth value.
+0. Uniform flat seabed specified by a depth value (System.depth).
 1. Uniform sloped seabed specified by a depth value at x,y = 0,0 along 
-   with xSlope and ySlope valus that specify the slope (rise/run). If 
-   only one of these values, the other is assumed to be zero.
+   with xSlope and ySlope valus that specify the slope (rise/run) in each direction. 
+   If only one of these values is provided, the other is assumed to be zero.
 2. A bathymetry grid where the seabed depth is interpolated as a function
    of x and y coorinates based on bilinear interpolation from a rectangular
-   grid of depth data. This grid is usually read in from a specially formatted
-   file similar to MoorDyn (link to be added).
+   grid of depth data. This grid data can be read in from a `MoorDyn-style 
+   bathymetry file <https://moordyn.readthedocs.io/en/latest/inputs.html#seafloor-bathymetry-file>`_.
 
-Further usage of these features will be described in (link to usage section to be added).
 
 Current
 ^^^^^^^
@@ -141,7 +178,3 @@ included, as controlled by the currentMod flag:
    vector. The drag force from this current will be added to the weight
    vector each time the catenary equations are used to solve the mooring
    line profiles.
-2. XX A steady current that is uniform in the horizontal direction but can
-   change with depth according to a lookup table (typically from an input 
-   file following the same format as in MoorDyn. This feature is NOT YET
-   IMPLEMENTED.
