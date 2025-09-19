@@ -767,7 +767,7 @@ def loadLineProps(source):
     elif source is None or source=="default":
         import os
         mpdir = os.path.dirname(os.path.realpath(__file__))
-        with open(os.path.join(mpdir,"MoorProps_default.yaml")) as file:
+        with open(os.path.join(mpdir,"library/MoorProps_default.yaml")) as file:
             source = yaml.load(file, Loader=yaml.FullLoader)
         
     elif type(source) is str:
@@ -1015,7 +1015,7 @@ def loadPointProps(source):
     elif source is None or source=="default":
         import os
         mpdir = os.path.dirname(os.path.realpath(__file__))
-        with open(os.path.join(mpdir,"PointProps_default.yaml")) as file:
+        with open(os.path.join(mpdir,"library/PointProps_default.yaml")) as file:
             source = yaml.load(file, Loader=yaml.FullLoader)
         
     elif type(source) is str:
