@@ -1,4 +1,10 @@
-# Default mooring line property coefficients for MoorPy
+# Default line properties with cost curves based on work presented in:
+  # Davies, R, Baca, E, & Hall, M. "An Updated Mooring Cost Modeling Tool Set With Application to a Reference Model
+  # Wave Energy Converter." Proceedings of the ASME 2025 44th International Conference on Ocean, Offshore and Arctic 
+  # Engineering. Volume 5: Ocean Renewable Energy. Vancouver, British Columbia, Canada. June 22–27, 2025. V005T09A066. 
+  # ASME. https://doi.org/10.1115/OMAE2025-156384
+
+
 # The following is YAML syntax and follows a heirarchy of
 # lineProps -> [line material name] -> [line material coefficients]
 
@@ -9,11 +15,15 @@
 #    MBL_d     :     # minimum breaking load per diameter [N/m]
 #    MBL_d2    :     # minimum breaking load per diameter^2 [N/m^2]
 #    MBL_d3    :     # minimum breaking load per diameter^3 [N/m^3]
+#    MBL_dmin  :     # minimum valid diameter for the MBL curve (values < 0 ignored)
+#    MBL_dmax  :     # maximum valid diameter for the MBL curve (values < 0 ignored)
 #    
 #    EA_0      :     # stiffness offset [N]
 #    EA_d      :     # stiffness per diameter [N/m]
 #    EA_d2     :     # stiffness per diameter^2 [N/m^2]
 #    EA_d3     :     # stiffness per diameter^3 [N/m^3]
+#    EA_dmin   :     # minimum valid diameter for the EA curve (values < 0 ignored)
+#    EA_dmax   :     # maximum valid diameter for the EA curve (values < 0 ignored)
 #    EA_MBL    :     # (quasi-static) stiffness per MBL [N/N] (aka Kr, Krs) 
 #    EAd_MBL   :     # dynamic stiffness per MBL [N/N] (aka Krd or Krd_alpha)
 #    EAd_MBL_Lm:     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (aka or Krd_beta)
@@ -23,12 +33,12 @@
 #    NOTE: Only one of the above three variables can be used as input!
 #    
 #    cost_0    :     # cost offset [$/m]
-#    cost_d    :     # cost per diameter [$/m^2]
-#    cost_d2   :     # cost per diameter^2 [$/m^3]
-#    cost_d3   :     # cost per diameter^2 [$/m^4]
+#    cost_d    :     # cost per meter per diameter [$/m^2]
+#    cost_d2   :     # cost per meter per diameter^2 [$/m^3]
+#    cost_d3   :     # cost per meter per diameter^2 [$/m^4]
 #    cost_mass :     # cost per mass [$/kg]
-#    cost_EA   :     # cost per stiffness [$/m/N]
-#    cost_MBL  :     # cost per MBL [$/m/N]
+#    cost_EA   :     # cost per meter per stiffness [$/m/N] 
+#    cost_MBL  :     # cost per meter per MBL [$/m/N] 
 #
 #    Cd        :     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
 #    Cd_ax     :     # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
@@ -43,7 +53,8 @@
 # - The chain MBL uses a cubic function, so be aware if you are researching theoretical chains with diameters greater than about 360mm, as the MBL will then decrease
 # - Chain EA values not provided in manufacturer catalogs, so the below coefficients are taken from DNV-OS-E301 2013
 
-
+# Note: costs combine all provided coefficients. If a coefficient is not provided it is assumed zero. All provided values will be used according to: 
+# cost per meter = 'cost_0' + 'cost_d' * d + 'cost_d2' * d**2 + 'cost_d3' * d**3 + 'cost_mass' * mass per meter + 'cost_EA' * EA + 'cost_MBL' * MBL
 
 lineProps: 
 
@@ -54,10 +65,11 @@ lineProps:
     MBL_d3    : -2.19e9    # minimum breaking load per diameter^3 [N/m^3]
     MBL_d2    :  1.21e9    # minimum breaking load per diameter^2 [N/m^2] 
     MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
-    dvol_dnom :   1.80     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
-    cost_mass :   2.585    # cost per mass [$/kg]
-    Cd        :   1.333    # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
-    Cd_ax     :   0.639    # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    dvol_dnom :  1.80      # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
+    cost_d    : -3.12e2    # cost per meter per diameter [2024$/m^2]
+    cost_d2   :  8.56e4    # cost per meter per diameter^2 [2024$/m^3]
+    Cd        :  1.333     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Cd_ax     :  0.639     # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
     Ca        :  1.0       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
     Ca_ax     :  0.5       # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07 
     
@@ -67,29 +79,37 @@ lineProps:
     MBL_d3    : -2.19e9    # minimum breaking load per diameter^3 [N/m^3]
     MBL_d2    :  1.21e9    # minimum breaking load per diameter^2 [N/m^2] 
     MBL_d     :  9.11e2    # minimum breaking load per diameter [N/m]   
-    dvol_dnom :   1.89     # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
-    cost_mass :   2.585    # cost per mass [$/kg]
-    Cd        :   1.376    # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
-    Cd_ax     :   0.741    # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    dvol_dnom :  1.89      # volume-equivalent diameter per nominal diameter [-] (assumes 7,850 kg/m^3 material density)
+    cost_d    : -3.12e2    # cost per meter per diameter [2024$/m^2]
+    cost_d2   :  8.56e4    # cost per meter per diameter^2 [2024$/m^3]
+    Cd        :  1.376     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
+    Cd_ax     :  0.741     # axial drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
     Ca        :  1.0       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
     Ca_ax     :  0.5       # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07      
 
-  wire :  # wire rope
-    mass_d2   :  5293    # linear mass density per diameter^2 [kg/m/m^2]    
-    dvol_dnom :  1.18     # volume-equivalent diameter per nominal diameter [-] (assumes 4,875.5 kg/m^3 material density)
+  chainR3 : # R3 grade chain, studless and studlink. Not included in OMAE2025-156384 in interest of brevity 
+    mass_d2   :  21e3    # linear mass density per diameter^2 [kg/m/m^2] - avg R4 studlink and R4 studless  
+    cost_d    : -2.34e2  # cost per meter per diameter [2024$/m^2]
+    cost_d2   :  5.95e4  # cost per meter per diameter^2 [2024$/m^3]
+
+  wire :            # wire rope
+    mass_d2   :  5293      # linear mass density per diameter^2 [kg/m/m^2]    
+    dvol_dnom :  1.18      # volume-equivalent diameter per nominal diameter [-] (assumes 4,875.5 kg/m^3 material density)
     MBL_d2    :  1022e6    # minimum breaking load per diameter^2 [N/m^2] 
     EA_d2     :  97.1e9    # stiffness per diameter^2 [N/m^2]
-    Cd        :  1.021    # drag coefficient (transverse) based on DNV-OS-E301 adjusted for volumetric diameter; longitudinal (Cd_ax) is neglected
-    cost_MBL  :  1.2e-05  # cost per N of MBL
+    Cd        :  1.021     # drag coefficient (transverse) based on DNV-OS-E301 adjusted for volumetric diameter; longitudinal (Cd_ax) is neglected
+    cost_d    :  2.58e2    # cost per meter per diameter [2024$/m^2]
+    cost_d2   :  1.43e4    # cost per meter per diameter^2 [2024$/m^3]
 
   polyester   :     # polyester synthetic rope
     mass_d2   :  679       # linear mass density per diameter^2 [kg/m/m^2]       
     MBL_d2    :  308e6     # minimum breaking load per diameter^2 [N/m^2]     
-    EA_MBL    :   14       # quasi-static stiffness per MBL [N/N]
-    EAd_MBL   :   11.6     # dynamic stiffness per MBL [N/N]
-    EAd_MBL_Lm :  40.0     # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
+    EA_MBL    :  14        # quasi-static stiffness per MBL [N/N]
+    EAd_MBL   :  11.6      # dynamic stiffness per MBL [N/N]
+    EAd_MBL_Lm : 40.0      # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
     density   :  1380      # density of the polyester material [kg/m^3] (taken from specific gravity of 1.38, relative to 1000 kg/m^3)
-    cost_MBL  :  1.65e-05  # cost per MBL [$/m/N]
+    cost_d    :  1.17e2    # cost per meter per diameter [2024$/m^2]
+    cost_d2   :  1.27e4    # cost per meter per diameter^2 [2024$/m^3]
     Cd        :  2.021     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
     Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
     Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
@@ -102,7 +122,8 @@ lineProps:
     EAd_MBL   :  2.08      # dynamic stiffness per MBL [N/N]
     EAd_MBL_Lm : 39.0      # dynamic stiffness per MBL per fraction of mean load (not %) [N/N] (beta term to be multiplied with the absolute mean tension)
     density   :  1140      # density of the nylon material [kg/m^3] (taken from specific gravity of 1.14, relative to 1000 kg/m^3)
-    cost_MBL  :  4.29e-05  # cost per MBL [$/m/N]
+    cost_d    :  9.84      # cost per meter per diameter [2024$/m^2]
+    cost_d2   :  1.43e4    # cost per meter per diameter^2 [2024$/m^3]
     Cd        :  1.979     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
     Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
     Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
@@ -118,9 +139,5 @@ lineProps:
     Cd        :  1.988     # drag coefficient based on DNV-OS-E301 adjusted for use with volumetric diameter
     Ca        :  1.1       # added mass coefficient based on Bureau Veritas 493-NR_2021-07
     Ca_ax     :  0.15      # axial added mass coefficient based on Bureau Veritas 493-NR_2021-07
-    cost_MBL  :  1.4e-04    # cost per N of MBL [$/m/N]
-
-
-
-
-
+    cost_d    : -2.27e3    # cost per meter per diameter [2024$/m^2]
+    cost_d2   :  1.10e5    # cost per meter per diameter^2 [2024$/m^3]

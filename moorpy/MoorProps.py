@@ -8,9 +8,10 @@
 
 import numpy as np
 import moorpy as mp
+import moorpy.helpers as helpers
 import math
 
-
+"""
 def getLineProps(dmm, type="chain", stud="studless", source="Orcaflex-altered", name=""):
     ''' getLineProps version 3.2: Restructuring v3.1 to 'Orcaflex-original' and 'Orcaflex-altered' 
     
@@ -194,7 +195,7 @@ def getLineProps(dmm, type="chain", stud="studless", source="Orcaflex-altered", 
     
 
     return mp.LineType(typestring, d_vol, massden, EA, MBL=MBL, cost=cost, notes=notes, input_type=type, input_d=dmm)
-
+"""
 
 #----NOTES----
 
@@ -213,7 +214,7 @@ def getLineProps(dmm, type="chain", stud="studless", source="Orcaflex-altered", 
 
 #--------------
 
-def getAnchorMass( uhc_mode = True, fx=0, fz=0, mass_int=0, anchor="drag-embedment", soil_type='medium clay', method = 'static', display=0):
+def getAnchorMass( uhc_mode = True, fx=0, fz=0, mass_int=0, anchor="drag-embedment", soil_type='medium clay', method = 'static', aprops = None, display=0):
     '''Calculates anchor required capacity, mass, and cost based on specified loadings and anchor type
     
     Parameters
@@ -240,9 +241,17 @@ def getAnchorMass( uhc_mode = True, fx=0, fz=0, mass_int=0, anchor="drag-embedme
         required anchor ultimate holding capacity [N]
     mass: float
         anchor mass [kg]
-    info: float
+    info: dict
         dictionary
     '''
+
+    # # --- Load PointProps ---
+    # if not aprops:
+    #     props = helpers.loadPointProps(None) 
+    #     # load Anchor props
+    #     aprops = props["AnchorProps"]
+    #     # In progress. Eventually these hardcoded coefficients should be brought over to PointProps_default.yaml
+
 
     #--MAGIC NUMBERS -- assign varibles to values
     density_st = 7.85*1000       #[kg/m^3]
@@ -400,9 +409,18 @@ def getAnchorMass( uhc_mode = True, fx=0, fz=0, mass_int=0, anchor="drag-embedme
             info["Mass"] = mass                 #[kg]
             #info["Length"] = L
           
+    elif anchor == "gravity":
 
-    
-    
+        capacity_x = 1.6*fx                           #[N]
+        capacity_z = 2.0*fz                           #[N]
+        uhc = np.linalg.norm([capacity_x, capacity_z])  
+ 
+        mass = max(capacity_x / gravity, capacity_z / gravity) # 2x safety factor for vertial 1.6x for horizontal per API standards. Use the larger value. Max load in kg * FOS = mass
+        # Alterative would be to use 4x the horizontal load per WEC mooring advice from UW APL. 
+
+        info["UHC"] = uhc           #[N]
+        info["Mass"] = mass                 #[kg]
+
     #-----IN PROGRESS -----------------------------------
 
     elif anchor == "SEPLA":
@@ -462,7 +480,7 @@ def getAnchorMass( uhc_mode = True, fx=0, fz=0, mass_int=0, anchor="drag-embedme
     #return info
 
 
-def getAnchorCost(fx, fz, type="drag-embedment",soil_type='medium clay', method = 'static'):
+def getAnchorCostOld(fx, fz, type="drag-embedment",soil_type='medium clay', method = 'static'):
     ''' applies factors to material cost '''
     
 
@@ -505,7 +523,72 @@ def getAnchorCost(fx, fz, type="drag-embedment",soil_type='medium clay', method 
 
     return anchorMatCost, anchorInstCost, anchorDecomCost, info   # [USD]
 
+def getAnchorCost(fx = None, fz = None, type="drag-embedment", mass = None, area = None, soil_type='medium clay', method = 'static', aprops = None):
+    '''Calculates anchor cost, and calls getAnchorMass if mass is not provided and design forces are. 
+    Costs based on the WEC mooring cost modeling work. 
+    
+    Parameters
+    ----------
+    fx : float
+        horizontal maximum anchor load [N]
+    fz : float 
+        vertical maximum anchor load [N] 
+    type : string
+        anchor type name
+    mass : float 
+        anchor mass [kg]   
+    area : float 
+        anchor plate area (for VLA) [m^2]  
+    soil_type: string
+        soil type name
+    method: string
+        anchor analysis method for applied safety factors 
+    aprops: dict
+        an AnchorProps structure containing coefficient data. This can by found in PointProps as PointProps["AnchorProps"]
 
+    Returns
+    -------
+    anchorMatCost : float
+        the anchor material cost [2024$]
+    anchorInstCost : float
+        the anchor installation cost [$]
+    anchorDecomCost : float
+        the anchor decomissioning cost [$]
+    info: dict
+        dictionary
+    '''
+    
+    # >>> This function can be moved into Point <<<
+
+    # --- Load PointProps ---
+    if not aprops:
+        props = helpers.loadPointProps(None)
+        # load Anchor props
+        aprops = props["AnchorProps"]
+
+    # --- Get Anchor Size if not provided ---
+    if (mass == None and type != "VLA") or (area == None and type == "VLA"):
+        if fx == None or fz == None:
+            raise ValueError(f"Horizontal and vertical loads required for size calculation of anchor type: {type}")
+        uhc, mass, info = getAnchorMass( uhc_mode = False, fx=fx, fz=fz, anchor = type, soil_type=soil_type, method = method, aprops = aprops)
+        area = info.get("Area", 0.0) # if area is not calculated, make zero
+    else:
+        info = dict(UHC = "", Mass = mass, Area = area, Notes = "")   
+    
+    # calculate cost
+    if type in aprops.keys(): # some checking for if value is not avaible (coud be give a none value as deafult if not proivded and check for error)
+        anchorMatCost = aprops[type]["matcost"] + aprops[type]["matcost_m"] * mass + aprops[type]["matcost_m2"] * mass**2 + aprops[type]["matcost_m3"] * mass**3 + aprops[type]["matcost_a"] * area + aprops[type]["matcost_a2"] * area**2 + aprops[type]["matcost_a3"] * area**3
+        anchorInstCost = aprops[type]["instcost"] + aprops[type]["instcost_m"] * mass + aprops[type]["instcost_m2"] * mass**2 + aprops[type]["instcost_m3"] * mass**3 + aprops[type]["instcost_a"] * area + aprops[type]["instcost_a2"] * area**2 + aprops[type]["instcost_a3"] * area**3
+        anchorDecomCost = aprops[type]["decomcost"] + aprops[type]["decomcost_m"] * mass + aprops[type]["decomcost_m2"] * mass**2 + aprops[type]["decomcost_m3"] * mass**3 + aprops[type]["decomcost_a"] * area + aprops[type]["decomcost_a2"] * area**2 + aprops[type]["decomcost_a3"] * area**3
+        if anchorMatCost == 0.0 or anchorInstCost == 0.0 or anchorDecomCost == 0.0:
+            info["Notes"] = f"A cost of zero indicates respective cost curve not provided for the anchor type {type}"
+    else:
+        raise ValueError(f'The anchor type {type} was not found in the AnchorProps library')
+
+    return anchorMatCost, anchorInstCost, anchorDecomCost, info   # [USD]
+
+
+"""
 def getAnchorProps(fx, fz, type="drag-embedment", display=0):
     ''' ****OLD VERSION**** Calculates anchor required capacity and cost based on specified loadings and anchor type'''
     
@@ -590,4 +673,4 @@ def getAnchorProps(fx, fz, type="drag-embedment", display=0):
     
 
     return anchorMatCost, anchorInstCost, anchorDecomCost   # [USD]
-
+"""

@@ -158,6 +158,7 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
     # ProfileType=5: Similar to above but both ends are off seabed, so it's U shaped and fully slack
     # ProfileType=6: Completely vertical line without seabed contact (on the seabed is handled by 4 and 5)
     # ProfileType = 7: Portion of the line is resting on the seabed, and the seabed has a slope
+    # ProfileType = 8: line resting on the seabed, and the seabed has a slope
     
     EA_W = EA/W
     
@@ -181,68 +182,120 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
         #   because a large value here risks adding a bad cross coupling term in the system stiffness matrix
     
     # ProfileType 0 case - entirely along seabed
-    if ZF==0.0 and hA == 0.0 and W > 0:
+    if hB==0.0 and hA == 0.0 and W > 0:
     
-        # >>> this case should be extended to support sloped seabeds <<<
-        if not alpha == 0: raise CatenaryError("Line along seabed but seabed is sloped - not yet supported")
-    
-        ProfileType = 0        
+        if alpha == 0:  # flat seabed case
         
-        if CB==0 or XF <= L:                    # case 1: no friction, or zero tension
-            HF = np.max([0, (XF/L - 1.0)*EA])
-            HA = 1.0*HF
-        elif 0.5*L + EA/CB/W*(1-XF/L) <= 0:     # case 2: seabed friction but tension at anchor (xB estimate < 0)
-            HF = (XF/L -1.0)*EA + 0.5*CB*W*L
-            HA = np.max([0.0, HF - CB*W*L])
-        else:                                   # case 3: seabed friction and zero anchor tension
-            if EA*CB*W*(XF-L) < 0: # something went wrong
-                breakpoint() 
-            HF = np.sqrt(2*EA*CB*W*(XF-L))
-            HA = 0.0
-            
-        VF = 0.0
-        VA = 0.0
-        
-        if HF > 0: # if taut
-            dHF_dXF = EA/L    # approximation <<<  what about friction?  <<<<<<<<
-            #dVF_dZF = W + HF/L # vertical stiffness <<< approximation a
-            dVF_dZF = dV_dZ_s(Tol, HF)      # vertical stiffness <<< approximation b
-        else:  # if slack
-            dHF_dXF = 0.0
-            dVF_dZF = W  # vertical stiffness        
-        
-        info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
-        info["VF"] = 0.0
-        info["stiffnessB"]  = np.array([[ dHF_dXF, 0.0], [0.0, dVF_dZF]])
-        info["stiffnessA"]  = np.array([[ dHF_dXF, 0.0], [0.0, dVF_dZF]])
-        info["stiffnessBA"] = np.array([[-dHF_dXF, 0.0], [0.0, 0.0]])
-        info["LBot"] = L
-        info['ProfileType'] = 0
-        info['Zextreme'] = 0
-        
-        if plots > 0:        
-        
-            if CB > 0 and XF > L:
-                xB = L - HF/W/CB                    # location of point at which line tension reaches zero
-            else:
-                xB = 0.0
-            
-            # z values remain zero in this case
+            ProfileType = 0        
             
             if CB==0 or XF <= L:                    # case 1: no friction, or zero tension
-                Xs = XF/L*s                             # X values uniformly distributed
-                Te = Te + np.max([0, (XF/L - 1.0)*EA])  # uniform tension
-            elif xB <= 0:                           # case 2: seabed friction but tension at anchor
-                Xs = s*(1+CB*W/EA*(0.5*s-xB))
-                Te = HF + CB*W*(s-L)
+                HF = np.max([0, (XF/L - 1.0)*EA])
+                HA = 1.0*HF
+            elif 0.5*L + EA/CB/W*(1-XF/L) <= 0:     # case 2: seabed friction but tension at anchor (xB estimate < 0)
+                HF = (XF/L -1.0)*EA + 0.5*CB*W*L
+                HA = np.max([0.0, HF - CB*W*L])
             else:                                   # case 3: seabed friction and zero anchor tension
-                for I in range(nNodes):                
-                    if s[I] <= xB:                  # if this node is in the zero tension range                        
-                        Xs[I] = s[I];               # x is unstretched, z and Te remain zero
-                    
-                    else:                           # the tension is nonzero
-                        Xs[I] = s[I] + CB*W/EA*(s[I] - xB)**2
-                        Te[I] = HF - CB*W*(L-s[I])
+                if EA*CB*W*(XF-L) < 0: # something went wrong
+                    breakpoint() 
+                HF = np.sqrt(2*EA*CB*W*(XF-L))
+                HA = 0.0
+                
+            VF = 0.0
+            VA = 0.0
+            
+            if HF > 0: # if taut
+                dHF_dXF = EA/L    # approximation <<<  what about friction?  <<<<<<<<
+                #dVF_dZF = W + HF/L # vertical stiffness <<< approximation a
+                dVF_dZF = dV_dZ_s(Tol, HF)      # vertical stiffness <<< approximation b
+            else:  # if slack
+                dHF_dXF = 0.0
+                dVF_dZF = W  # vertical stiffness        
+            
+            info["HF"] = HF     # solution to be used to start next call (these are the solved variables, may be for anchor if line is reversed)
+            info["VF"] = 0.0
+            info["stiffnessB"]  = np.array([[ dHF_dXF, 0.0], [0.0, dVF_dZF]])
+            info["stiffnessA"]  = np.array([[ dHF_dXF, 0.0], [0.0, dVF_dZF]])
+            info["stiffnessBA"] = np.array([[-dHF_dXF, 0.0], [0.0, 0.0]])
+            info["LBot"] = L
+            info['ProfileType'] = 0
+            info['Zextreme'] = 0
+            
+            if plots > 0:        
+            
+                if CB > 0 and XF > L:
+                    xB = L - HF/W/CB                    # location of point at which line tension reaches zero
+                else:
+                    xB = 0.0
+                
+                # z values remain zero in this case
+                
+                if CB==0 or XF <= L:                    # case 1: no friction, or zero tension
+                    Xs = XF/L*s                             # X values uniformly distributed
+                    Te = Te + np.max([0, (XF/L - 1.0)*EA])  # uniform tension
+                elif xB <= 0:                           # case 2: seabed friction but tension at anchor
+                    Xs = s*(1+CB*W/EA*(0.5*s-xB))
+                    Te = HF + CB*W*(s-L)
+                else:                                   # case 3: seabed friction and zero anchor tension
+                    for I in range(nNodes):                
+                        if s[I] <= xB:                  # if this node is in the zero tension range                        
+                            Xs[I] = s[I];               # x is unstretched, z and Te remain zero
+                        
+                        else:                           # the tension is nonzero
+                            Xs[I] = s[I] + CB*W/EA*(s[I] - xB)**2
+                            Te[I] = HF - CB*W*(L-s[I])
+        
+        else:  # sloped seabed case with full contact 
+    
+            ProfileType = 8
+            
+            cos_alpha = np.cos(np.radians(alpha))
+            tan_alpha = np.tan(np.radians(alpha))
+            sin_alpha = np.sin(np.radians(alpha))
+            
+            LAB = XF/cos_alpha  # calling this the lenght along the seabed for this case
+            if LAB < 0:
+                breakpoint()
+                LAB = max(LAB, 0)  # Ensure LAB is not less than zero 
+            
+            
+            Ts = np.max([0, (LAB/L - 1.0)*EA]) # approximate tension based on streatch
+            Tg = L*W*sin_alpha  # effect of weight and slope
+            # ignoring friction for now
+            
+            HF = cos_alpha*(Ts + 0.5*Tg)
+            VF = sin_alpha*(Ts + 0.5*Tg)
+            HA = cos_alpha*(Ts - 0.5*Tg)
+            VA = sin_alpha*(Ts - 0.5*Tg)
+            
+            if plots > 0:
+            
+                for I in range(nNodes):
+                    Xs[I] = np.min([s[I]*cos_alpha, XF])
+                    Zs[I] = Xs[I]*tan_alpha
+                    Te[I] = Ts - 0.5*Tg + Tg*float(I/(nNodes-1))
+            
+            if HF > 0: # if taut
+                dHF_dXF = EA/L    # CRUDE approximation
+                dVF_dZF = dV_dZ_s(Tol, HF) # same
+            else:  # if slack
+                dHF_dXF = 0.0
+                dVF_dZF = W  # vertical stiffness        
+            
+            info["HF"] = HF
+            info["VF"] = VF
+            info["stiffnessB"]  = np.array([[ dHF_dXF, 0.0], [0.0, dVF_dZF]])
+            info["stiffnessA"]  = np.array([[ dHF_dXF, 0.0], [0.0, dVF_dZF]])
+            info["stiffnessBA"] = np.array([[-dHF_dXF, 0.0], [0.0, 0.0]])
+            info["LBot"] = L
+            info['ProfileType'] = 8
+            info['Zextreme'] = 0
+            
+            if plots > 0:        
+            
+                if CB > 0 and XF > L:
+                    xB = L - HF/W/CB                    # location of point at which line tension reaches zero
+                else:
+                    xB = 0.0
         
     
     # ProfileType 4 case - fully slack
@@ -531,8 +584,8 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         X2 = np.linspace(0, d, nNodes)
                         Z2 = W2/T0*X2**2 + b*X2
                         
-                        Xs_parabola = X2*np.cos(theta) - Z2*np.sin(theta) # put in global frame
-                        Zs_parabola = X2*np.sin(theta) + Z2*np.cos(theta)
+                        Xs_backup = X2*np.cos(theta) - Z2*np.sin(theta) # put in global frame
+                        Zs_backup = X2*np.sin(theta) + Z2*np.cos(theta)
                         
                         # Now get the forces and stiffnesses, again assuming it's just based on elasticity
                         # This is back in the regular orientation - should we add weight in?
@@ -564,7 +617,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         info4['oths']['error'] = False
                         info4['oths']['message'] = 'Approximated as a straight massless spring as a last resort.'
                         
-                        
                         info.update(info4['oths'])  # <<< hopefully I modified enough in info4 for this to work
                         info['catenary'] = info4
                     
@@ -573,12 +625,26 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         L_bot = (d**2 - L**2)/(2*(XF-L))  # length on seabed
                         Ls = L - L_bot
                         VF = Ls*W                   # weight of suspended length
+                        VA = 0
                         HF = (XF - L_bot)/ZF * VF
-                   
+                        HA = HF
+                        T0 = np.sqrt(HF*HF+VF*VF)
+                        
+                        R = np.array([[XF/d, -ZF/d],[ZF/d, XF/d]]) # rotation matrix
+                        Kl = EA/L # inline stiffness (rough guess)
+                        Kt = T0/d # transverse stiffness
+                        K = np.matmul(R, np.matmul( np.array([[Kl,0],[0,Kt]]), R.T) ) # stiffness matrix (should check some of the math)
+                        
+                        
                         # put things in the format expected for later parts of the code
                         X = np.zeros(2)
                         X[0] = HF
                         X[1] = VF
+                        
+                        X2 = np.linspace(0, d, nNodes)  # straight line profile approximation
+                        Xs_backup = X2*XF/d
+                        Zs_backup = X2*ZF/d
+                        Ts_backup = np.linspace(0, T0, nNodes) # linear tension profile approximation
                         
                         info4['oths']['HF'] = HF
                         info4['oths']['VF'] = VF
@@ -593,6 +659,9 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         info4['oths']['ProfileType'] = -2 # flag for the bilinear solution for the coordinates...
                         info4['oths']['error'] = False
                         info4['oths']['message'] = 'Approximated as bilinear with seabed contact as a last resort.'
+                        
+                        info.update(info4['oths'])  # <<< hopefully I modified enough in info4 for this to work
+                        info['catenary'] = info4
                         
                     # Otherwise, we'd need an iterative solve of tension, curvature, and distributed load.
                     # It could potentially be with a parabola. We don't have that yet, so fail.
@@ -869,10 +938,14 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
                         Zs[I] = ( SQRT1VFMinWLs_HF2 - SQRT1VFMinWL_HF2 )*HF_W + s_EA*( VFMinWL + 0.5*Ws );
                         Te[I] = np.sqrt( HF*HF + VFMinWLs*VFMinWLs );
                     
-                    if ProfileType==-1:  # new last-ditch solution attempt for taut lines 
-                        Xs[I] = Xs_parabola[I]
-                        Zs[I] = Zs_parabola[I]
+                    elif ProfileType == -1:  # new last-ditch solution attempt for taut lines 
+                        Xs[I] = Xs_backup[I]
+                        Zs[I] = Zs_backup[I]
                         Te[I] = T0
+                    elif ProfileType == -2:  # new last-ditch solution attempt for almost-taut lines 
+                        Xs[I] = Xs_backup[I]
+                        Zs[I] = Zs_backup[I]
+                        Te[I] = Ts_backup[I]
                     
                     
                     # A portion of the line must rest on the seabed
@@ -1018,7 +1091,6 @@ def catenary(XF, ZF, L, EA, W, CB=0, alpha=0, HF0=0, VF0=0, Tol=0.000001,
         FzA = -FzA
         FzB = -FzB
         
-        info["stiffnessA"], info["stiffnessB"] = info["stiffnessB"], info["stiffnessA"]  # swap A and BB
         # note: diagonals of AB matrix do not change 
         
         info["stiffnessA"][0,1] = -info["stiffnessA"][0,1]  # reverse off-diagonal signs
@@ -1069,19 +1141,20 @@ def eval_func_cat(X, args):
     SQRT1VFMinWL_HF2 = np.sqrt( 1.0 + VFMinWL_HF2 )
     
     # simple inelastic approximation of arc lenght of a parabola with exactly zero laid length
-    s = np.sqrt(4*XF**2 + 16*ZF**2)  # some constanst
-    lp = s/4 + XF**2/4/ZF*np.log((4*ZF + s)/2/ZF)  # length of parabola (slight underestimate vs lenght of catenary)
+    mm = ZF/XF**2  # parabola coefficient z = mx^2
+    lp = (2*mm*XF*np.sqrt(4*mm**2*XF**2 + 1) + np.arcsinh(2*mm*XF))/(4*mm)  # arc length
+    
     d = np.linalg.norm([XF, ZF])  # distance from points 
     
     alpha_rad = np.radians(alpha)  # convert to radians for convenience
     sin_alpha = np.sin(alpha_rad)
     cos_alpha = np.cos(alpha_rad)
     
-    # this is a crude check that nothing should be laying along the seabed:ZF/HF >> 0 and L-d << (lp-d)
-
     # determine line profile type
-    if (hA > 0.0  or  W < 0.0  or  VFMinWL > sin_alpha/cos_alpha
-        or (ZF/XF > 0.1 and L-d < 0.001*(lp-d)) ): # no portion of the line rests on the seabed
+    if (hA > 0.0                    # no portion of the line rests on the seabed
+        or W < 0.0  
+        or VFMinWL > sin_alpha/cos_alpha
+        or (ZF/XF > 0.2 and L-d < 0.001*(lp-d)) ): # crude check that nothing should be laying along the seabed
         ProfileType = 1
     elif not alpha==0:              # a portion of line rests along a *sloped* seabed
         ProfileType = 7
@@ -1187,14 +1260,22 @@ def eval_func_cat(X, args):
             info['error'] = True
             info['message'] = "ProfileType 7: VF_HF + SQRT1VF_HF2 <= 0"
             
-        elif HF*1000000 < VF:
+        elif HF*1000000000 < VF:
             info['error'] = True
             info['message'] = "ProfileType 7: HF << VF, line is slack, not supported yet"
             breakpoint()
         
         else:
-        
-            LBot = L - (VF - HF * sin_alpha/cos_alpha)/W  # Lb on the seafloor
+            
+            # Improved LBot (seabed contact unstretched lenght) estimate
+            if VF/HF < ZF/XF:  # if the end B tension angle is guessed too horizontal
+                VF0 = 1.0*VF  # original copy of VF
+                VFI = ZF/XF*HF  # ideal VF for taut line
+                VFU = 0.1*VF0 + 0.9*VFI # let's make it 90% closer to the taut line angle
+            else:
+                VFU = 1.0*VF
+            
+            LBot = L - (VFU - HF * sin_alpha/cos_alpha)/W  # Lb on the seafloor
             
             # Practical limits on LBot, because the estimates can be way off
             if LBot > XF/cos_alpha:  # if LBot is too large (if true, this would be profileType 4)
@@ -1467,10 +1548,26 @@ if __name__ == "__main__":
     #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(0.16525209064463553, 1000.1008645356192, 976.86359774357, 861890783.955385, -5.663702119364548, 0.0, -0.0, 0.0, 17325264.3383085, 5.000000000000001e-05, 101, 1, 1000)
     #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(0.0, 997.8909672113768, 1006.0699998926483, 361256000.00000006, 2.4952615384615333, 0, 0.0, 0, 0, 0.0001, 101, 100, 1, 1000)
     #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(148.60942473375343, 1315.624259105325, 1279.7911844766932, 17497567581.802254, -81.8284437736437, CB=0.0, alpha=-0.0, HF0=795840.9590915733, VF0=6399974.444658389, Tol=0.0005, MaxIter=100, depth=1300.0, plots=1)
-    (fAH1, fAV1, fBH1, fBV1, info1) =  catenary(2887.113193120885, -838.1577017360617, 2979.7592390255295, 41074520109.87981, 1104.878355564403, CB=0.0, alpha=81.41243787249468, HF0=0.0, VF0=3564574.0622291695, Tol=0.0005, MaxIter=100, depth=3000.0, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(2887.113193120885, -838.1577017360617, 2979.7592390255295, 41074520109.87981, 1104.878355564403, CB=0.0, alpha=81.41243787249468, HF0=0.0, VF0=3564574.0622291695, Tol=0.0005, MaxIter=100, depth=3000.0, plots=1)
+    
+    
+    #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(20.386176076554875, -83.33919733899663, 85.0, 469622033.24936056, -166.5252156894419, 
+    #   CB=-897.8894086817654, alpha=0, HF0=1045436.0319202082, VF0=4280849.602990574, Tol=0.0001, MaxIter=100, depth=800, plots=1)
+    
+    
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(239.68133374054617, 5.572397767284315, 239.67708907645783, 2003669644.0239, 3993.8681384566403, CB=0.0, alpha=0.7703995482284995, HF0=265897.4720034979, VF0=3575.475193332911, Tol=0.0001, MaxIter=100, depth=835.6052666569179, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(242.43063215088046, 16.438515754164882, 242.94180148966598, 1977564385.9456, 3941.831324315529, CB=0.0, alpha=3.879122219600495, HF0=400446.3427158061, VF0=26452.686481212237, Tol=0.0001, MaxIter=100, depth=820.2155229016184, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) =  catenary(113.98763202381406, 135.64003587014417, 222.9088982113214, 1799620189.0374997, 3587.1279256290677, CB=0.0, alpha=-1.6131140432335964, HF0=737382.1987996304, VF0=1014826.8890259801, Tol=0.0001, MaxIter=100, depth=914.6515127916663, plots=1)
     
     #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(274.9, 15.6, 328.5, 528887323., -121., 
     #         CB=-48., alpha=0, HF0=17939., VF0=20596., Tol=2e-05, MaxIter=100, plots=1)
+    
+    
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(997.547, 186.0, 1016.97134, 799738627.1597824, 1594.059185077651, CB=0.0, alpha=0.0, HF0=314561.120450163, VF0=523671.07753570913, Tol=2e-05, MaxIter=100, depth=200, nNodes=100, plots=1)
+    #(fAH1, fAV1, fBH1, fBV1, info1) = catenary(997.5168, 186.0, 1016.97134, 801228558.5672204, 1597.0290198975624, CB=0.0, alpha=0.0, HF0=315147.1684089979, VF0=524646.7105467543, Tol=2e-05, MaxIter=100, depth=200, nNodes=100, plots=1)
+    
+    
+    (fAH1, fAV1, fBH1, fBV1, info1) = catenary(36.8677299586167, -20.0, 41.943170938142885, 720564398.5432665, 4.790651494763263, CB=-20.0, alpha=0, HF0=0, VF0=0, Tol=0.00025, MaxIter=100, depth=0, plots=1)
     
     
     # First attempt's iterations are as follows:

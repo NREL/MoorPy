@@ -99,6 +99,8 @@ class Subsystem(System, Line):
         # the old rAFair input for the position of a second fairlead of a shaerd mooring line is gone
         # currently we assume rad_fair and z_fair are same for both ends of a shared line...
         
+        self.offset = 0  # used for debugging
+        
         # seabed bathymetry - seabedMod 0 = flat; 1 = uniform slope, 2 = grid
         self.seabedMod = 0
         
@@ -107,9 +109,21 @@ class Subsystem(System, Line):
             self.xSlope = getFromDict(kwargs, 'xSlope', default=0)
             self.ySlope = getFromDict(kwargs, 'ySlope', default=0)
         
+        #if 'bathymetry' in kwargs:
+            #self.seabedMod = 2
+            #self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = self.readBathymetryFile(kwargs['bathymetry'])
+        '''
         if 'bathymetry' in kwargs:
             self.seabedMod = 2
-            self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = self.readBathymetryFile(kwargs['bathymetry'])
+            if isinstance(kwargs['bathymetry'],str):
+                self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = readBathymetryFile(kwargs['bathymetry'])
+            elif isinstance(kwargs['bathymetry'],dict):
+                bath_dictionary = kwargs['bathymetry']
+                # grid sent in, just assign to properties
+                self.bathGrid_Xs = bath_dictionary['x']
+                self.bathGrid_Ys = bath_dictionary['y']
+                self.bathGrid = bath_dictionary['depth'] 
+        '''
         # Note, System and Subsystem bathymetry can be set after creation 
         # by setBathymetry, which uses link to existing data, for efficiency.
         
@@ -124,6 +138,70 @@ class Subsystem(System, Line):
         
         self.MDoptions = {} # dictionary that can hold any MoorDyn options read in from an input file, so they can be saved in a new MD file if need be
         self.qs = 1         # flag that it's a MoorPy analysis, so System methods don't complain. One day should replace this <<<
+    
+        self.dynamic_stiffness_activated = False  # flag turned on when dynamic EA values are activate
+    
+    
+    def updateBathymetry(self):
+        '''Updates the bathymetry description underneath the Subsystem based on
+        global bathymetry data stored in the parent System if it exists.
+        Bathymetry under the subsystem is represented as an x-depth curve with
+        node points corresponding to wherever the subsystem cross over an edge
+        of the bathymetry grid.
+        '''
+        
+        dx = self.rB[0] - self.rA[0]
+        dy = self.rB[1] - self.rA[1]
+        
+        LH = np.hypot(dx, dy)  # horizontal distance between ends
+        
+        if self.sys and hasattr(self.sys, 'bathGrid_Xs'):  # only do this if there is a parent System AND bathymetry grid
+            
+            xs_loc = []  # local x value along subsystem from end A
+            depths = []
+            
+            # Find all places where the subsystem crosses the bathGrid_Xs
+            if abs(dx) > 0:
+                for x in self.sys.bathGrid_Xs:  # look along each grid line
+                    # Check if x is between rA and rB:
+                    if (self.rA[0] < x and x < self.rB[0]) or (self.rA[0] > x and x > self.rB[0]):
+                        
+                        y = self.rA[1] + (x - self.rA[0])*dy/dx  # corresponding y value
+                        
+                        depth, _ = self.sys.getDepthFromBathymetry(x, y) # depth
+                        
+                        xs_loc.append( (x - self.rA[0])*LH/dx )  # hotizontal length along sybsystem
+                        depths.append(depth)
+        
+        
+            # Find all places where the subsystem crosses the bathGrid_Ys
+            if abs(dy) > 0:
+                for y in self.sys.bathGrid_Ys:  # look along each grid line
+                    # Check if x is between rA and rB:
+                    if (self.rA[1] < y and y < self.rB[1]) or (self.rA[1] > y and y > self.rB[1]):
+                        
+                        x = self.rA[1] + (y - self.rA[1])*dx/dy  # corresponding y value
+                        
+                        depth, _ = self.sys.getDepthFromBathymetry(x, y) # depth
+                        
+                        xs_loc.append( (y - self.rA[1])*LH/dy )  # hotizontal length along sybsystem
+                        depths.append(depth)
+        
+            # Sort xs_loc and depths by increasing xs_loc values
+            xs_loc = np.array(xs_loc)
+            depths = np.array(depths)
+            idx = np.argsort(xs_loc)
+            xs_loc_sorted = xs_loc[idx]
+            depths_sorted = depths[idx]
+            # >>> TO DO <<<
+            
+            # Store the updated 1D representation in the Subsystem
+            self.bathGrid_Xs = np.array(xs_loc_sorted)
+            self.bathGrid_Ys = np.array([0])
+            self.bathGrid    = np.array([depths_sorted])
+            
+        else:
+            pass  # MH: can't think of anything to do for isolated subsystems at the moment...
         
     
     def initialize(self, daf_dict={}):
@@ -144,6 +222,7 @@ class Subsystem(System, Line):
         self.Te0 = np.zeros([self.nLines,2])  # undispalced values
         self.TeM = np.zeros([self.nLines,2])  # mean offset values
         self.TeD = np.zeros([self.nLines,2])  # dynamic values
+        self.TeDmin = np.zeros([self.nLines,2])  # dynamic minimum values
         
         # adjustment on laylength... positive means that the dynamic lay length is greater than linedesign laylength 
         self.LayLen_adj = getFromDict(daf_dict, 'LayLen_adj', shape=0, default=0.0) 
@@ -152,7 +231,7 @@ class Subsystem(System, Line):
         self.damage = np.zeros(self.nNodes)
         
     
-    def makeGeneric(self, lengths, types, connectors=[], suspended=0):
+    def makeGeneric(self, lengths, types, connectors=[], suspended=0, nSegs=40):
 
         '''Creates a cable of n components going between an anchor point and
         a floating body (or a bridle point). If shared, it goes between two
@@ -227,7 +306,14 @@ class Subsystem(System, Line):
                 raise Exception(f"Can't find lineType '{types[i]}' in the SubSystem.")
             
             # add the line segment using the reference to its lineType dict
-            self.addLine(lengths[i],self.lineTypes[i])
+            if nSegs is None:
+                self.addLine(lengths[i], self.lineTypes[i])
+            elif isinstance(nSegs, (int, float)):
+                self.addLine(lengths[i], self.lineTypes[i], nSegs=nSegs)
+            elif isinstance(nSegs, list):
+                self.addLine(lengths[i], self.lineTypes[i], nSegs=nSegs[i])
+            else:
+                raise ValueError("Invalid type for nSegs. Expected None, a number, or a list.")
 
             # add the upper end point of the segment
             if i==self.nLines-1:                            # if this is the upper-most line
@@ -262,10 +348,13 @@ class Subsystem(System, Line):
         LineError
             If the given endB value is not a 1 or 0
         '''
-        
         if sink: # set z coordinate on seabed
-            z, _ = self.getDepthFromBathymetry(r[0], r[1])
-            r = np.array([r[0], r[1], z])  # (making a copy of r to not overwrite it)
+            if self.sys:  # If there is a parent system, query it's seabed info
+                z, _ = self.sys.getDepthFromBathymetry(r[0], r[1])
+            else:
+                z = -self.depth  # Otherwise use the subsystem's depth parameter
+            
+            r = np.array([r[0], r[1], -z])  # (making a copy of r to not overwrite it)
         
         # set end coordinates in global frame just like for a Line
         if endB == 1:
@@ -274,9 +363,11 @@ class Subsystem(System, Line):
             self.rA = np.array(r, dtype=float)
         else:
             raise LineError("setEndPosition: endB value has to be either 1 or 0")
+        
+        # Could optionally set end position here (though it will be set in staticSolve)
+        
     
-    
-    def staticSolve(self, reset=False, tol=0, profiles=0):
+    def staticSolve(self, tol=0, profiles=0, maxIter=500):
         '''Solve internal equilibrium of the Subsystem and saves the forces
         and stiffnesses at the ends in the global reference frame. All the 
         This method mimics the behavior of the Line.staticSolve method and 
@@ -300,24 +391,28 @@ class Subsystem(System, Line):
         else:
             self.pointList[ 0].setPosition([ -self.span   , 0, self.rA[2]])
             self.pointList[-1].setPosition([ -self.span+LH, 0, self.rB[2]])
-            
-        # get equilibrium
-        self.solveEquilibrium(tol=tol)
-        
-        # get 2D stiffness matrices of end points
-        K = self.getCoupledStiffnessA()
         
         # transform coordinates and forces back into global frame
         if LH > 0:
             self.cos_th = dr[0]/LH          # cos of line heading
             self.sin_th = dr[1]/LH          # sin of line heading
-            th = np.arctan2(dr[1],dr[0])    # heading (from A to B) [rad]
-            self.R = rotationMatrix(0,0,th)  # rotation matrix about z that goes from +x direction to heading
+            self.th = np.arctan2(dr[1],dr[0])    # heading (from A to B) [rad]
+            self.R = rotationMatrix(0,0,self.th)  # rotation matrix about z that goes from +x direction to heading
             
         else:   # special case of vertical line: line heading is undefined - use zero as default
             self.cos_th = 1.0
             self.sin_th = 0.0
+            self.th = 0
             self.R = np.eye(3)
+        
+        # update the bathymetry in case either end position has changed
+        self.updateBathymetry()
+            
+        # get equilibrium
+        self.solveEquilibrium(tol=tol, maxIter = maxIter)
+        
+        # get 2D stiffness matrices of end points
+        K = self.getCoupledStiffnessA()
         
         # save end forces and stiffness matrices (first in local frame)
         self.fA_L = self.pointList[ 0].getForces(xyz=True) # force at end A
@@ -372,11 +467,14 @@ class Subsystem(System, Line):
             plt.show()    
     
     
-    def drawLine2d(self, Time, ax, color="k", endpoints=False, Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, plotnodes=[], plotnodesline=[],label="",cmap='rainbow', alpha=1.0):
+    def drawLine2d(self, Time, ax, color="k", endpoints=False, Xuvec=[1,0,0], Yuvec=[0,0,1], Xoff=0, Yoff=0, colortension=False, plotnodes=[], plotnodesline=[],label="",cmap='rainbow', alpha=1.0, linewidth = 1):
         '''wrapper to System.plot2d with some transformation applied'''
         
         for i, line in enumerate(self.lineList):
-            
+            if isinstance(label,list) and len(label)==len(self.lineList):
+                lab = label[i]
+            else:
+                lab = label
             # color and width settings
             if color == 'self':
                 colorplot = line.color  # attempt to allow custom colors
@@ -408,7 +506,7 @@ class Subsystem(System, Line):
                     rgba = cmap_obj(color_ratio)    # return the rbga values of the colormap of where the node tension is
                     ax.plot(Xs2d[i:i+2], Ys2d[i:i+2], color=rgba, zorder=100)
             else:
-                ax.plot(Xs2d, Ys2d, color=colorplot, lw=lw, zorder=100, label=label, alpha=alpha)
+                ax.plot(Xs2d, Ys2d, color=colorplot, lw=lw, zorder=100, label=lab, alpha=alpha)
             
             if len(plotnodes) > 0:
                 for i,node in enumerate(plotnodes):
@@ -426,13 +524,14 @@ class Subsystem(System, Line):
             
             # color and width settings
             if color == 'self':
-                color = line.color  # attempt to allow custom colors
-                lw = line.lw
+                line.color = line.color  # attempt to allow custom colors
+                line.lw = line.lw
             elif color == None:
-                color = [0.3, 0.3, 0.3]  # if no color, default to grey
-                lw = 1
+                line.color = [0.3, 0.3, 0.3]  # if no color, default to grey
+                line.lw = 1
             else:
-                lw = 1
+                line.lw = 1
+                line.color = color
             
             # get the Line's local coordinates
             Xs0, Ys0, Zs, tensions = line.getLineCoords(Time)
@@ -451,14 +550,25 @@ class Subsystem(System, Line):
                     ax.plot(Xs[i:i+2], Ys[i:i+2], Zs[i:i+2], color=rgba, zorder=100)
             else:
                 #linebit.append(ax.plot(Xs, Ys, Zs, color=color, lw=lw, zorder=100))
-                ax.plot(Xs, Ys, Zs, color=color, lw=lw, zorder=100)
+                ax.plot(Xs, Ys, Zs, color=line.color, lw=line.lw, zorder=100)
             
             if shadow:
-                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.depth, color=[0.5, 0.5, 0.5, 0.2], lw=lw, zorder = 1.5) # draw shadow
+                if self.seabedMod == 0:
+                    Zs = np.zeros_like(Xs)-self.depth
+                elif self.seabedMod == 1:
+                    Zs = self.depth - self.xSlope*Xs - self.ySlope*Ys
+                elif self.seabedMod == 2:
+                    Zs = np.zeros(len(Xs))
+                    for i in range(len(Xs)):
+                        # Can get depths from the Subsystem's local grid
+                        Zs[i] = self.getDepthFromBathymetry(Xs0[i], Ys0[i])
+                        #Zs[i] = self.sys.getDepthFromBathymetry(Xs[i], Ys[i])
+
+                ax.plot(Xs, Ys, Zs, color=[0.5, 0.5, 0.5, 0.2], lw=line.lw, zorder = 1.5) # draw shadow
             
             if endpoints == True:
                 #linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
-                ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color)
+                ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = line.color)
     
     
     def setOffset(self, offset, z=0):
@@ -467,6 +577,8 @@ class Subsystem(System, Line):
         'span' (shouldn't change), and B is set based on offset and the
         rad_fair/z_fair setting. Optional argument z can be added for a z offset.
         '''
+        
+        self.offset = float(offset)
         
         # Use static EA values and unstretched lengths
         self.revertToStaticStiffness()
@@ -480,17 +592,22 @@ class Subsystem(System, Line):
             self.rA = np.array([-self.span-self.rad_fair, 0, self.rA[2]])
             self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
             
-        self.staticSolve(tol=self.eqtol)  # solve the subsystem
-        
+        if hasattr(self, 'maxIter'):
+            self.staticSolve(tol=self.eqtol, maxIter = self.maxIter)  # solve the subsystem
+        else:
+            self.staticSolve(tol=self.eqtol)
+            
         # Store some values at this offset position that may be used later
         for i, line in enumerate(self.lineList):
             self.TeM[i,0] = np.linalg.norm(line.fA)
             self.TeM[i,1] = np.linalg.norm(line.fB)
-                
-        self.anchorFx0 = self.lineList[0].fA[0]
-        self.anchorFz0 = self.lineList[0].fA[2]
+               
+        # save anchor forces at mean offset    
+        self.anchorFxM = self.lineList[0].fA[0]
+        self.anchorFzM = self.lineList[0].fA[2]
     
         self.TeD = np.copy(self.TeM)  # set the dynamic values as well, in case they get queried right away
+        self.TeDmin = np.copy(self.TeM)  # set the dynamic values as well, in case they get queried right away
         
     
     def setDynamicOffset(self, offset, z=0):
@@ -503,19 +620,26 @@ class Subsystem(System, Line):
         Optional argument z can be added for a z offset.
         '''
         
+        self.offset = float(offset)
+        
         if not self.dynamic_stiffness_activated: # if not already using them,
             System.activateDynamicStiffness(self)  # switch to dynamic EA values
         
         # adjust end B to the absolute offsets specified
-        self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
-        
+        if self.shared:
+            self.rB = np.array([-self.rad_fair + offset/2, 0, self.z_fair+z]) 
+        else:
+            self.rB = np.array([-self.rad_fair + offset, 0, self.z_fair+z]) 
         self.staticSolve(tol=self.eqtol)  # solve the subsystem
         
         # Store dynamic values at this offset position that may be used later
         for i, line in enumerate(self.lineList):
             self.TeD[i,:] = self.TeM[i,:] + self.DAFs[i]*( np.array([line.TA, line.TB]) - self.TeM[i,:] )
+            self.TeDmin[i,:] = self.TeM[i,:] - self.DAFs[i]*( np.array([line.TA, line.TB]) - self.TeM[i,:] )
         
-        
+        # Store dynamic anchor forces
+        self.anchorFxD = self.anchorFxM + self.DAFs[-1]*(self.lineList[0].fA[0] - self.anchorFxM)
+        self.anchorFzD = self.anchorFzM + self.DAFs[-2]*(self.lineList[0].fA[2] - self.anchorFzM)
     
     def activateDynamicStiffness(self, display=0):
         '''Calls the dynamic stiffness method from System rather than from Line.'''
@@ -525,6 +649,56 @@ class Subsystem(System, Line):
     def revertToStaticStiffness(self):
         '''Calls the static stiffness method from System rather than from Line.'''
         System.revertToStaticStiffness(self)
+    
+    
+    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=1e-4):
+        '''Compute M,A,B,K matrices for the Subsystem. This calls 
+        get_dynamic_matrices() for each Line in the Subsystem then combines
+        the results. Note that this method overrides the Line method. Other
+        Line methods used for dynamics can be used directly in Subsystem.
+        '''
+        self.nNodes = np.sum([line.nNodes for line in self.lineList]) - self.nLines + 1
+        
+        EA_segs = np.zeros(self.nNodes-1) # extensional stiffness of the segments
+        n_dofs = 3*self.nNodes # number of dofs
+        M = np.zeros([n_dofs,n_dofs], dtype='float')
+        A = np.zeros([n_dofs,n_dofs], dtype='float')
+        B = np.zeros([n_dofs,n_dofs], dtype='float')
+        K = np.zeros([n_dofs,n_dofs], dtype='float')
+        r_mean = np.zeros([self.nNodes,3], dtype='float')
+        r_dynamic = np.ones((len(omegas),self.nNodes,3),dtype='float')*r_dynamic
+        v_dynamic = 1j*omegas[:,None,None]*r_dynamic
+
+        n = 0  # starting index of the next line's entries in the matrices
+        
+        for line in self.lineList:
+            n1 = int(n/3) 
+            n2 = n1 + line.nNodes
+
+            # Filling matrices for line (dof n to dof 3xline_nodes+n)
+            M_n,A_n,B_n,K_n,r_n,EA_segs_n = line.getDynamicMatrices(omegas, S_zeta,r_dynamic[:,n1:n2,:],depth,kbot,cbot,seabed_tol=seabed_tol)
+            M[n:3*line.nNodes+n,n:3*line.nNodes+n] += M_n
+            A[n:3*line.nNodes+n,n:3*line.nNodes+n] += A_n
+            B[n:3*line.nNodes+n,n:3*line.nNodes+n] += B_n
+            K[n:3*line.nNodes+n,n:3*line.nNodes+n] += K_n
+
+            # Attachment point properties
+            attachment = self.pointList[line.attached[-1]-1] # attachment point
+            attachment_idx = n2 - 1 # last node index
+            sigma_vp = np.sqrt(np.trapezoid(np.abs(v_dynamic[:,attachment_idx,:])**2*S_zeta[:,None],omegas,axis=0)) # standard deviations of the global components of the attachment point's velocity
+
+            M[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += attachment.m*np.eye(3) 
+            A[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += attachment.Ca* self.rho * attachment.v * np.eye(3)
+            B[3*line.nNodes - 3:3*line.nNodes, 3*line.nNodes - 3:3*line.nNodes] += 0.5* self.rho * attachment.CdA * np.pi*(3*attachment.v/4/np.pi)**(2/3) \
+                                                                                   * np.eye(3) * np.sqrt(8/np.pi) * np.diag(sigma_vp)
+
+            # Static line properties
+            r_mean[n1:n2,:] = r_n
+            EA_segs[n1:n2-1] = EA_segs_n 
+
+            n += 3*line.nNodes - 3 # next line starting node add the number of dofs of the current line minus 3 to get the last shared node
+        
+        return M,A,B,K,r_mean,EA_segs
     
     
     # ---- Extra convenience functions (subsystem should be in equilibrium) -----
@@ -600,8 +774,17 @@ class Subsystem(System, Line):
         
         return dynamicTe 
     
+    def getMinTen(self, iLine):
+        '''Compute the end (maximum) tension for a specific line, including
+        a dynamic amplification factor.'''
+        line = self.lineList[iLine]
+
+        dynamicTe = min( self.TeDmin[iLine,:] )
+        
+        return dynamicTe 
     
-    def getTenSF(self, iLine):
+    
+    def getTenSF(self, iLine, corrosion_mm=0):
         '''Compute MBL/tension for a specific line.'''
         return self.lineList[iLine].type['MBL'] / self.getTen(iLine) 
         

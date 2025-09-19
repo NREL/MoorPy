@@ -80,9 +80,12 @@ gives an example of how they work (from manual_system.py).
       ms.addLine(lineLength, typeName, pointA=2*i+1, pointB=2*i+2)
 
 
+Note that both the fairlead and anchor points are set to type 1 (fixed). 
+See the :ref:`The API Page<API>` for more information about the methods
+used above.
 
 
-Creating a MoorPy System for a MoorDyn Input File
+Creating a MoorPy System from a MoorDyn Input File
 -------------------------------------------------
 
 .. _inputfile:
@@ -96,7 +99,8 @@ passing the input file name when creating the System object (from imported_syste
 
 
 The format of the input file is expected to follow the
-MoorDyn v2 style, an example of which is shown below:
+`MoorDyn v2 format <https://moordyn.readthedocs.io/en/latest/inputs.html#the-v2-input-file>`_,
+an example of which is shown below:
 
 
 .. code-block:: none
@@ -107,16 +111,10 @@ MoorDyn v2 style, an example of which is shown below:
   TypeName      Diam     Mass/m     EA     BA/-zeta     EI      Cd     Ca   CdAx  CaAx
   (name)        (m)      (kg/m)     (N)    (N-s/-)    (N-m^2)   (-)    (-)  (-)   (-)
   chain         0.2160   286.56    1.23e9   -1.0        0.00    1.00  1.00  0.00  0.00  
-  --------------------- ROD TYPES -----------------------------------------------------
-  TypeName      Diam     Mass/m    Cd     Ca      CdEnd    CaEnd
-  (name)        (m)      (kg/m)    (-)    (-)     (-)      (-)
   ----------------------- BODIES ------------------------------------------------------
   ID   Attachment    X0     Y0     Z0     r0     p0     y0     Mass     CG*     I*      Volume   CdA*   Ca*
   (#)     (-)        (m)    (m)    (m)   (deg)  (deg)  (deg)   (kg)     (m)    (kg-m^2)  (m^3)   (m^2)  (-)
   1     coupled     0.00   0.00   -0.75  0.00   0.00   0.00    1.0e6    0.00    0.00     1.0e3   0.00   0.00
-  ---------------------- RODS ---------------------------------------------------------
-  ID   RodType  Attachment  Xa    Ya    Za    Xb    Yb    Zb   NumSegs  RodOutputs
-  (#)  (name)    (#/key)    (m)   (m)   (m)   (m)   (m)   (m)  (-)       (-)
   ---------------------- POINTS -------------------------------------------------------
   ID  Attachment     X        Y        Z       Mass   Volume  CdA    Ca
   (#)   (-)         (m)      (m)      (m)      (kg)   (mˆ3)  (m^2)   (-)
@@ -137,8 +135,10 @@ MoorDyn v2 style, an example of which is shown below:
   --------------------- need this line ------------------------------------------------
 
 
-Note that some parameters are only applicable to a dynamic model like MoorDyn, and are ignored by MoorPy.
-Conversely, some Body parameters used by MoorPy for hydrostatics are not captured in a MoorDyn-style file.
+Note that some parameters are only applicable to a dynamic model like MoorDyn, 
+and are not used by MoorPy. Conversely, some Body parameters used by MoorPy 
+for hydrostatics are not captured in a MoorDyn-style file and would need to be
+added as a second step after reading in the input file.
 
 
 
@@ -165,14 +165,16 @@ Here is an example showing one of the possible functions to analyze a mooring sy
 
 
 
-**Documentation Overview**
+Documentation Overview
+----------------------
 
 An overview of how a mooring system is represented in MoorPy can be found in :ref:`The Model Structure page<Model Structure>`.
 
 More documentation and examples of other functions that can be applied to a MoorPy mooring system can be 
 found in :ref:`The Usage page<MoorPy Usage>`.
 
-Detailed theory "under the hood" of the functions in MoorPy can be found in :ref:`The Theory Page<Theory and References>`.
+Links to papers that cover MoorPy theory can be found in :ref:`The Theory Page<Theory and References>`.
 
-Detailed inputs and outputs of MoorPy classes and functions can be found in :ref:`The API Page<API>`.
+Descriptions of the MoorPy System class methods, the main way to interact
+with MoorPy programmatically, can be found in :ref:`The API Page<API>`.
 

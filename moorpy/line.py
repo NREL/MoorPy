@@ -6,7 +6,9 @@ from moorpy.Catenary import catenary
 from moorpy.nonlinear import nonlinear                                      
 from moorpy.helpers import (unitVector, LineError, CatenaryError, 
                      rotationMatrix, makeTower, read_mooring_file, 
-                     quiver_data_to_segments, printVec, printMat)
+                     quiver_data_to_segments, printVec, printMat,
+                     get_dynamic_matrices, get_dynamic_tension, get_modes, guyan_reduce)
+
 from os import path
 
  
@@ -41,6 +43,8 @@ class Line():
         
         self.sys    = mooringSys       # store a reference to the overall mooring system (instance of System class)
         
+        self.attached = attachments  # ID numbers of the Points at the Line ends [a,b] >>> NOTE: not fully supported <<<<
+
         self.number = num
         self.isRod = isRod
             
@@ -49,7 +53,8 @@ class Line():
         self.type = lineType    # dictionary of a System.lineTypes entry
         self.cost = {}          # empty dictionary to contain cost information
         
-        self.EA = self.type['EA']  # use the default stiffness value for now (may be modified if using nonlinear elasticity) [N]
+        if not self.isRod:
+            self.EA = self.type['EA']  # use the default stiffness value for now (may be modified if using nonlinear elasticity) [N]
         
         self.nNodes = int(nSegs) + 1
         self.cb = float(cb)    # friction coefficient (will automatically be set negative if line is fully suspended)
@@ -75,8 +80,7 @@ class Line():
         self.lw=0.5
         
         self.fCurrent = np.zeros(3)  # total current force vector on the line [N]
-    
-    
+
     def loadData(self, dirname, rootname, sep='.MD.', id=0):
         '''Loads line-specific time series data from a MoorDyn output file'''
         
@@ -446,6 +450,11 @@ class Line():
         
         linebit = []  # make empty list to hold plotted lines, however many there are
         
+        if color == 'self':
+            colorplot = self.color  # attempt to allow custom colors
+        else:
+            colorplot = color
+        
         Xs, Ys, Zs, Ts = self.getLineCoords(Time)
         
         if self.isRod > 0:
@@ -455,9 +464,9 @@ class Line():
             Ys2d = Xs*Yuvec[0] + Ys*Yuvec[1] + Zs*Yuvec[2] 
         
             for i in range(int(len(Xs)/2-1)):
-                linebit.append(ax.plot(Xs2d[2*i:2*i+2]    ,Ys2d[2*i:2*i+2]    , lw=0.5, color=color))  # side edges
-                linebit.append(ax.plot(Xs2d[[2*i,2*i+2]]  ,Ys2d[[2*i,2*i+2]]  , lw=0.5, color=color))  # end A edges
-                linebit.append(ax.plot(Xs2d[[2*i+1,2*i+3]],Ys2d[[2*i+1,2*i+3]], lw=0.5, color=color))  # end B edges
+                linebit.append(ax.plot(Xs2d[2*i:2*i+2]    ,Ys2d[2*i:2*i+2]    , lw=0.5, color=colorplot))  # side edges
+                linebit.append(ax.plot(Xs2d[[2*i,2*i+2]]  ,Ys2d[[2*i,2*i+2]]  , lw=0.5, color=colorplot))  # end A edges
+                linebit.append(ax.plot(Xs2d[[2*i+1,2*i+3]],Ys2d[[2*i+1,2*i+3]], lw=0.5, color=colorplot))  # end B edges
         
         # drawing lines...
         else:            
@@ -559,9 +568,19 @@ class Line():
                     linebit.append(ax.plot(Xs[i:i+2], Ys[i:i+2], Zs[i:i+2], color=rgba, zorder=100))
             else:
                 linebit.append(ax.plot(Xs, Ys, Zs, color=color, lw=lw, zorder=100))
-            
+                
             if shadow:
-                ax.plot(Xs, Ys, np.zeros_like(Xs)-self.sys.depth, color=[0.5, 0.5, 0.5, 0.2], lw=lw, zorder = 1.5) # draw shadow
+                if self.sys.seabedMod == 0:
+                    Zs = np.zeros_like(Xs)-self.sys.depth
+                elif self.sys.seabedMod == 1:
+                    Zs = self.sys.depth - self.sys.xSlope*Xs - self.sys.ySlope*Ys
+                elif self.sys.seabedMod == 2:
+                    Zs = np.zeros(len(Xs))
+                    for i in range(len(Xs)):
+                        z,_ = self.sys.getDepthFromBathymetry(Xs[i], Ys[i])
+                        Zs[i] = -z
+
+                ax.plot(Xs, Ys, Zs, color=[0.5, 0.5, 0.5, 0.2], lw=lw, zorder = 1.5) # draw shadow
             
             if endpoints == True:
                 linebit.append(ax.scatter([Xs[0], Xs[-1]], [Ys[0], Ys[-1]], [Zs[0], Zs[-1]], color = color))
@@ -740,6 +759,21 @@ class Line():
         else:
             self.cb = -depthA - self.rA[2]  # when cb < 0, -cb is defined as height of end A off seabed (in catenary)
 
+        # Handle case of line above the water
+        if self.rA[2] > 0 or self.rB[2] > 0:  # end B out of water  << or do this in catenary?
+            ww = (self.type['m'] - np.pi/4*self.type['d_vol']**2 *self.sys.rho) * self.sys.g
+            wa = (self.type['m']) * self.sys.g  # weight in air
+            
+            z_top = max(self.rA[2], self.rB[2])
+            z_bot = min(self.rA[2], self.rB[2])
+            
+            # overwrite the weight based on the wet-dry weight ratio based on end z vals
+            self.w = ww + (wa - ww) * ( -min(0, z_bot) )/( z_top - z_bot )
+        else:
+            # reset to the normal weight if the line hasn't left the water
+            self.w = (self.type['m'] - np.pi/4*self.type['d_vol']**2 *self.sys.rho) * self.sys.g
+            
+            # >>> TODO: should replace all this with a more versatile catenary solve in future <<<
         
         # ----- Perform rotation/transformation to 2D plane of catenary -----
         
@@ -749,9 +783,9 @@ class Line():
         if np.sum(np.abs(self.fCurrent)) > 0:
         
             # total line exernal force per unit length vector (weight plus current drag)
-            w_vec = self.fCurrent/self.L + np.array([0, 0, -self.type["w"]])
-            w = np.linalg.norm(w_vec)
-            w_hat = w_vec/w
+            w_vec = self.fCurrent/self.L + np.array([0, 0, -self.w])
+            w_total = np.linalg.norm(w_vec)
+            w_hat = w_vec/w_total
             
             # >>> may need to adjust to handle case of buoyant vertical lines <<<
             
@@ -770,7 +804,12 @@ class Line():
         # if no current force, things are simple
         else:
             R_curr = np.eye(3,3)
-            w = self.type["w"]
+            w_total = self.w
+        
+        
+        # horizontal and vertical dimensions of line profile (end A to B)
+        LH = np.linalg.norm(dr[:2])
+        LV = dr[2]
         
         
         # apply a rotation about Z' to align the line profile with the X'-Z' plane
@@ -782,12 +821,17 @@ class Line():
         
         # figure out slope in plane (only if contacting the seabed)
         if self.rA[2] <= -depthA or self.rB[2] <= -depthB:
-            nvecA_prime = np.matmul(R, nvecA)
-        
-            dz_dx = -nvecA_prime[0]*(1.0/nvecA_prime[2])  # seabed slope components
-            dz_dy = -nvecA_prime[1]*(1.0/nvecA_prime[2])  # seabed slope components
-            # we only care about dz_dx since the line is in the X-Z plane in this rotated situation
-            alpha = np.degrees(np.arctan(dz_dx))
+            #nvecA_prime = np.matmul(R, nvecA)
+            #dz_dx = -nvecA_prime[0]*(1.0/nvecA_prime[2])  # seabed slope components
+            #dz_dy = -nvecA_prime[1]*(1.0/nvecA_prime[2])  # seabed slope components
+            
+            if LH == 0:
+                alpha = 0
+            else:
+                # Seabed slope along line direction (based on end A/B depth)
+                dz_dx = (-depthB + depthA)/LH  
+                # we only care about dz_dx since the line is in the X-Z plane in this rotated situation
+                alpha = np.degrees(np.arctan(dz_dx))
             cb = self.cb
         else:
             if np.sum(np.abs(self.fCurrent)) > 0 or nvecA[2] < 1: # if there is current or seabed slope
@@ -797,10 +841,6 @@ class Line():
                 alpha = 0
                 cb = self.cb
         
-        # horizontal and vertical dimensions of line profile (end A to B)
-        LH = np.linalg.norm(dr[:2])
-        LV = dr[2]
-        
         
         # ----- call catenary function or alternative and save results -----
         
@@ -808,14 +848,14 @@ class Line():
         if 'EA' in self.type:
             try:
                 (fAH, fAV, fBH, fBV, info) = catenary(LH, LV, self.L, self.EA, 
-                     w, CB=cb, alpha=alpha, HF0=self.HF, VF0=self.VF, Tol=tol, 
+                     w_total, CB=cb, alpha=alpha, HF0=self.HF, VF0=self.VF, Tol=tol, 
                      nNodes=self.nNodes, plots=profiles, depth=self.sys.depth)
             
             except CatenaryError as error:
                 raise LineError(self.number, error.message)       
         #If EA isnt found then we will use the ten-str relationship defined in the input file 
         else:
-            (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],np.linalg.norm(w)) 
+            (fAH, fAV, fBH, fBV, info) = nonlinear(LH, LV, self.L, self.type['Str'], self.type['Ten'],np.linalg.norm(w_total)) 
     
     
         # save line profile coordinates in global frame (involves inverse rotation)
@@ -1011,6 +1051,147 @@ class Line():
         
         # revert to original line length
         self.L = self.L0
+  
+
+
+    def updateLumpedMass(self, omegas, S_zeta, depth, kbot=0, cbot=0, seabed_tol=1e-4, RAO_A=None, RAO_B=None):
+        '''Updates the inertia, added mass, damping, and stiffness matrices for the line using a lumped mass approach.
+
+        The updated values are stored in:
+        - self.Ml_allNodes, self.Al_allNodes, self.Bl_allNodes, and self.Kl_allNodes: 3N x 3N matrices, where N is the number of nodes (3 dofs for each line node)
+        - self.Ml, self.Al, self.Bl, and self.Kl: 6 x 6 matrices that lump the matrices _allNodes at the extremities of the line. For example,
+                self.Kl[:3, :3] is analogous to self.KA, self.Kl[3:, 3:] is analogous to self.KB, and self.Kl[:3, 3:] is analogous to self.KBA.
+
+        Only the damping matrix depends on sea state and RAOs. Hence, this function can be called without the RAOs to compute the inertia, added mass, and 
+        stiffness matrices. But do NOT trust the values of the damping matrix if the RAOs are not provided!!!
+
+        Inputs
+        ----------        
+        omegas : ndarray
+            Array of frequencies in rad/s.
+        S_zeta : ndarray
+            Wave spectrum array in m^2/(rad/s), must be of the same length as omegas.
+        depth : float
+            Water depth.
+        kbot : float
+            Vertical stiffness for points lying on the seabed.
+        cbot : float
+            Vertical damping for points lying on the seabed.
+        seabed_tol : float, optional
+            Distance from seabed within which a node is considered to be lying on the seabed, by default 1e-4 m.
+        RAO_A : ndarray
+            Translational RAOs for end node A given as a (m,3) array where m is the number of frequencies (must be equal to the length of omegas) .
+        RAO_B : ndarray
+            Translational RAOs for end node B given as a (m,3) array where m is the number of frequencies (must be equal to the length of omegas) .
+
+        '''
+
+        def lump_matrix(matrix, nodes2remove=None):
+            # The matrices should be symmetrical, but they can be slightly off due to numerical errors.
+            # Because we are going to invert them twice, we force them to be symmetrical to avoid amplifying the errors. 
+            matrix = (matrix + matrix.T)/2
+
+            # Empty nodes2remove is the same thing as not removing any nodes
+            if nodes2remove is not None and nodes2remove.size==0:
+                nodes2remove = None
+
+            if nodes2remove is not None:
+                # Convert nodes2remove to dofs
+                dofs2remove = np.array([(node*3, node*3+1, node*3+2) for node in nodes2remove]).flatten()
+
+                # Create a mask for the dofs to keep
+                # dofs2remove = np.array([node*3 + 2 for node in nodes2remove])
+
+                # Create a mask for the dofs to keep
+                mask = np.ones(matrix.shape[0], dtype=bool)
+                mask[dofs2remove] = False
+                # Remove the rows and columns
+                matrix = matrix[mask][:, mask]           
+
+            n = matrix.shape[0]
+
+            # If we are not removing the extremities, we fill the whole 6x6 matrix_inv_coupled
+            if nodes2remove is None or (nodes2remove[0] !=0 and nodes2remove[-1] != self.nNodes-1):                
+                keep = list(range(3)) + list(range(n-3, n))
+                free = [i for i in range(n) if i not in keep]
+                i_arrange = keep + free
+                matrix_coupled = guyan_reduce(matrix[:,i_arrange][i_arrange,:], len(keep))
+            
+            # if we are removing the first node, we fill the bottom right 3x3 matrix
+            if nodes2remove is not None and nodes2remove[0] == 0:
+                keep = list(range(n-3, n))
+                free = [i for i in range(n) if i not in keep]
+                i_arrange = keep + free
+                matrix_coupled = np.block([[np.zeros((3,3)), np.zeros((3,3))], [np.zeros((3,3)), guyan_reduce(matrix[:,i_arrange][i_arrange,:], len(keep))]])
+            
+            # if we are removing the last node, we fill the top left 3x3 matrix
+            if nodes2remove is not None and nodes2remove[-1] == self.nNodes-1:
+                keep = list(range(3))
+                free = [i for i in range(n) if i not in keep]
+                i_arrange = keep + free
+                matrix_coupled = np.block([[guyan_reduce(matrix[:,i_arrange][i_arrange,:], len(keep)), np.zeros((3,3))], [np.zeros((3,3)), np.zeros((3,3))]])
+
+            return matrix_coupled
+       
+        # Remove the nodes that are lying on the seabed
+        if not hasattr(self, 'lineList'):
+            X_mean,Y_mean,Z_mean,T_mean = self.getLineCoords(0.0,n=self.nNodes) # coordinates of line nodes and tension values
+            depth = self.sys.depth
+        else:
+            X_mean, Y_mean, Z_mean = [np.zeros(self.nNodes) for _ in range(3)]
+            depth = self.depth
+            idxNodeA = 0
+            for iline, line in enumerate(self.lineList):
+                x, y, z, _ = line.getLineCoords(0.0)
+                n = len(x)                
+                if iline == 0:  # For the first line, include all nodes
+                    X_mean[idxNodeA:idxNodeA+n] = x
+                    Y_mean[idxNodeA:idxNodeA+n] = y
+                    Z_mean[idxNodeA:idxNodeA+n] = z
+                    idxNodeA += n
+                else:  # For subsequent lines, exclude the first node to avoid repetition
+                    X_mean[idxNodeA:idxNodeA+n-1] = x[1:]
+                    Y_mean[idxNodeA:idxNodeA+n-1] = y[1:]
+                    Z_mean[idxNodeA:idxNodeA+n-1] = z[1:]
+                    idxNodeA += (n - 1)
+        idx2remove = np.where(Z_mean <= -depth+1e-06)[0]
+                
+        # If we have the motions of the extremities of the lines, we can iterate the quadratic drag to compute the damping matrix.
+        # Otherwise, we use the default values for the motion amplitude (unitary displacement for all nodes) to linearize the quadratic drag. This is clearly wrong, but affects only drag.
+        if RAO_A is None and RAO_B is None:
+            r_dynamic = np.ones((len(omegas), self.nNodes, 3))
+            self.Ml_allNodes, self.Al_allNodes, self.Bl_allNodes, self.Kl_allNodes, _, _ = self.getDynamicMatrices(omegas, S_zeta, r_dynamic, depth, kbot=kbot, cbot=cbot, seabed_tol=seabed_tol)
+        else:
+            if RAO_A is None:
+                RAO_A = np.zeros([len(omegas), 3])
+            if RAO_B is None:
+                RAO_B = np.zeros([len(omegas), 3])
+            self.Ml_allNodes, self.Al_allNodes, self.Bl_allNodes, self.Kl_allNodes = self.dynamicSolve(omegas, S_zeta, RAO_A, RAO_B, depth, kbot, cbot, seabed_tol=seabed_tol, returnMatrices=True) # Dynamic solve calls get_dynamic_matrices internally
+
+        self.Ml = lump_matrix(self.Ml_allNodes, nodes2remove=idx2remove)
+        self.Al = lump_matrix(self.Al_allNodes, nodes2remove=idx2remove)
+        self.Bl = lump_matrix(self.Bl_allNodes, nodes2remove=idx2remove)
+        self.Kl = lump_matrix(self.Kl_allNodes, nodes2remove=idx2remove)       
+
+    def getDynamicMatricesLumped(self):
+        '''Return the lumped M,A,B,K matrices for the Line object.'''
+        if not hasattr(self, 'Ml'):
+            raise LineError("Call updateLumpedMass first")
+        return self.Ml, self.Al, self.Bl, self.Kl
+
+    def getDynamicMatrices(self, omegas, S_zeta, r_dynamic, depth, kbot=0, cbot=0, seabed_tol=1e-4):
+        '''Compute M,A,B,K matrices for Line. See get_dynamic_matrices().'''
+        return get_dynamic_matrices(self, omegas, S_zeta, r_dynamic, depth, kbot, cbot, seabed_tol=seabed_tol)    
+
+    def dynamicSolve(self, omegas, S_zeta, RAO_A, RAO_B, depth, kbot=0, cbot=0, seabed_tol=1e-4, tol = 0.01, iters=100, w = 0.8, conv_time=False, returnMatrices=False):
+        '''Compute complex amplitudes of line nodes. See get_dynamic_tension().'''
+        return get_dynamic_tension(self, omegas, S_zeta, RAO_A, RAO_B, depth, kbot, cbot, seabed_tol=seabed_tol, tol=tol, iters=iters, w=w, conv_time=conv_time, returnMatrices=returnMatrices)
+    
+    
+    def getModes(self,*args, **kwargs):
+        '''Compute (and optionally plot) the line's mode shapes.
+        See get_modes().'''
+        return get_modes(self, *args, **kwargs)
     
 
 def from2Dto3Drotated(K2D, Kt, R): 

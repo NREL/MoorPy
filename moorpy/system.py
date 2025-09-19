@@ -11,8 +11,7 @@ import warnings
 from os import path
 
 from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import spsolve
-from scipy.sparse.linalg.dsolve import MatrixRankWarning
+from scipy.sparse.linalg import spsolve, MatrixRankWarning
 
 from moorpy.body import Body
 from moorpy.point import Point
@@ -22,9 +21,9 @@ import matplotlib as mpl
 #import moorpy.MoorSolve as msolve
 from moorpy.helpers import (rotationMatrix, rotatePosition, getH, printVec, 
                             set_axes_equal, dsolve2, SolveError, MoorPyError, 
-                            loadLineProps, getLineProps, read_mooring_file, 
+                            loadLineProps, loadPointProps, getLineProps, getPointProps, read_mooring_file, 
                             printMat, printVec, getInterpNums, unitVector,
-                            getFromDict, addToDict, readBathymetryFile)
+                            getFromDict, addToDict, readBathymetryFile, guyan_reduce)
 
 
 
@@ -34,7 +33,7 @@ class System():
     # >>> note: system module will need to import Line, Point, Body for its add/creation routines 
     #     (but line/point/body modules shouldn't import system) <<<
     
-    def __init__(self, file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1, Fortran=True, lineProps=None, **kwargs):
+    def __init__(self, file="", dirname="", rootname="", depth=0, rho=1025, g=9.81, qs=1, Fortran=True, lineProps=None, pointProps = None, **kwargs):
         '''Creates an empty MoorPy mooring system data structure and will read an input file if provided.
 
         Parameters
@@ -63,10 +62,14 @@ class System():
         self.pointList = []
         self.lineList = []
         self.lineTypes = {}
+        self.pointTypes = {}
         self.rodTypes = {}
         
         # load mooring line property scaling coefficients for easy use when creating line types
         self.lineProps = loadLineProps(lineProps)
+
+        # load point property scaling coefficients for easy use when creating point types
+        self.pointProps = loadPointProps(pointProps)
         
         # the ground body (number 0, type 1[fixed]) never moves but is the parent of all anchored things
         self.groundBody = Body(self, 0, 1, np.zeros(6))   # <<< implementation not complete <<<< be careful here if/when MoorPy is split up
@@ -93,8 +96,14 @@ class System():
         
         if 'bathymetry' in kwargs:
             self.seabedMod = 2
-            self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = readBathymetryFile(kwargs['bathymetry'])
-        
+            if isinstance(kwargs['bathymetry'],str):
+                self.bathGrid_Xs, self.bathGrid_Ys, self.bathGrid = readBathymetryFile(kwargs['bathymetry'])
+            elif isinstance(kwargs['bathymetry'],dict):
+                bath_dictionary = kwargs['bathymetry']
+                # grid sent in, just assign to properties
+                self.bathGrid_Xs = bath_dictionary['x']
+                self.bathGrid_Ys = bath_dictionary['y']
+                self.bathGrid = bath_dictionary['depth']        
         
         # initializing variables and lists        
         self.nDOF = 0       # number of (free) degrees of freedom of the mooring system (needs to be set elsewhere)        
@@ -118,9 +127,9 @@ class System():
         if self.qs==0:  # if the mooring system is desired to be used as a portrayal of MoorDyn data
             # Load main mooring file
             if Fortran:
-                self.loadData(dirname, rootname, sep='.MD.')
+                self.loadData(dirname, rootname, sep='.MD')
             else:
-                self.loadData(dirname, rootname, sep='_')
+                self.loadData(dirname, rootname, sep='.')
             
             if len(file)==0 or len(rootname)==0:
                 raise ValueError("The MoorDyn input file name and the root name of the MoorDyn output files (e.g. the .fst file name without extension) need to be given.")
@@ -169,14 +178,13 @@ class System():
 
         Returns
         -------
-        None.
-
+        Body
         '''
         
         self.bodyList.append( Body(self, len(self.bodyList)+1, mytype, r6, m=m,
             v=v, rCG=rCG, AWP=AWP, rM=rM, f6Ext=f6Ext, DOFs=DOFs) )
         
-        # handle display message if/when MoorPy is reorganized by classes
+        return self.bodyList[-1]  # pass back reference to the created object
         
         
     def addRod(self, rodType, rA, rB, nSegs=1, bodyID=0):
@@ -204,7 +212,9 @@ class System():
             else: # (in progress - unsure if htis works) <<<
                 self.rodList[-1].rA = rA  #.setEndPosition(rA, 0)  # set initial end A position
                 self.rodList[-1].rB = rB  #.setEndPosition(rB, 1)  # set initial end B position
-
+        
+        return self.rodList[-1]  # pass back reference to the created object
+        
     
     def addPoint(self, mytype, r, m=0, v=0, fExt=np.zeros(3), DOFs=[0,1,2], d=0, body=0):
         '''Convenience function to add a Point to a mooring system
@@ -228,12 +238,10 @@ class System():
 
         Returns
         -------
-        None.
-
+        Point
         '''
 
         self.pointList.append( Point(self, len(self.pointList)+1, mytype, r, m=m, v=v, fExt=fExt, DOFs=DOFs, d=d) )
-        
         
         if body > 0:
             if body <= len(self.bodyList):
@@ -241,11 +249,9 @@ class System():
             else:
                 raise Exception(f"Provided body ID of {body} exceeds number of bodies in the system.")
         
-        
-        return len(self.pointList)  # return the index of the added point
-        #print("Created Point "+str(self.pointList[-1].number))
-        # handle display message if/when MoorPy is reorganized by classes
-
+        return self.pointList[-1]  # pass back reference to the created object
+    
+    
     def addLine(self, lUnstr, lineType, nSegs=40, pointA=0, pointB=0, cb=0):
         '''Convenience function to add a Line to a mooring system
 
@@ -264,8 +270,7 @@ class System():
 
         Returns
         -------
-        None.
-
+        Line
         '''
         
         if not isinstance(lineType, dict):                      # If lineType is not a dict, presumably it is a key for System.LineTypes.
@@ -274,7 +279,7 @@ class System():
             else:
                 raise ValueError(f"The specified lineType name ({lineType}) does not correspond with any lineType stored in this MoorPy System")
         
-        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, lineType, nSegs=nSegs, cb=cb) )
+        self.lineList.append( Line(self, len(self.lineList)+1, lUnstr, lineType, nSegs=nSegs, cb=cb, attachments = [pointA,pointB]) )
         
         if pointA > 0:
             if pointA <= len(self.pointList):
@@ -287,8 +292,8 @@ class System():
             else:
                 raise Exception(f"Provided pointB of {pointB} exceeds number of points.")
         
-        #print("Created Line "+str(self.lineList[-1].number))
-        # handle display message if/when MoorPy is reorganized by classes
+        return self.lineList[-1]  # pass back reference to the created object
+    
     
     """
     def addSubsystem(self, lengths, lineTypes, pointA=0, pointB=0):
@@ -409,6 +414,11 @@ class System():
 
         # <<< the "name" keyword in this method is confusing in that it isn't the index key. Does it have a purpose? <<<
 
+    def captureCompositeLine(self,point_id):
+        if not hasattr(self,'compositeLineList'):
+            self.compositeLineList = []
+        
+        self.compositeLineList.append(CompositeLine(self,point_id))
 
     def setLineType(self, dnommm, material, source=None, name="", **kwargs):
         '''Add or update a System lineType using the new dictionary-based method.
@@ -446,6 +456,41 @@ class System():
 
         return lineType                              # return the dictionary in case it's useful separately
 
+    def setPointType(self, design, source = None, name = "", **kwargs):
+        '''Add or update a System pointType using the new dictionary-based method. 
+
+        Parameters
+        ----------
+        design : string or dict
+            design keyword from DesignProps or dictionary with num_a_<anchor key>, num_b_<buoy key>, num_c_<connect key> entries
+        source : dict or filename (optional)
+            YAML file name or dictionary containing point property scaling coefficients and 
+            design properties. If not provided, whatever has already been loaded into the 
+            MoorPy system will be used.
+        name : string (optional)
+            Identifier for the point type (otherwise wll be generated automatically).
+
+        Returns
+        -------
+        pointType : dict
+            A pointType structure agnostic of point size
+        '''
+ 
+        # compute the actual values for this point type
+        if source==None:
+            pointType = getPointProps(design=design, Props=self.pointProps, name=name)  
+        else:
+            pointType = getPointProps(design=design, source=source, name=name)  
+        
+        pointType.update(kwargs)                      # add any custom arguments provided in the call to the pointType's dictionary
+        
+        # add the dictionary to the System's pointTypes master dictionary
+        if pointType['name'] in self.pointTypes:                                # if there is already a point type with this name
+            self.pointTypes[pointType['name']].update(pointType)                 # update the existing dictionary values rather than overwriting with a new dictionary
+        else:
+            self.pointTypes[pointType['name']] = pointType                       # otherwise save a new entry
+
+        return pointType                              # return the dictionary in case it's useful separately
 
     def setRodType(self, d, name="", **kwargs):
         '''hasty replication of setLineType for rods'''
@@ -738,12 +783,12 @@ class System():
                         
                         
                         if ("anch" in entry1) or ("fix" in entry1):
-                            pointType = 1
+                            pType = 1
                             # attach to ground body for ease of identifying anchors
                             self.groundBody.attachPoint(num,entries[2:5]) 
                             
                         elif ("body" in entry1) or ("turbine" in entry1):
-                            pointType = 1
+                            pType = 1
                             # attach to body here
                             BodyID = int("".join(filter(str.isdigit, entry1)))
                             if len(self.bodyList) < BodyID:
@@ -755,7 +800,7 @@ class System():
                             
                         elif ("fair" in entry1) or ("ves" in entry1) or ("couple" in entry1):
                             # for coupled point type, just set it up that same way in MoorPy (attachment to a body not needed, right?)
-                            pointType = -1                            
+                            pType = -1                            
                             '''
                             # attach to a generic platform body (and make it if it doesn't exist)
                             if len(self.bodyList) > 1:
@@ -769,7 +814,7 @@ class System():
                             '''
                                 
                         elif ("con" in entry1) or ("free" in entry1):
-                            pointType = 0
+                            pType = 0
                         else:
                             print("Point type not recognized")
                         
@@ -780,7 +825,7 @@ class System():
                         v  = float(entries[6])
                         CdA= float(entries[7])
                         Ca = float(entries[8])
-                        self.pointList.append( Point(self, num, pointType, r, m=m, v=v, CdA=CdA, Ca=Ca) )
+                        self.pointList.append( Point(self, num, pType, r, m=m, v=v, CdA=CdA, Ca=Ca) )
                         line = next(f)
                         
                         
@@ -798,7 +843,7 @@ class System():
                         nSegs  = int(entries[5])         
                         
                         #lineList.append( Line(dirName, num, lUnstr, dia, nSegs) )
-                        self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs)) #attachments = [int(entries[4]), int(entries[5])]) )
+                        self.lineList.append( Line(self, num, lUnstr, lineType, nSegs=nSegs, attachments = [int(entries[2]), int(entries[3])]) )
                         
                         # attach end A
                         numA = int("".join(filter(str.isdigit, entries[2])))  # get number from the attachA string
@@ -952,19 +997,19 @@ class System():
             num = i+1   # not counting on things being numbered in YAML files
             
             if ("anch" in entry1) or ("fix" in entry1):
-                pointType = 1
+                pType = 1
                 # attach to ground body for ease of identifying anchors
                 self.groundBody.attachPoint(num, d['location']) 
                 
             elif ("body" in entry1):
-                pointType = 1
+                pType = 1
                 # attach to body here
                 BodyID = int("".join(filter(str.isdigit, entry1)))
                 rRel = np.array(d['location'], dtype=float)
                 self.bodyList[BodyID-1].attachPoint(num, rRel)
                 
             elif ("fair" in entry1) or ("ves" in entry1):
-                pointType = 1   # <<< this used to be -1.  I need to figure out a better way to deal with this for different uses! <<<<<<
+                pType = 1   # <<< this used to be -1.  I need to figure out a better way to deal with this for different uses! <<<<<<
                 # attach to a generic platform body (and make it if it doesn't exist)
                 if len(self.bodyList) > 1:
                     raise ValueError("Generic Fairlead/Vessel-type points aren't supported when bodies are defined.")
@@ -976,7 +1021,7 @@ class System():
                 self.bodyList[0].attachPoint(num, rRel)    
                     
             elif ("con" in entry1) or ("free" in entry1):
-                pointType = 0
+                pType = 0
             else:
                 print("Point type not recognized")
             
@@ -992,7 +1037,7 @@ class System():
             else:
                 v = 0.0
                                 
-            self.pointList.append( Point(self, num, pointType, r, m=m, v=v) )
+            self.pointList.append( Point(self, num, pType, r, m=m, v=v) )
                         
                     
         # lines
@@ -1010,7 +1055,7 @@ class System():
 
 
     def unload(self, fileName, MDversion=2, line_dL=0, rod_dL=0, flag='p', 
-               outputList=[], Lm=0, T_half=42):
+               outputList=[], Lm=[0], T_half=42, phi=None, MDoptionsDict={}):
         '''Unloads a MoorPy system into a MoorDyn-style input file
 
         Parameters
@@ -1023,12 +1068,17 @@ class System():
             Optional specified for target segment length when discretizing Rods
         outputList : list of strings, optional
             Optional list of additional requested output channels
-        Lm : float
-            Mean load on mooring line as FRACTION of MBL, used for dynamic stiffness calculation. Only used if line type has a nonzero EAd
+        Lm : list of floats
+            Mean load on mooring line as FRACTION of MBL, used for dynamic stiffness calculation. Only used if line type has a nonzero EAd.
+            Can either be a list with a single Lm to be assumed for all line types, or a list of Lm values with length equal to the number
+            of lines with a nonzero EAd
         T_half : float, optional
             For tuning response of viscoelastic model, the period when EA is
             half way between the static and dynamic values [s]. Default is 42.
-            
+        phi : list of floats, optional 
+            platform's rotations variables [deg]. Defaults to None and platforms are not unrotated.
+        MDoptionsDict: dictionary, optional
+            MoorDyn Options. If not given, default options are considered.
         Returns
         -------
         None.
@@ -1040,7 +1090,8 @@ class System():
             #Collection of default values, each can be customized when the method is called
             
             # Set up the dictionary that will be used to write the OPTIONS section
-            MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
+            if not MDoptionsDict:
+                MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
             # Other available options: Echo=False, dtIC=2, CdScaleIC=10, threshIC=0.01
             MDoptionsDict.update(self.MDoptions)                                  # update the dict with any settings saved from an input file
             MDoptionsDict.update(dict(g=self.g, WtrDepth=self.depth, rho=self.rho))  # lastly, apply any settings used by MoorPy
@@ -1113,13 +1164,20 @@ class System():
                     point_type = 'Fixed'
                     
                     #Check if the point is attached to body
-                    for body in self.bodyList:
+                    for i, body in enumerate(self.bodyList):
                         for attached_Point in body.attachedP:
                             
                             if attached_Point == point.number:
                                 #point_type = "Body" + str(body.number)
-                                point_type = "Vessel"
-                                point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
+                                point_type = "Vessel"                                
+                                if phi:
+                                    c, s = np.cos(np.radians(-phi[i])), np.sin(np.radians(-phi[i]))
+                                    R = np.array([[c, -s, 0],
+                                                  [s,  c, 0],
+                                                  [0,  0, 1]])
+                                    point_pos = R @ body.rPointRel[body.attachedP.index(attached_Point)]                                    
+                                else:
+                                    point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
                     
                 elif point.type == 0:           # point is coupled externally (con, free)
                     point_type = 'Connect'
@@ -1196,8 +1254,14 @@ class System():
             #version = 
             #description = 
             
+            # Check length of phi if given
+            if phi:
+                if len(phi) != len(self.bodyList):
+                    raise ValueError(f"Inconsistency in the size of the given platform rotation angle phi. There are {len(self.bodyList)} bodies in MS but only {len(phi)} angles are given.")
+                
             # Set up the dictionary that will be used to write the OPTIONS section
-            MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
+            if not MDoptionsDict:
+                MDoptionsDict = dict(dtM=0.001, kb=3.0e6, cb=3.0e5, TmaxIC=60)        # start by setting some key default values
             MDoptionsDict.update(self.MDoptions)                                  # update the dict with any settings saved from an input file
             MDoptionsDict.update(dict(g=self.g, depth=self.depth, rho=self.rho))  # lastly, apply any settings used by MoorPy
             
@@ -1270,14 +1334,24 @@ class System():
             L.append("TypeName      Diam     Mass/m     EA     BA/-zeta     EI        Cd      Ca      CdAx    CaAx")
             L.append("(name)        (m)      (kg/m)     (N)    (N-s/-)    (N-m^2)     (-)     (-)     (-)     (-)")
             
+            j = 0 # count for list of Lms
             for key, lineType in self.lineTypes.items(): 
                 di = lineTypeDefaults.copy()  # start with a new dictionary of just the defaults
                 di.update(lineType)           # then copy in the lineType's existing values
                 if 'EAd' in di.keys() and di['EAd'] > 0:
-                    if Lm > 0:
+                    if Lm[0] > 0:
                         print('Calculating dynamic stiffness with Lm = ' + str(Lm)+'* MBL')
-                        # Get dynamic stiffness including mean load dependence
-                        EAd = di['EAd'] + di['EAd_Lm']*Lm*di['MBL']
+                        
+                        #assume list of Lms (length must equal number of lines with EAd)
+                        if len(Lm) > 1:
+                            # Get dynamic stiffness including mean load dependence
+                            EAd = di['EAd'] + di['EAd_Lm']*Lm[j]*di['MBL']
+                            j = j + 1
+                        
+                        #otherwise assume same Lm for all 
+                        else:
+                            # Get dynamic stiffness including mean load dependence
+                            EAd = di['EAd'] + di['EAd_Lm']*Lm[0]*di['MBL']
                         # This damping value is chosen for critical damping of a 10 m segment
                         c2 = 10 * np.sqrt(di['EA'] * di['m'])
                         # or use c1 = di['BA'] ?
@@ -1385,11 +1459,19 @@ class System():
                         point_type = 'Fixed'
                         
                         #Check if the point is attached to body
-                        for body in self.bodyList:
+                        for i, body in enumerate(self.bodyList):
                             for attached_Point in body.attachedP:
+
                                 if attached_Point == point.number:
                                     point_type = "Body" + str(body.number)
-                                    point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
+                                    if phi:
+                                        c, s = np.cos(np.radians(-phi[i])), np.sin(np.radians(-phi[i]))
+                                        R = np.array([[c, -s, 0],
+                                                    [s,  c, 0],
+                                                    [0,  0, 1]])
+                                        point_pos = R @ body.rPointRel[body.attachedP.index(attached_Point)]                    
+                                    else:
+                                        point_pos = body.rPointRel[body.attachedP.index(attached_Point)]   # get point position in the body reference frame
                         
                     elif point.type == 0:           # point is coupled externally (con, free)
                         point_type = 'Free'
@@ -1506,6 +1588,8 @@ class System():
             
         for line in self.lineList:
             line.staticSolve(profiles=1)  # flag to enable additional line outputs used for plotting, tension results, etc.
+            if hasattr(line, 'lineList'):
+                line.initialize()
             
         for point in self.pointList:
             point.getForces()
@@ -2018,7 +2102,7 @@ class System():
                 tols += point.nDOF*[tol]
                 
         tols = np.array(tols)
-        lineTol = 0.01*tol
+        lineTol = 0.01*tol          # <<< maybe trying 0.1 instead of 0.01
         n = len(X0)
         
         # if there are no DOFs, just update the mooring system force calculations then exit
@@ -2314,7 +2398,8 @@ class System():
             #    breakpoint()
             
             
-            if np.sum(np.isnan(dX)) > 0: breakpoint()
+            if np.sum(np.isnan(dX)) > 0:
+                raise ValueError("Something is wrong")
                     
             return dX
 
@@ -2722,32 +2807,23 @@ class System():
         if self.nDOF == 0:
             return K_all
         
-        # invert matrix
-        try:
-            K_inv_all = np.linalg.inv(K_all)
-        except:
-            K_inv_all = np.linalg.pinv(K_all)
-        
-        # remove free DOFs (this corresponds to saying that the sum of forces on these DOFs will remain zero)
-        #indices = list(range(n))                # list of DOF indices that will remain active for this step
-        mask = [True]*n                         # this is a mask to be applied to the array K indices
-        
-        for i in range(n-1, -1, -1):            # go through DOFs and flag free ones for exclusion
+        # Go through DOFs and make a list of all coupled indices then free indices
+        i_arrange = []
+        for i in range(n):  
+            if DOFtypes[i] == -1:
+                i_arrange.append(i)
+        for i in range(n):  
             if DOFtypes[i] == 0:
-                mask[i] = False
-                #del indices[i]
+                i_arrange.append(i)
         
-        K_inv_coupled = K_inv_all[mask,:][:,mask]
+        # Arrange the matrix with coupled DOFs first
+        K_rearranged = K_all[:,i_arrange][i_arrange,:]
+        K_coupled = guyan_reduce(K_rearranged, self.nCpldDOF)
         
-        # invert reduced matrix to get coupled stiffness matrix (with free DOFs assumed to equilibrate linearly)
-        try:
-            K_coupled = np.linalg.inv(K_inv_coupled)
-        except:
-            K_coupled = np.linalg.pinv(K_inv_coupled)
+        # # Arrange the answer back into the right order (if needed)
+        # i_rearrange = [n-i for i in i_arrange] 
+        # K_coupled = K_reduced[:,i_rearrange][i_rearrange,:]
         
-        #if tensions:
-        #    return K_coupled, J
-        #else:
         return K_coupled    
             
     
@@ -2934,7 +3010,256 @@ class System():
         
         return K
     
+    def getCoupledDynamicMatrices(self, lines_only=False):
+        '''Write something here later
+        '''                                    
+        self.nDOF, self.nCpldDOF, DOFtypes = self.getDOFs()
+        
+        n = self.nDOF + self.nCpldDOF
+        
+        if self.display > 2:
+            print("Getting mooring system stiffness matrix...")
+
+        # get full system stiffness matrix
+        M_all, A_all, B_all, K_all = self.getSystemDynamicMatrices(DOFtype="both", lines_only=lines_only)
+                
+        # If there are no free DOFs, then _all is _coupled, so return the _all matrices
+        if self.nDOF == 0:
+            return M_all, A_all, B_all, K_all
+        
+        # Go through DOFs and make a list of all coupled indices then free indices
+        i_arrange = []
+        for i in range(n):  
+            if DOFtypes[i] == -1:
+                i_arrange.append(i)
+        for i in range(n):  
+            if DOFtypes[i] == 0:
+                i_arrange.append(i)
+
+        # Arrange the matrix with coupled DOFs first and then do guyan reduction
+        # TODO: This is preliminary! guyan_reduce only works for stiffness now. Need to change the function to work with other matrices
+        K_rearranged = K_all[:,i_arrange][i_arrange,:]
+        K_coupled = guyan_reduce(K_rearranged, self.nCpldDOF)
+
+        M_rearranged = M_all[:,i_arrange][i_arrange,:]
+        M_coupled = guyan_reduce(M_rearranged, self.nCpldDOF)
+
+        A_rearranged = A_all[:,i_arrange][i_arrange,:]
+        A_coupled = guyan_reduce(A_rearranged, self.nCpldDOF)
+
+        B_rearranged = B_all[:,i_arrange][i_arrange,:]
+        B_coupled = guyan_reduce(B_rearranged, self.nCpldDOF)
+
+        return M_coupled, A_coupled, B_coupled, K_coupled
+        
     
+    def getSystemDynamicMatrices(self, DOFtype="free", lines_only=False):
+        '''Write something here later        
+        '''                      
+        # find the total number of free and coupled DOFs in case any object types changed
+        self.nDOF, self.nCpldDOF, _ = self.getDOFs()
+        
+        #self.solveEquilibrium()   # should we make sure the system is in equilibrium?
+        
+        # allocate stiffness matrix according to the DOFtype specified
+        if DOFtype=="free":
+            M = np.zeros([self.nDOF, self.nDOF])
+            A = np.zeros([self.nDOF, self.nDOF])
+            B = np.zeros([self.nDOF, self.nDOF])
+            K = np.zeros([self.nDOF, self.nDOF])
+            d = [0]
+        elif DOFtype=="coupled":
+            M = np.zeros([self.nCpldDOF, self.nCpldDOF])
+            A = np.zeros([self.nCpldDOF, self.nCpldDOF])
+            B = np.zeros([self.nCpldDOF, self.nCpldDOF])
+            K = np.zeros([self.nCpldDOF, self.nCpldDOF])
+            d = [-1]
+        elif DOFtype=="both":
+            M = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
+            A = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
+            B = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
+            K = np.zeros([self.nDOF+self.nCpldDOF, self.nDOF+self.nCpldDOF])
+            d = [0,-1]
+        else:
+            raise ValueError("getSystemDynamicMatrices called with invalid DOFtype input. Must be free, coupled, or both")
+        
+        
+        # The following will go through and get the lower-triangular stiffness terms,
+        # calculated as the force/moment on Body/Point 2 from translation/rotation of Body/Point 1.
+        
+        # go through DOFs, looking for lines that couple to anchors or other DOFs
+        
+        i = 0                               # start counting number of DOFs at zero
+        
+        # go through each movable body in the system
+        for body1 in self.bodyList:
+            if body1.type in d:    # >>>> when DOFtype==both, this approach gives different indexing than what is in setPositions/getForces and getSystemStiffness <<<<<
+                
+                #i = (body1.number-1)*6      # start counting index for body DOFs based on body number to keep indexing consistent
+                
+                # get body's self-stiffness matrix (now only cross-coupling terms will be handled on a line-by-line basis)
+                M6, A6, B6, K6 = body1.getDynamicMatrices(lines_only=lines_only)
+                M[i:i+body1.nDOF, i:i+body1.nDOF] += M6
+                A[i:i+body1.nDOF, i:i+body1.nDOF] += A6
+                B[i:i+body1.nDOF, i:i+body1.nDOF] += B6
+                K[i:i+body1.nDOF, i:i+body1.nDOF] += K6                            
+                
+                # go through each attached point
+                for pointID1,rPointRel1 in zip(body1.attachedP,body1.rPointRel):
+                    point1 = self.pointList[pointID1-1]
+                    
+                    r1 = rotatePosition(rPointRel1, body1.r6[3:])   # relative position of Point about body ref point in unrotated reference frame  
+                    H1 = getH(r1)                                   # produce alternator matrix of current point's relative position to current body
+                  
+                    for lineID in point1.attached:      # go through each attached line to the Point, looking for when its other end is attached to something that moves
+
+                        endFound = 0                    # simple flag to indicate when the other end's attachment has been found
+                        j = i + body1.nDOF              # first index of the DOFs this line is attached to. Start it off at the next spot after body1's DOFs
+                        
+                        # get cross-coupling stiffness of line: force on end attached to body1 due to motion of other end
+                        M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped()
+                                             
+                        MB = M_all[-3:,:3] if point1.attachedEndB == 1 else M_all[:3,-3:]
+                        AB = A_all[-3:,:3] if point1.attachedEndB == 1 else A_all[:3,-3:]
+                        BB = B_all[-3:,:3] if point1.attachedEndB == 1 else B_all[:3,-3:]
+                        KB = K_all[-3:,:3] if point1.attachedEndB == 1 else K_all[:3,-3:]
+                        
+                        # look through Bodies further on in the list (coupling with earlier Bodies will already have been taken care of)
+                        for body2 in self.bodyList[self.bodyList.index(body1)+1: ]:
+                            if body2.type in d:
+                                
+                                # go through each attached Point
+                                for pointID2,rPointRel2 in zip(body2.attachedP,body2.rPointRel):
+                                    point2 = self.pointList[pointID2-1]
+                                    
+                                    if lineID in point2.attached:     # if the line is also attached to this Point2 in Body2
+                                        
+                                        # following are analagous to what's in functions getH and translateMatrix3to6 except for cross coupling between two bodies
+                                        r2 = rotatePosition(rPointRel2, body2.r6[3:])   # relative position of Point about body ref point in unrotated reference frame  
+                                        H2 = getH(r2)
+                                        
+                                        # loads on body1 due to motions of body2
+                                        K66 = np.block([[   KB        , np.matmul(KB, H2)],
+                                                  [np.matmul(H1.T, KB), np.matmul(np.matmul(H2, KB), H1.T)]])
+                                        
+                                        # Trim for only enabled DOFs of the two bodies
+                                        K66 = K66[body1.DOFs,:][:,body2.DOFs]
+                                        
+                                        K[i:i+body1.nDOF, j:j+body2.nDOF] += K66    # f on B1 due to x of B2
+                                        K[j:j+body2.nDOF, i:i+body1.nDOF] += K66.T  # mirror
+                                        
+                                        # note: the additional rotational stiffness due to change in moment arm does not apply to this cross-coupling case
+                                        endFound = 1  # signal that the line has been handled so we can move on to the next thing
+                                        break  
+
+                                j += body2.nDOF # if this body has DOFs we're considering, then count them
+                        
+                        
+                        # look through free Points
+                        if endFound==0:                              #  if the end of this line hasn't already been found attached to a body
+                            for point2 in self.pointList:
+                                if point2.type in d:                 # if it's a free point and
+                                    if lineID in point2.attached:    # the line is also attached to it
+                                        
+                                        # only add up one off-diagonal sub-matrix for now, then we'll mirror at the end                                          
+                                        K63 = np.vstack([KB, np.matmul(H1.T, KB)])                                        
+                                        
+                                        # Trim for only enabled DOFs of the point and body
+                                        K63 = K63[body1.DOFs,:][:,point2.DOFs]
+                                        
+                                        K[i:i+ body1.nDOF, j:j+point2.nDOF] += K63  # f on B1 due to x of P2
+                                        K[j:j+point2.nDOF, i:i+ body1.nDOF] += K63.T    # mirror 
+                                        
+                                        break
+                                    
+                                    j += point2.nDOF                  # if this point has DOFs we're considering, then count them
+                                    
+                                # note: No cross-coupling with fixed points. The body's own stiffness matrix is now calculated at the start.
+              
+                i += body1.nDOF  # moving along to the next body...
+                
+
+        # go through each movable point in the system
+        for point in self.pointList:
+            if point.type in d:
+            
+                n = point.nDOF
+                
+                # >>> TODO: handle case of free end point resting on seabed <<<
+                
+                # get point's self-stiffness matrix                    
+                M1, A1, B1, K1 = point.getDynamicMatrices()
+                M[i:i+n,i:i+n] += M1
+                A[i:i+n,i:i+n] += A1
+                B[i:i+n,i:i+n] += B1 
+                K[i:i+n,i:i+n] += K1
+
+                for lineID in point.attached:
+                    
+                    j = i + n
+                    
+                    # go through movable points to see if one is attached
+                    for point2 in self.pointList[self.pointList.index(point)+1: ]:
+                        if point2.type in d:
+                            if lineID in point2.attached:  # if this point is at the other end of the line
+
+                                # get cross-coupling stiffness of line: force on end attached to point1 due to motion of other end
+                                # The names are somewhat confusing, but AB: Added mass matrix (A) at point B due to motions of the other extremity
+                                M_all, A_all, B_all, K_all = self.lineList[lineID-1].getDynamicMatricesLumped()
+                                             
+                                MB = M_all[-3:,:3] if point.attachedEndB == 1 else M_all[:3,-3:]
+                                AB = A_all[-3:,:3] if point.attachedEndB == 1 else A_all[:3,-3:]
+                                BB = B_all[-3:,:3] if point.attachedEndB == 1 else B_all[:3,-3:]
+                                KB = K_all[-3:,:3] if point.attachedEndB == 1 else K_all[:3,-3:]
+                                 
+                                # Trim stiffness matrix to only use the enabled DOFs of each point
+                                MB = MB[point.DOFs,:][:,point2.DOFs]
+                                AB = AB[point.DOFs,:][:,point2.DOFs]
+                                BB = BB[point.DOFs,:][:,point2.DOFs]
+                                KB = KB[point.DOFs,:][:,point2.DOFs]                                
+                                
+                                # Include in total inertia matrix
+                                M[i:i+n          , j:j+point2.nDOF] += MB    # force on P1 due to movement of P2
+                                M[j:j+point2.nDOF, i:i+n          ] += MB.T  # mirror (f on P2 due to x of P1)
+
+                                # Include in total added mass matrix
+                                A[i:i+n          , j:j+point2.nDOF] += AB    # force on P1 due to movement of P2
+                                A[j:j+point2.nDOF, i:i+n          ] += AB.T  # mirror (f on P2 due to x of P1)
+
+                                # Include in total damping matrix
+                                B[i:i+n          , j:j+point2.nDOF] += BB    # force on P1 due to movement of P2
+                                B[j:j+point2.nDOF, i:i+n          ] += BB.T  # mirror (f on P2 due to x of P1)
+
+                                # Include in total stiffness matrix
+                                K[i:i+n          , j:j+point2.nDOF] += KB    # force on P1 due to movement of P2
+                                K[j:j+point2.nDOF, i:i+n          ] += KB.T  # mirror (f on P2 due to x of P1)
+                                
+                            j += point2.nDOF                  # if this point has DOFs we're considering, then count them
+                                
+                i += n
+        
+        return M, A, B, K
+
+
+    def updateSystemDynamicMatrices(self, omegas=np.array([0.0]), S_zeta=np.array([0.0]), seabed_tol=1e-4):
+        '''Updates the dynamic matrices of all the lines in the system. Works only with lumped mass approach (MoorDyn input file)
+        This function can only properly update/compute the inertia, added mass, and stiffness matrices of each line in the system.        
+        
+        This function also updates the damping matrix, but this is done considering unitary amplitude motions of the nodes, which
+        is not correct.
+        If `omegas` and `S_zeta` are provided, the damping matrix will account for wave kinematics as well, but that would still
+        be wrong
+
+        To properly compute the damping matrix, you should call line.updateLumpedMass externally providing the motion RAOs of the
+        line ends.
+        '''
+        kbot=0 # Should read those from the input file
+        cbot=0
+        
+        for line in self.lineList:
+            line.updateLumpedMass(omegas, S_zeta, self.depth, kbot=kbot, cbot=cbot, seabed_tol=seabed_tol)
+
+
     def getAnchorLoads(self, sfx, sfy, sfz, N):
         ''' Calculates anchor loads
         Parameters
@@ -3031,12 +3356,20 @@ class System():
         # NOTE this function has very limited functionality because imported systems will not have line MBLs.... still thinking about the best way to handle this
         if self.qs == 1:
             ratios = []
-            for line in self.lineList:            
-                if hasattr(line.type,'MBL'):
-                     ratios.append(max(line.TA, line.TB)/line.type['MBL'])
+            for line in self.lineList:
+                if hasattr(line, 'lineList'):
+                    for linesec in line.lineList:
+                        if 'MBL' in linesec.type:
+                            ratios.append(max(linesec.TA, linesec.TB)/linesec.type['MBL'])
+                        else:
+                            print('Line does not have an MBL')
+                            return
                 else:
-                    print('Line does not have an MBL')
-                    return
+                    if 'MBL' in linesec.type:
+                        ratios.append(max(line.TA, line.TB)/line.type['MBL'])
+                    else:
+                        print('Line does not have an MBL')
+                        return
             return(ratios)
         else:
             ratios = []
@@ -3098,7 +3431,13 @@ class System():
         self.bathGrid_Xs = x 
         self.bathGrid_Ys = y
         self.bathGrid    = depth
+        
+        # Tell the System (and any Subsystems) that there is bathymetry
         self.seabedMod = 2
+        
+        for line in self.lineList:
+            if isinstance(line, Subsystem):
+                line.seabedMod = 2  # Ensure the Subsystem knows there's bathymetry
     
     
     def getDepthFromBathymetry(self, x, y):   #BathymetryGrid, BathGrid_Xs, BathGrid_Ys, LineX, LineY, depth, nvec)
@@ -3189,7 +3528,7 @@ class System():
         '''
         
         # Temporarily storing all data in main output file in system.data ..... probably will want to change this at some point
-        if path.exists(dirname+rootname+'.MD.out'):
+        if path.exists(dirname+rootname+sep+'out'):
         
             self.data, self.ch, self.channels, self.units = read_mooring_file(dirname+rootname+sep, "out") # remember number starts on 1 rather than 0
         
@@ -3334,10 +3673,13 @@ class System():
         
         if draw_clumps:
             for point in self.pointList:
+                markersize = np.max([point.m, point.v*self.rho])**0.4094 * 0.065
                 if point.v*self.rho > point.m:   # if it has positive buoyancy
-                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='b', markeredgecolor='k', marker='o', markersize=5)
+                    #ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='b', markeredgecolor='k', marker='o', markersize=5)
+                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], color='y', marker='o', markersize=markersize)
                 elif point.m > 0:   # if it is a weight
-                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='r', markeredgecolor='k', marker='o', markersize=5)
+                    #ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='r', markeredgecolor='k', marker='o', markersize=5)
+                    ax.plot([point.r[0]],[point.r[1]],[point.r[2]], color='k', marker='o', markersize=markersize)
                     
         if draw_anchors:
             for line in self.lineList:
@@ -3365,6 +3707,10 @@ class System():
                         line.drawLine(time, ax, color=[.8,.8,.2], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                     elif 'buoy' in line.type['material']:
                         line.drawLine(time, ax, color=[.6,.6,.0], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                    elif 'hmpe' in line.type['material']:
+                        line.drawLine(time, ax, color='tab:green', endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
+                    elif 'cable' in line.type['material']:
+                        line.drawLine(time, ax, color='y', endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                     else:
                         line.drawLine(time, ax, color=[0.5,0.5,0.5], endpoints=endpoints, shadow=shadow, colortension=colortension, cmap_tension=cmap_tension)
                 else:
@@ -3470,7 +3816,7 @@ class System():
         pointlabels      = kwargs.get('pointlabels'     , False     )   # toggle to include point number labels in the plot
         draw_body        = kwargs.get("draw_body"       , False     )   # toggle to draw the Bodies or not
         draw_anchors     = kwargs.get('draw_anchors'    , False     )   # toggle to draw the anchors of the mooring system or not   
-        draw_seabed     = kwargs.get('draw_seabed'    , True      )     # toggle to draw the seabed bathymetry or not
+        draw_seabed      = kwargs.get('draw_seabed'     , True      )   # toggle to draw the seabed bathymetry or not
         cmap_bath        = kwargs.get("cmap_bath"       , 'ocean'   )   # matplotlib colormap specification
         alpha            = kwargs.get("opacity"         , 1.0       )   # the transparency of the bathymetry plot_surface
         rang             = kwargs.get('rang'            , 'hold'    )   # colorbar range: if range not used, set it as a placeholder, it will get adjusted later
@@ -3488,7 +3834,7 @@ class System():
         label            = kwargs.get('label'           , ""        )   # the label/marker name of a line in the System
         draw_fairlead    = kwargs.get('draw_fairlead'   , False     )   # toggle to draw large points for the fairleads
         line_width       = kwargs.get('linewidth'       , 1         )   # toggle to set the mooring line width in "drawLine2d
-
+        marker           = kwargs.get('marker'          , 'o'       )   # the symbol used to represent points with a nonzero mass or volume
         
         
         
@@ -3536,8 +3882,17 @@ class System():
                     else:
                         c=color
                     plt.plot(x, y, 'v', color=c, markersize=5)
-            
+
         
+        for point in self.pointList:
+            markersize = np.max([point.m, point.v*self.rho])**0.4094 * 0.065
+            if point.v*self.rho > point.m:   # if it has positive buoyancy
+                #ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='b', markeredgecolor='k', marker='o', markersize=5)
+                ax.plot(point.r[0],point.r[2], color='y', marker='o', markersize=markersize)
+            elif point.m > 0:   # if it is a weight
+                #ax.plot([point.r[0]],[point.r[1]],[point.r[2]], markerfacecolor='r', markeredgecolor='k', marker='o', markersize=5)
+                ax.plot(point.r[0],point.r[2], color='k', marker='o', markersize=markersize)
+
         j = 0
         for line in self.lineList:
             if line!=self.lineList[0]:
@@ -3548,6 +3903,12 @@ class System():
                     line.drawLine2d(time, ax, color=[.1, 0, 0], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
                 elif 'rope' in line.type['material'] or 'polyester' in line.type['material']:
                     line.drawLine2d(time, ax, color=[.3,.5,.5], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
+                elif 'buoy' in line.type['material']:
+                    line.drawLine2d(time, ax, color=[.6,.6,.0], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
+                elif 'cable' in line.type['material']:
+                    line.drawLine2d(time, ax, color='y', Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
+                elif 'hmpe' in line.type['material']:
+                    line.drawLine2d(time, ax, color='tab:green', Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
                 else:
                     line.drawLine2d(time, ax, color=[0.3,0.3,0.3], Xuvec=Xuvec, Yuvec=Yuvec, colortension=colortension, cmap=cmap_tension, plotnodes=plotnodes, plotnodesline=plotnodesline, label=label, alpha=alpha, linewidth=line_width)
             else:
@@ -3809,7 +4170,7 @@ class System():
         # Animation: update the figure with the updated coordinates from update_Coords function
         # NOTE: the animation needs to be stored in a variable, return out of the method, and referenced when calling self.animatelines()
         line_ani = animation.FuncAnimation(fig, self.updateCoords, np.arange(1, nFrames-1, speed), fargs=(colortension, cmap_tension, label, dt),
-                                           interval=1, repeat=repeat, repeat_delay=delay, blit=False)
+                                           interval=interval, repeat=repeat, repeat_delay=delay, blit=False)
                                             # works well when np.arange(...nFrames...) is used. Others iterable ways to do this
         
         return line_ani

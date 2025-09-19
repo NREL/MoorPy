@@ -41,36 +41,31 @@ class MoorPyError(Error):
 
 
 def printMat(mat):
-    '''Prints a matrix to a format that is specified
+    '''Prints the provided matrix with elements separated by tabs.
 
     Parameters
     ----------
     mat : array
         Any matrix that is to be printed.
-
-    Returns
-    -------
-    None.
-
     '''
-    for i in range(mat.shape[0]):
-        print( "\t".join(["{:+8.3e}"]*mat.shape[1]).format( *mat[i,:] ))
-        
+    
+    if mat.dtype in [int, bool]:
+        for i in range(mat.shape[0]):
+            print( "\t".join(["{}"]*mat.shape[1]).format( *mat[i,:] ))
+    else:
+        for i in range(mat.shape[0]):
+            print( "\t".join(["{:+8.3e}"]*mat.shape[1]).format( *mat[i,:] ))
+
+
 def printVec(vec):
-    '''Prints a vector to a format that is specified
+    '''Prints a vector with 4 decimal scientific notation and consisten spaces
 
     Parameters
     ----------
     vec : array
         Any vector that is to be printed.
-
-    Returns
-    -------
-    None.
-
     '''
     print( "\t".join(["{:+9.4e}"]*len(vec)).format( *vec ))
-
 
 
 def unitVector(r):
@@ -653,6 +648,11 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
         Water density used for computing apparent (wet) weight [kg/m^3].
     g : float (optional)
         Gravitational constant used for computing weight [m/s^2].
+    
+    Returns
+    -------
+    lineType : dictionary
+        A lineType dictionary
     '''
     
     if lineProps==None and source==None:
@@ -672,10 +672,30 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     mat = lineProps[material]       # shorthand for the sub-dictionary of properties for the material in question    
     d = dnommm*0.001                # convert nominal diameter from mm to m      
     mass = mat['mass_d2']*d**2
+
+    # Checking valid diameter ranges for MBL
+    if mat['MBL_dmax'] >= 0 and mat['MBL_dmin'] >= 0: # if min and max values given and the diameter outside of the range
+        if d > mat['MBL_dmax'] or d < mat['MBL_dmin']:
+            raise Exception(f"Input diameter {d} m is outside of the valid range for the MBL curve of {mat['MBL_dmin']}-{mat['MBL_dmax']} m")
+    elif mat['MBL_dmax'] >= 0 and d > mat['MBL_dmax']: # if a max value is given and the diameter is greater than the max
+        raise Exception(f"Input diameter {d} m is greater than the max valid value for the MBL curve of {mat['MBL_dmax']} m")
+    elif mat['MBL_dmin'] >= 0 and d < mat['MBL_dmin']: # if a min value is given and the diameter is less than the min
+        raise Exception(f"Input diameter {d} m is less than the min valid value for the MBL curve of {mat['MBL_dmin']} m")
     MBL  = mat[ 'MBL_0'] + mat[ 'MBL_d']*d + mat[ 'MBL_d2']*d**2 + mat[ 'MBL_d3']*d**3 
+
+    # Checking valid diameter ranges fo EA
+    if mat['EA_dmax'] >= 0 and mat['EA_dmin'] >= 0: # if min and max values given and the diameter outside of the range
+        if d > mat['EA_dmax'] or d < mat['EA_dmin']:
+            raise Exception(f"Input diameter {d} m is outside of the valid range for the EA curve of {mat['EA_dmin']}-{mat['EA_dmax']} m")
+    elif mat['EA_dmax'] >= 0 and d > mat['EA_dmax']: # if a max value is given and the diameter is greater than the max
+        raise Exception(f"Input diameter {d} m is greater than the max valid value for the EA curve of {mat['EA_dmax']} m")
+    elif mat['EA_dmin'] >= 0 and d < mat['EA_dmin']: # if a min value is given and the diameter is less than the min
+        raise Exception(f"Input diameter {d} m is less than the min valid value for the EA curve of {mat['EA_dmin']} m")
     EA   = mat[  'EA_0'] + mat[  'EA_d']*d + mat[  'EA_d2']*d**2 + mat[  'EA_d3']*d**3 + mat['EA_MBL']*MBL 
+
     cost =(mat['cost_0'] + mat['cost_d']*d + mat['cost_d2']*d**2 + mat['cost_d3']*d**3 
                          + mat['cost_mass']*mass + mat['cost_EA']*EA + mat['cost_MBL']*MBL)
+    
     # add in drag and added mass coefficients if available, if not, use defaults
     if 'Cd' in mat:
         Cd   = mat['Cd']
@@ -713,7 +733,7 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     notes = f"made with getLineProps"
 
     lineType = dict(name=typestring, d_vol=d_vol, m=mass, EA=EA, w=w,
-                    MBL=MBL, EAd=EAd, EAd_Lm=EAd_Lm, input_d=d,
+                    MBL=MBL, EAd=EAd, EAd_Lm=EAd_Lm, d_nom=d,
                     cost=cost, notes=notes, material=material, 
                     Cd=Cd, CdAx=CdAx, Ca=Ca, CaAx=CaAx)
     
@@ -736,7 +756,7 @@ def loadLineProps(source):
     
     Returns
     -------
-    dictionary
+    output : dictionary
         LineProps dictionary listing each supported mooring line type and 
         subdictionaries of scaling coefficients for each.
     '''
@@ -747,7 +767,7 @@ def loadLineProps(source):
     elif source is None or source=="default":
         import os
         mpdir = os.path.dirname(os.path.realpath(__file__))
-        with open(os.path.join(mpdir,"MoorProps_default.yaml")) as file:
+        with open(os.path.join(mpdir,"library/MoorProps_default.yaml")) as file:
             source = yaml.load(file, Loader=yaml.FullLoader)
         
     elif type(source) is str:
@@ -773,6 +793,8 @@ def loadLineProps(source):
         output[mat]['EA_d'     ] = getFromDict(props, 'EA_d'     , default=0.0)
         output[mat]['EA_d2'    ] = getFromDict(props, 'EA_d2'    , default=0.0)
         output[mat]['EA_d3'    ] = getFromDict(props, 'EA_d3'    , default=0.0)
+        output[mat]['EA_dmin'  ] = getFromDict(props, 'EA_dmin'  , default=-1.0) # -1 to disable checking
+        output[mat]['EA_dmax'  ] = getFromDict(props, 'EA_dmax'  , default=-1.0) # -1 to disable checking
         output[mat]['EA_MBL'   ] = getFromDict(props, 'EA_MBL'   , default=0.0)
         output[mat]['EAd_MBL'  ] = getFromDict(props, 'EAd_MBL'  , default=0.0)
         output[mat]['EAd_MBL_Lm']= getFromDict(props, 'EAd_MBL_Lm',default=0.0)
@@ -780,11 +802,12 @@ def loadLineProps(source):
         output[mat]['Cd_ax'    ] = getFromDict(props, 'Cd_ax'    , default=0.0)
         output[mat]['Ca'       ] = getFromDict(props, 'Ca'       , default=0.0)
         output[mat]['Ca_ax'    ] = getFromDict(props, 'Ca_ax'    , default=0.0)
-        
         output[mat]['MBL_0'    ] = getFromDict(props, 'MBL_0'    , default=0.0)
         output[mat]['MBL_d'    ] = getFromDict(props, 'MBL_d'    , default=0.0)
         output[mat]['MBL_d2'   ] = getFromDict(props, 'MBL_d2'   , default=0.0)
         output[mat]['MBL_d3'   ] = getFromDict(props, 'MBL_d3'   , default=0.0)
+        output[mat]['MBL_dmin' ] = getFromDict(props, 'MBL_dmin' , default=-1.0) # -1 to disable checking
+        output[mat]['MBL_dmax' ] = getFromDict(props, 'MBL_dmax' , default=-1.0) # -1 to disable checking
         output[mat]['dvol_dnom'] = getFromDict(props, 'dvol_dnom', default=1.0)
 
         # special handling if material density is provided
@@ -808,50 +831,191 @@ def loadLineProps(source):
     return output
 
 
+def getPointProps(design, Props = None, source = None, name="", **kwargs):
+    '''Sets up a dictionary that represents a mooring point type based on the 
+    specified design. Data used for determining these properties is a MoorPy
+    pointTypes dictionary data structure, created by loadPointProps. This data
+    can be passed in via the Props parameter, or a new data set can be
+    generated based on a YAML filename or dictionary passed in via the source 
+    parameter. The pointProps dictionary should be error-checked at creation,
+    so it is not error check in this function for efficiency.
+    
+    Parameters
+    ----------
+    design : string or dict
+        design keyword from DesignProps or dictionary with num_a_<anchor key>, num_b_<buoy key>, num_c_<connect key> entries
+    Props : dictionary (optional)
+        A MoorPy PointProps dictionary data structure containing designs and property scaling coefficients.
+    source : dict or filename (optional)
+        YAML file name or dictionary containing designs and property scaling coefficients.
+    name : string (optional)
+        Identifier for the point type (otherwise wll be generated automatically).
 
-
-def getPointProps(weight, rho=1025.0, g=9.81, **kwargs):
-    '''for now this is just getClumpMV put in a place where it could grow 
-    into a fully versatile equivalent to getMoorProps.
+    Returns
+    -------
+    dictionary
+        A pointType dictionary 
     '''
-    
-    '''A function to provide a consistent scheme for converting a clump weight/float magnitude to the 
-    mass and volume to use in a MoorPy Point.'''
-    
-    if weight >= 0:                          # if the top point of the intermediate line has a clump weight
-        pointvol = 0.0
-        pointmass = weight*1000.0           # input variables are in units of tons (1000 kg), convert to kg
-    else:
-        pointvol = -weight*1200.0/rho  # input variables are still in tons. Assume additional 20% of BM mass
-        pointmass = -weight*200.0
 
-    return dict(m=pointmass, v=pointvol)
+    pointinfo = {} # Dictionary to hold any information statements
+
+    if Props==None  and source==None:
+        raise MoorPyError('Either Props or source keyword arguments must be provided')
+
+    # deal with the source (is it a dictionary, or reading in a new yaml?)
+    if not source==None:
+        if not Props==None :
+            print('Warning: both Props and source arguments were passed to getLineProps. Props will be ignored.')
+        Props = loadPointProps(source)
+
+    # if design is a keyword, load it from design props, otherwise just use the passed dict
+    if type(design) == str: 
+        # raise an error if the material isn't in the source dictionary
+        if not design in Props["DesignProps"]:
+            raise MoorPyError(f'Specified point design, {design}, is not in the database.')
+        dtype = Props["DesignProps"][design]       # shorthand for the sub-dictionary of properties for the design in question
+    else:
+        dtype = design
+
+    # Check that fractions of anchor size and buoy size are realistic (and create them as num * 1/total num object if they dont exist)
+    num_aTypes = 0
+    num_bTypes = 0
+    for key in dtype.keys(): # count total num anchors and buoys
+        if 'num_a_' in key:
+            num_aTypes += 1
+        if 'num_b_' in key:
+            num_bTypes += 1
+
+    aFrac_sum = 0.0
+    bFrac_sum = 0.0
+    key_list = list(dtype.keys()) # becasue we are changing the dict in the loop, we only want to iterate over the original keys
+    for key in key_list:
+        if 'num_a_' in key:
+            if not (f"frac_a_{key[6:]}" in dtype.keys()): # if we dont have frac_a_<key>. This only can happen if design is passed in as dict and not keyword
+                # set frac as 1/total num anchs
+                dtype[f"frac_a_{key[6:]}"] = 1/num_aTypes
+
+            aFrac_sum += dtype[f"frac_a_{key[6:]}"]
+
+        if 'num_b_' in key:
+            if not (f"frac_b_{key[6:]}" in dtype.keys()): # if we dont have frac_a_<key>. This only can happen if design is passed in as dict and not keyword
+                # set frac as 1/total num buoys
+                dtype[f"frac_b_{key[6:]}"] = 1/num_bTypes
+
+            bFrac_sum += dtype[f"frac_b_{key[6:]}"]
+
+    if aFrac_sum > 1:
+        raise MoorPyError(f"Anchor fractions sum to {aFrac_sum}, which is greater than 1") 
+    if bFrac_sum > 1:
+        raise MoorPyError(f"Buoy fractions sum to {bFrac_sum}, which is greater than 1") 
+
+    # Set up a name identifier for the pointtype unless one is provided
+    if name=="":
+        if type(design) == str: # if design is a keyword, use that
+            typestring = design 
+        else: # otherwise :(
+            typestring = "no_name"
+    else:
+        typestring = name
+
+    # initialize list to hold FOS. 0 is default, but this shouldn't ever be used because c_bool will be false if nothing is added to the list
+    pointfos_list = [0.0] # FOS
+
+    # initialize pointType outputs
+    a_bool = False
+    b_bool = False
+    c_bool = False
+    anchorList = []
+    aprops_out = {}
+    Bcost = dict(cost_b0 = 0.0, cost_b1 = 0.0, cost_b2 = 0.0, cost_b3 = 0.0)
+    Ccost = dict(cost_load0 = 0.0, cost_load1 = 0.0, cost_load2 = 0.0, cost_load3 = 0.0)
+
+    # load ABC props and assign values to the point.
+
+    for key in dtype.keys():
+        
+        # anchors
+        if 'num_a_' in key:
+            '''
+            anchor stuff is handled in MoorProps and point.getCost_and_MBL, so just agregate general things here
+            '''
+            a_bool = True
+            anchorList.append({"name" : key[6:], "num" : dtype[key], "frac" : dtype[f"frac_a_{key[6:]}"]})
+            aprops_out[key[6:]] = Props["AnchorProps"][key[6:]] # Error checking of valid keys is already done in loadPointProps
+
+        # buoys
+        if 'num_b_' in key:
+            '''
+            Number of this buoy type * the cost coefficient to get our general cost coefficients for the point
+            Each buoy has a buoyancy of (total buoyancy of point * % of buoyancy). 
+
+            Note: 
+            This assumes if there are multiple buoys of the same type they share the same % of buoyancy. I.e. frac_b_key / num_b_key
+
+            Note:
+            Num of type * (unit cost) = Num of type * (B1 * (buoyancy * % of buoyancy ) + B2 * (buoyancy * % of buoyancy )^2 + ...) = Num of type * B1 * % of buoyancy * buoyancy + Num of type * B2 * % of buoyancy^2 * buoyancy^2 + ...
+            '''
+
+            b_bool = True
+            Bcost["cost_b0"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b0']                                                # Error checking of valid keys is already done in loadPointProps
+            Bcost["cost_b1"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b1'] * (dtype[f"frac_b_{key[6:]}"] / dtype[key])    # Error checking of valid keys is already done in loadPointProps
+            Bcost["cost_b2"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b2'] * (dtype[f"frac_b_{key[6:]}"] / dtype[key])**2 # Error checking of valid keys is already done in loadPointProps
+            Bcost["cost_b3"] += dtype[key] * Props["BuoyProps"][key[6:]]['cost_b3'] * (dtype[f"frac_b_{key[6:]}"] / dtype[key])**3 # Error checking of valid keys is already done in loadPointProps
+
+        # connections
+        if 'num_c_' in key:
+            '''
+            Number of this connect type * the cost coefficient to get our general cost coefficients for the point
+
+            Note:
+            Num * (C1 * (Load * FOS) + C2 * (Load * FOS)**2 + ...) = Num * C1 * FOS * Load + Num * C2 * FOS^2 * Load^2 + ...
+            '''
+            c_bool = True
+            FOS = Props["ConnectProps"][key[6:]]["FOS"]
+            Ccost["cost_load0"] += dtype[key] * Props["ConnectProps"][key[6:]]['cost_MBL0']          # Error checking of valid keys is already done in loadPointProps
+            Ccost["cost_load1"] += dtype[key] * Props["ConnectProps"][key[6:]]['cost_MBL1'] * FOS    # Error checking of valid keys is already done in loadPointProps
+            Ccost["cost_load2"] += dtype[key] * Props["ConnectProps"][key[6:]]['cost_MBL2'] * FOS**2 # Error checking of valid keys is already done in loadPointProps
+            Ccost["cost_load3"] += dtype[key] * Props["ConnectProps"][key[6:]]['cost_MBL3'] * FOS**3 # Error checking of valid keys is already done in loadPointProps
+            pointfos_list.append(FOS)
+
+    pointType = dict(name=typestring, Anchors = a_bool, Buoys = b_bool, Connections = c_bool, 
+                     anchor_list = anchorList, aprops = aprops_out, buoy_cost = Bcost, 
+                     connector_cost = Ccost, FOS = np.max(pointfos_list), info=pointinfo)
+
+    pointType.update(kwargs)   # add any custom arguments provided in the call to the pointType's dictionary
+
+    return pointType
 
 
 def loadPointProps(source):
     '''Loads a set of MoorPy point property scaling coefficients from
-    a specified YAML file or passed dictionary. 
+    a specified YAML file or passed dictionary. Any coefficients not included will take a 
+    default value. It returns two dictionaries containing the 
+    complete point design descriptions and the connection component scaling 
+    coefficient set to use for any provided point data types.
     
     Parameters
     ----------
     source : dict or filename
-        YAML file name or dictionary containing line property scaling coefficients
+        YAML file name or dictionary containing point property dictionaries of designs and connection hardware
     
     Returns
     -------
-    dictionary
-        PointProps dictionary listing each supported mooring line type and 
-        subdictionaries of scaling coefficients for each.
+    output : dictionary
+        PointProps dictionary listing each supported connection design type and 
+        subdictionaries of anchor, buoy, and connection properties.
     '''
-    
-    '''
+
+    # Note that the assumption that connection hardware matches line MBL is not necessarily correct. Typical hardware FOS are 5:1 (tri-plates) or 6:1 (shackles). 
+    # A more accurate approach would find nominal size to MBL coefficients for each type, and find a relation between attached line diam and nominal size.
+
     if type(source) is dict:
         source = source
         
     elif source is None or source=="default":
         import os
         mpdir = os.path.dirname(os.path.realpath(__file__))
-        with open(os.path.join(mpdir,"PointProps_default.yaml")) as file:
+        with open(os.path.join(mpdir,"library/PointProps_default.yaml")) as file:
             source = yaml.load(file, Loader=yaml.FullLoader)
         
     elif type(source) is str:
@@ -859,20 +1023,151 @@ def loadPointProps(source):
             source = yaml.load(file, Loader=yaml.FullLoader)
 
     else:
-        raise Exception("loadLineProps supplied with invalid source")
+        raise MoorPyError("loadPointProps supplied with invalid source")
     
-    if 'lineProps' in source:
-        lineProps = source['lineProps']
+    # read the Anchor dict
+    if 'AnchorProps' in source:
+        AnchorProps = source['AnchorProps']
     else:
-        raise Exception("YAML file or dictionary must have a 'lineProps' field containing the data")
+        raise MoorPyError("YAML file or dictionary must have a 'AnchorProps' field containing the data") # We might want to remove this requirement becasue if a user just gives point mass volume and cost they wont need a anchor dict
+    
+    anchor = dict()  # output dictionary combining default values with loaded coefficients
+    
+     # combine loaded coefficients and default values into dictionary that will be saved for each material
+    for atype, props in AnchorProps.items():  
+        anchor[atype] = {}
+
+        anchor[atype]['matcost_m'   ] = getFromDict(props, 'matcost_m'   , default=0.0)
+        anchor[atype]['matcost_m2'  ] = getFromDict(props, 'matcost_m2'  , default=0.0)
+        anchor[atype]['matcost_m3'  ] = getFromDict(props, 'matcost_m3'  , default=0.0)
+        anchor[atype]['matcost_a'   ] = getFromDict(props, 'matcost_a'   , default=0.0)
+        anchor[atype]['matcost_a2'  ] = getFromDict(props, 'matcost_a2'  , default=0.0)
+        anchor[atype]['matcost_a3'  ] = getFromDict(props, 'matcost_a3'  , default=0.0)
+        anchor[atype]['matcost'     ] = getFromDict(props, 'matcost'     , default=0.0)
+        anchor[atype]['instcost_m'  ] = getFromDict(props, 'instcost_m'  , default=0.0)
+        anchor[atype]['instcost_m2' ] = getFromDict(props, 'instcost_m2' , default=0.0)
+        anchor[atype]['instcost_m3' ] = getFromDict(props, 'instcost_m3' , default=0.0)
+        anchor[atype]['instcost_a'  ] = getFromDict(props, 'instcost_a'  , default=0.0)
+        anchor[atype]['instcost_a2' ] = getFromDict(props, 'instcost_a2' , default=0.0)
+        anchor[atype]['instcost_a3' ] = getFromDict(props, 'instcost_a3' , default=0.0)
+        anchor[atype]['instcost'    ] = getFromDict(props, 'instcost'    , default=0.0)
+        anchor[atype]['decomcost_m' ] = getFromDict(props, 'decomcost_m' , default=0.0)
+        anchor[atype]['decomcost_m2'] = getFromDict(props, 'decomcost_m2', default=0.0)
+        anchor[atype]['decomcost_m3'] = getFromDict(props, 'decomcost_m3', default=0.0)
+        anchor[atype]['decomcost_a' ] = getFromDict(props, 'decomcost_a' , default=0.0)
+        anchor[atype]['decomcost_a2'] = getFromDict(props, 'decomcost_a2', default=0.0)
+        anchor[atype]['decomcost_a3'] = getFromDict(props, 'decomcost_a3', default=0.0)
+        anchor[atype]['decomcost'   ] = getFromDict(props, 'decomcost'   , default=0.0)
+
+    # read the Buoy dict
+    if 'BuoyProps' in source:
+        BuoyProps = source['BuoyProps']
+    else:
+        raise MoorPyError("YAML file or dictionary must have a 'BuoyProps' field containing the data") # We might want to remove this requirement becasue if a user just gives point mass volume and cost they wont need a buoy dict
+    
+    buoy = dict()  # output dictionary combining default values with loaded coefficients
+    
+     # combine loaded coefficients and default values into dictionary that will be saved for each material
+    for btype, props in BuoyProps.items():  
+        buoy[btype] = {}
+        # buoy[btype]['mass_b'   ] = getFromDict(props, 'mass_b'   , default=0.0)  
+        # buoy[btype]['v_b'      ] = getFromDict(props, 'v_b'      , default=0.0)
+        buoy[btype]['cost_b0'  ] = getFromDict(props, 'cost_b0'  , default=0.0)
+        buoy[btype]['cost_b1'  ] = getFromDict(props, 'cost_b1'  , default=0.0)
+        buoy[btype]['cost_b2'  ] = getFromDict(props, 'cost_b2'  , default=0.0)
+        buoy[btype]['cost_b3'  ] = getFromDict(props, 'cost_b3'  , default=0.0)
+
+    # read the connection hardware dict
+    if 'ConnectProps' in source:
+        ConnectProps = source['ConnectProps']
+    else:
+        raise MoorPyError("YAML file or dictionary must have a 'ConnectProps' field containing the data") # We might want to remove this requirement becasue if a user just gives point mass volume and cost they wont need a connect dict
+    
+    connect = dict()  # output dictionary combining default values with loaded coefficients
+    
+     # combine loaded coefficients and default values into dictionary that will be saved for each material
+    for ctype, props in ConnectProps.items():  
+        connect[ctype] = {}
+        # connect[ctype]['mass_mbl' ] = getFromDict(props, 'mass_mbl' , default=0.0)  
+        # connect[ctype]['v_mbl'    ] = getFromDict(props, 'v_mbl'    , default=0.0)
+        connect[ctype]['FOS'      ] = getFromDict(props, 'FOS'      , default=1.0) # defaults to 1, to return design load as MBL
+        connect[ctype]['cost_MBL0'] = getFromDict(props, 'cost_MBL0', default=0.0)
+        connect[ctype]['cost_MBL1'] = getFromDict(props, 'cost_MBL1', default=0.0)
+        connect[ctype]['cost_MBL2'] = getFromDict(props, 'cost_MBL2', default=0.0)
+        connect[ctype]['cost_MBL3'] = getFromDict(props, 'cost_MBL3', default=0.0)
+
+    # read the point design dict
+    if 'DesignProps' in source:
+        DesignProps = source['DesignProps']
+    else:
+        raise MoorPyError("YAML file or dictionary must have a 'DesignProps' field containing the data")
+
+    point = dict()  # output dictionary combining default values with loaded designs
+    
+    # combine loaded coefficients and default values into dictionary that will be saved for each material
+    for dtype, props in DesignProps.items():  
+        point[dtype] = {}
+        num_anchs = 0 # counter for allocating fraction defaults
+        num_buoys = 0 # counter for allocating fraction defaults
+
+        # load the number of each component in the design
+        for key in props.keys():
+            # handle the numbers of each Anchor type
+            if 'num_a_' in key:
+                atype = key[6:]
+                if atype in AnchorProps.keys():
+                    point[dtype][key] = getFromDict(props, key, default=0) 
+                else:
+                    raise MoorPyError(f'Anchor type {atype} not found in AnchorProps dictionary')
+                
+                num_anchs += 1
+                    
+            # handle the numbers of each Buoy type
+            if 'num_b_' in key:
+                btype = key[6:]
+                if btype in BuoyProps.keys():
+                    point[dtype][key] = getFromDict(props, key, default=0) 
+                else:
+                    raise MoorPyError(f'Buoy type {btype} not found in BuoyProps dictionary')
+                
+                num_buoys += 1
+                
+            # handle the numbers of each Connection type
+            if 'num_c_' in key:
+                ctype = key[6:]
+                if ctype in ConnectProps.keys():
+                    point[dtype][key] = getFromDict(props, key, default=0) 
+                else:
+                    raise MoorPyError(f'Connection type {ctype} not found in ConnectProps dictionary')
+
+        # load the fractions, which default as 1/total number of type. This checks for num_<key> because frac_<key> should only be loaded if num_<key> is provided
+        if num_anchs > 0 or num_buoys > 0:
+            for key in props.keys():
+                if 'num_a_' in key:
+                    # handle the fractions for each Anchor type
+                    point[dtype][f'frac_a_{key[6:]}'] = getFromDict(props, f'frac_a_{key[6:]}', default = 1/num_anchs)    
+                if 'num_b_' in key:
+                    # handle the fractions for each Buoy type
+                    point[dtype][f'frac_b_{key[6:]}'] = getFromDict(props, f'frac_b_{key[6:]}', default = 1/num_buoys)
+
+    # return ABCD dict
+    return dict(AnchorProps = anchor, BuoyProps = buoy, ConnectProps = connect, DesignProps = point)
+
+
+def getAnchorCost(fx, fz, type='drag-embedment'):
+    '''Simple interface function for getting the cost of an anchor given the
+    anchor load. Points to other functions in MoorPy that are in a state of 
+    flux.
+    Inputs: fx [N], fy [N], anchor type ('drag-embedment' or 'suction').
+    Returns: anchor material cost [$]
     '''
     
-    output = dict()  # output dictionary combining default values with loaded coefficients
+    # Currently using the original cost function
+    from moorpy.MoorProps import getAnchorCostOld
     
-    #output['generic'] = dict(rho = , m_v = , )
+    anchorMatCost, anchorInstCost, anchorDecomCost, info = getAnchorCostOld(fx, fz, type=type)
     
-    return output
-
+    return anchorMatCost
 
 
 def getFromDict(dict, key, shape=0, dtype=float, default=None):
@@ -1051,6 +1346,7 @@ def lines2ss(ms):
             raise ValueError("f point number {pointi.number} branches out.")
         # 1) define the connected lines if any
         subsys_line_id.append(pointi.attached[0])
+
         subsys_point_id.append(pointi.number)
         # 2) check where the line with line_ID has been repeated in other points
         while True:
@@ -1117,7 +1413,7 @@ def lines2ss(ms):
         
         lines = list(subsys_lines)
         points = list(subsys_points)
-        ms = lines2subsystem(lines, ms, span=None, case=case)
+        ms = lines2subsystem(lines, points, ms, span=None, case=case)
         ms.initialize()
         ms.solveEquilibrium()
         i += 1
@@ -1126,7 +1422,7 @@ def lines2ss(ms):
 
     return ms
 
-def lines2subsystem(lines,ms,span=None,case=0):
+def lines2subsystem(lines,points, ms,span=None,case=0):
     '''Takes a set of connected lines (in order from rA to rB) in a moorpy system and creates a subsystem equivalent.
     The original set of lines are then removed from the moorpy system and replaced with the 
     subsystem.
@@ -1135,6 +1431,8 @@ def lines2subsystem(lines,ms,span=None,case=0):
     ----------
     lines : list
         List of indices in the ms.lineList to replace.
+    points : list
+        List of indices in the ms.pointList to replace
     ms : object
         MoorPy system object the lines are part of
     span : float (optional)
@@ -1154,7 +1452,7 @@ def lines2subsystem(lines,ms,span=None,case=0):
     from copy import deepcopy
     # save a deepcopy of the line list to delete
     originalList = deepcopy(lines)
-    
+
     # # check that all lines connect (all are sections of one full mooring line)
     # for i in range(0,len(lines)):
     #     if i>0:
@@ -1167,39 +1465,26 @@ def lines2subsystem(lines,ms,span=None,case=0):
     ss = Subsystem(depth=ms.depth, span=span,rBFair=ms.lineList[lines[-1]].rB)
     lengths = []
     types = []
-    pt = [] # list of points that 
-    # ptB = []
 
     # go through each line
     for i in lines:
-        # see which point is connected to end A and end B
-        for j in range(0,len(ms.pointList)):
-            for k in range(0,len(ms.pointList[j].attached)):
-                if ms.pointList[j].attached[k] == i+1: #and ms.pointList[j].attachedEndB[k] == 0:
-                    if not j in pt:
-                        pt.append(j)
-                # elif ms.pointList[j].attached[k] == i+1 and ms.pointList[j].attachedEndB[k] == 1:
-                #     ptB.append(j)
-
         # collect line lengths and types                                          
         lengths.append(ms.lineList[i].L)
         types.append(ms.lineList[i].type['name'])
         ss.lineTypes[types[-1]] = ms.lineTypes[types[-1]]
         
     # use makeGeneric to build the subsystem line
-    ss.makeGeneric(lengths,types,suspended=case)
+    nSegs = [ms.lineList[i].nNodes-1 for i in lines]
+    ss.makeGeneric(lengths,types,suspended=case, nSegs=nSegs)
     ss.setEndPosition(ms.lineList[lines[0]].rA,endB=0)
     ss.setEndPosition(ms.lineList[lines[-1]].rB,endB=1)
     
     # add in any info on the points connected to the lines
     # currently, mass, volume, and diameter but others could be added
-    for i in range(0,len(pt)):
-        ss.pointList[i].m = ms.pointList[pt[i]].m
-        ss.pointList[i].v = ms.pointList[pt[i]].v
-        ss.pointList[i].d = ms.pointList[pt[i]].d
-        # ss.pointList[i].m = ms.pointList[ptB[i]].m
-        # ss.pointList[i].v = ms.pointList[ptB[i]].v
-        # ss.pointList[i].d = ms.pointList[ptB[i]].d
+    for i in range(0,len(points)):
+        ss.pointList[i].m = ms.pointList[points[i]].m
+        ss.pointList[i].v = ms.pointList[points[i]].v
+        ss.pointList[i].d = ms.pointList[points[i]].d
     
     from moorpy import helpers
     # delete old line
@@ -1211,11 +1496,11 @@ def lines2subsystem(lines,ms,span=None,case=0):
             delpts = 2
             for j in range(0,len(ms.pointList)):
                 if lines[i]+1 in ms.pointList[j].attached:
-                    if pt[-1]>j and decB == 0:                    
-                        pt[-1] -= 1
+                    if points[-1]>j and decB == 0:                    
+                        points[-1] -= 1
                         decB = 1
-                    if pt[0]>j and decA == 0:
-                        pt[0] -= 1 
+                    if points[0]>j and decA == 0:
+                        points[0] -= 1 
                         decA = 1
         elif i == 0 and i == len(lines) - 1:
             # first line, only line (keep point A and B)
@@ -1229,11 +1514,11 @@ def lines2subsystem(lines,ms,span=None,case=0):
             # reduce index of last point B in ptB list and first point A in ptA list (only care about last ptB and first ptA now) by one
             for j in range(0,len(ms.pointList)):
                 if lines[i]+1 in ms.pointList[j].attached:
-                    if pt[-1]>j and decB == 0:                    
-                        pt[-1] -= 1
+                    if points[-1]>j and decB == 0:                    
+                        points[-1] -= 1
                         decB = 1
-                    if pt[0]>j and decA == 0:
-                        pt[0] -= 1 
+                    if points[0]>j and decA == 0:
+                        points[0] -= 1 
                         decA = 1
         # adjust index of any lines that have a higher index than the line to delete
         for j in range(0,len(lines)):
@@ -1247,8 +1532,8 @@ def lines2subsystem(lines,ms,span=None,case=0):
     ms.lineList.append(ss)
     ssNum = len(ms.lineList)
     # attach subystem line to the end points
-    ms.pointList[pt[0]].attachLine(ssNum,0) # rA
-    ms.pointList[pt[-1]].attachLine(ssNum,1) # rB     
+    ms.pointList[points[0]].attachLine(ssNum,0) # rA
+    ms.pointList[points[-1]].attachLine(ssNum,1) # rB     
         
     return(ms)
 
@@ -1480,9 +1765,225 @@ def subsystem2Line(ms,ssNum,nsegs=10):
     if 'body' in points[-1]:
         ms.bodyList[points[-1]['body']].attachPoint(len(ms.pointList),[ms.pointList[-1].r[0]-ms.bodyList[points[-1]['body']].r6[0],ms.pointList[-1].r[1]-ms.bodyList[points[-1]['body']].r6[1],ms.pointList[-1].r[2]])
    
+def ss2lines(ms, nsegs=10):
+    '''Replace all subsystem in ms with equivalent set of lines
+
+    Parameters
+    ----------
+    ms : system object
+        MoorPy system object that contains the subsystem
+    nsegs : list OR int, optional
+        Number of segments per line for each line. Can be an integer (all line sections have the same # of segments)
+        OR can be a list (# of segments for each section of line in order from A to B)
+
+    Returns
+    -------
+    new mooring system object with all subsystems replaced with lines
+
+    '''
+    from copy import deepcopy
+    original_ms = deepcopy(ms)
+    subsystemCount = len(original_ms.lineList)
+    sub_idx = 0
+    newly_created_lines = []
+    shared_point_map = {}
+    # Use a stable key per original point (coordinates are fine if stable)
+    def _pt_key(P):
+        # round to avoid tiny float diffs; include type to be safer
+        return (round(P.r[0], 6), round(P.r[1], 6), round(P.r[2], 6), int(P.type))    
+    for _ in range(subsystemCount):
+        # get subsystem object
+        ss = ms.lineList[sub_idx]   
+        types = []
+        lengths = []
+        points = []
+        # record line types, lines, and points in the subsystem
+        for i in range(0,len(ss.lineList)):
+            types.append(ss.lineList[i].type)
+            lengths.append(ss.lineList[i].L)
+            if not types[-1]['name'] in ms.lineTypes:
+                # add type to lineTypes list
+                ms.lineTypes[types[-1]['name']] = types[-1]
+        for i,spt in enumerate(ss.pointList):
+            # gather all info about the points in the subsystem
+            points.append({'r':spt.r,'m':spt.m,'v':spt.v,'CdA':spt.CdA,'d':spt.d,'type':spt.type,'Ca':spt.Ca})
+        # points[0]['r'] = ss.rA
+        # points[-1]['r'] = ss.rB
+            if spt.attachedEndB[-1]:
+                endB = i
+                points[endB]['r'] = ss.rB
+            if spt.attachedEndB[0] == 0:
+                endA = i
+                points[endA]['r'] = ss.rA
+        # get actual r of end points (r in subsystem is not true location)
+        for i in range(0,len(ms.pointList)):
+            # check if point is attached to the subsystem line
+            for j in range(0,len(ms.pointList[i].attached)):
+                if ms.pointList[i].attached[j] == sub_idx+1:
+                    if ms.pointList[i].attachedEndB[j]:
+                        # for k in range(0,len(ms.bodyList)):
+                        #     if i+1 in ms.bodyList[k].attachedP:
+                        #         points[-1]['body'] = k    
+                        # update end B r
+                        points[endB]['r'] = ms.pointList[i].r
+                        points[endB]['type'] = ms.pointList[i].type
+                        # check if end points are attached to a body
+                        for k in range(0,len(ms.bodyList)):
+                            if i+1 in ms.bodyList[k].attachedP:
+                                points[endB]['body'] = k
+                    else:
+                        # update end A r
+                        points[endA]['r'] = ms.pointList[i].r
+                        points[endA]['type'] = ms.pointList[i].type 
+                        key = _pt_key(ms.pointList[i])
+                        if len(ms.pointList[i].attached) > 1:
+                            # This is a shared anchor
+                            other_attached_ss = []
+                            for att in ms.pointList[i].attached:
+                                if att != sub_idx + 1 and att not in newly_created_lines:
+                                    other_attached_ss.append(att - 1)
+
+                            # --- mark this endpoint as shared & key it for reuse later
+                            points[endA]['shared'] = True
+                            # build a stable key based on the ORIGINAL system's point data if possible
+                            key = _pt_key(ms.pointList[i])
+                            points[endA]['share_key'] = key
+                            points[endA]['shared_with'] = other_attached_ss
+                        # check if end points are attached to a body
+                        for k in range(0,len(ms.bodyList)):
+                            if i+1 in ms.bodyList[k].attachedP:
+                                points[endA]['body'] = k
+        # approximate midpoint r with depth of subsystem point r and angle from two end points
+        aang = np.arctan2(points[0]['r'][1] - points[-1]['r'][1],points[0]['r'][0] - points[-1]['r'][0])
+        # update x-y location of any midpoints if they exist
+        if len(points)>2:
+            for i in range(1,len(points)-1):
+                ll = np.sqrt(points[i]['r'][0]**2+points[i]['r'][1]**2)
+                points[i]['r'][0] = (ll)*np.cos(aang)+points[-1]['r'][0]# poits[-1]['r][0]
+                points[i]['r'][1] = (ll)*np.sin(aang)+points[-1]['r'][1]
+                #points[i]['r'][0] = (ll+np.abs(points[-1]['r'][0]))*np.cos(aang)
+                #points[i]['r'][1] = (ll+np.abs(points[-1]['r'][1]))*np.sin(aang)
+
+        from moorpy import helpers
+        for i in range(0, len(ms.pointList)):
+            key = _pt_key(ms.pointList[i])
+            if key in shared_point_map:
+                # This point has already been created for another subsystem - detach from current subsystem
+                if sub_idx + 1 in ms.pointList[i].attached:
+                    ms.pointList[i].attached.remove(sub_idx + 1)
+        # remove subsystem line, delete all associated points
+        helpers.deleteLine(ms,sub_idx,delpts=3)  # for some reason, in the delete line, it attached 19 to 13 again. Please investigate
+        # add in new lines to replace subsystem
+        for i in range(0,len(types)):
+            # determine # of segments for this line section
+            if isinstance(nsegs,list):
+                NSegs = nsegs[i]
+            elif isinstance(nsegs,int):
+                NSegs = nsegs
+            else:
+                raise Exception('Input nsegs must be either a list or an integer')
+            # add point A (if it wasn't added already by other subsystems since shared anchors are a possibility)
+            # --- Reuse shared anchors (do not add again)
+            use_existing = False
+            curr_pt_idx = None  # 1-based index in ms.pointList            
+            if points[i].get('shared', False):
+                key = points[i]['share_key']
+                if key in shared_point_map:
+                    # already created for another subsystem – find it then reuse it
+                    # find it
+                    for j, point in enumerate(ms.pointList):
+                        k_j = _pt_key(point)
+                        if k_j == key:
+                            curr_pt_idx = j + 1
+                            break
+                    use_existing = True            
+
+            if not use_existing:
+                # Not shared, or shared but not created yet -> create it now
+                ms.addPoint(points[i]['type'], points[i]['r'], points[i]['m'], points[i]['v'], d=points[i]['d'])
+                ms.pointList[-1].CdA = points[i]['CdA']
+                ms.pointList[-1].Ca  = points[i]['Ca']
+                curr_pt_idx = len(ms.pointList)
+                if points[i].get('shared', False):
+                    # This is a shared anchor, and has just been created so let's attach it to the other subsystems now
+                    for other_ss in points[i]['shared_with']:
+                        ms.pointList[curr_pt_idx - 1].attachLine(other_ss, endB=0)
+                    # remember it if this is a shared anchor
+                    shared_point_map[points[i]['share_key']] = curr_pt_idx
+
+            # add line
+            ms.addLine(lengths[i], types[i]['name'], nSegs=NSegs)
+            newly_created_lines.append(len(ms.lineList))
+            # attach point A to the just-created line
+            ms.pointList[curr_pt_idx - 1].attachLine(len(ms.lineList), endB=0)
+
+            # attach to any bodies the point was originally attached to
+            if (not use_existing) and ('body' in points[i]):
+                ms.bodyList[points[i]['body']].attachPoint(
+                    curr_pt_idx,
+                    [ms.pointList[curr_pt_idx - 1].r[0] - ms.bodyList[points[i]['body']].r6[0],
+                    ms.pointList[curr_pt_idx - 1].r[1] - ms.bodyList[points[i]['body']].r6[1],
+                    ms.pointList[curr_pt_idx - 1].r[2]]
+                )
+            if i > 0:
+                # this same point is end B for previous line
+                ms.pointList[curr_pt_idx - 1].attachLine(len(ms.lineList) - 1, endB=1)
+        
+        # add last point (should be the fairlead)
+        ms.addPoint(points[-1]['type'], points[-1]['r'], points[-1]['m'], points[-1]['v'], d=points[-1]['d'])
+        ms.pointList[-1].CdA = points[-1]['CdA']
+        ms.pointList[-1].Ca = points[-1]['Ca']
+        # attach to last line as point B
+        ms.pointList[-1].attachLine(len(ms.lineList),endB=1)
+        # attach to a body if applicable
+        if 'body' in points[-1]:
+            ms.bodyList[points[-1]['body']].attachPoint(len(ms.pointList),[ms.pointList[-1].r[0]-ms.bodyList[points[-1]['body']].r6[0],ms.pointList[-1].r[1]-ms.bodyList[points[-1]['body']].r6[1],ms.pointList[-1].r[2]])        
+    return ms
             
+def duplicateSyntheticLines(ms):
+    '''reads in a MoorPy system and duplicates linetypes with nonzero EAd. needed for system unload to work with 
+    multiple mean load values'''
+    import copy
     
+    # list of line types with nonzero EAd
+    types = []
+    for key, lineType in ms.lineTypes.items():
+        if 'EAd' in lineType.keys() and lineType['EAd'] > 0:
+            types.append(lineType['name'])
+    
+
+    if len(types) > 0:
+        
+        #iterate through types with nonzero EAd
+        for t in types:
+
+            #store indexes of lines that use that line type
+            inds = []
+            for i, line in enumerate(ms.lineList):
+                if line.type['name'] == t:
+                    inds.append(i)
+            
+            names = [t]
+            
+            # make copies of lineType (so that each segment with nonzero EAd has unique LineType)
+            for i in inds[1:]:
                 
+                # insert the copies right below the existing linetype to make ordering more logical
+                
+                pos = list(ms.lineTypes.keys()).index(t) + 1
+                items = list(ms.lineTypes.items())     
+                items.insert(pos, (t+str(i), copy.deepcopy(ms.lineTypes[t])))
+                ms.lineTypes = dict(items)
+                ms.lineTypes[t + str(i)]['name'] = t + str(i)
+                
+                names.append(t + str(i))
+            
+            #make sure each line points to the correct lineType
+            for j, i in enumerate(inds):
+                ms.lineList[i].type = ms.lineTypes[names[j]]
+        return(ms)
+    else:
+        print('No lines have nonzero EAd')                
 
 def readBathymetryFile(filename):
     '''Read a MoorDyn-style bathymetry input file (rectangular grid of depths)
@@ -1559,11 +2060,17 @@ def read_mooring_file(dirName,fileName):
     
     data2 = np.array(data)
     
+    # Check if *** characters in data2 and if so replace with 0
+    for i in range(len(data2)):
+        for j in range(len(data2[i])):
+            if data2[i][j].count('***') > 0:
+                data2[i][j] = '0.0'
+
     data3 = data2.astype(float)
     
     return data3, ch, channels, units    
 
-def read_output_file(dirName,fileName, skiplines=-1, hasunits=1, chanlim=999, dictionary=True):
+def read_file(dirName,fileName, skiplines=-1, hasunits=1, chanlim=999, dictionary=True):
 
     # load data from FAST output file
     # looks for channel names, then units (if hasunits==1), then data lines after first skipping [skiplines] lines.
@@ -1641,3 +2148,492 @@ def read_output_file(dirName,fileName, skiplines=-1, hasunits=1, chanlim=999, di
         return dataDict, unitDict
     else:
         return data3, ch, channels, units
+
+
+def get_horizontal_oop_vec(p1,p2):
+    """
+    Evaluates the horizontal out of plane vector given the coordinates of two points.
+    """
+    hor_vec = p2 - np.array([p1[0],p1[1],p2[2]])
+    ver_vec = p1 - np.array([p1[0],p1[1],p2[2]])
+
+    if np.isclose(np.linalg.norm(hor_vec),0): # vertical line
+        n_op = np.array([1,0,0]) 
+    elif np.isclose(np.linalg.norm(ver_vec),0): # horizontal line
+        oop_vec = np.cross(hor_vec,np.array([0,0,1])) 
+        n_op = oop_vec/np.linalg.norm(oop_vec)
+    else:
+        oop_vec = np.cross(hor_vec,ver_vec)
+        n_op = oop_vec/np.linalg.norm(oop_vec)
+    return n_op
+
+
+def guyan_reduce(K, n_coupled):
+    """
+    Perform Guyan reduction on stiffness matrix K, keeping the first n_coupled DOFs as the loaded dofs.
+    Returns the reduced stiffness matrix with dimensions (n_coupled, n_coupled).
+    See https://hal.science/hal-01711552v1/document
+    """
+ 
+    # Partitions of the stiffness matrix
+    Kcc = K[:n_coupled, :n_coupled]
+    Kcu = K[:n_coupled, n_coupled:]
+    Kuc = K[n_coupled:, :n_coupled]
+    Kuu = K[n_coupled:, n_coupled:]
+
+    # Using the partitions to compute the reduced matrix
+    try:
+        Kuu_inv = np.linalg.inv(Kuu)
+    except:
+        Kuu_inv = np.linalg.pinv(Kuu)
+    K_reduced = Kcc - Kcu @ Kuu_inv @ Kuc
+    return K_reduced
+
+
+def get_dynamic_matrices(Line, omegas, S_zeta,r_dynamic,depth,kbot,cbot,seabed_tol=1e-4):
+    """
+    Evaluates dynamic matrices for a Line object.
+
+    Parameters
+    ----------
+    Line : Line
+        An instance of MoorPy's Line class
+    omegas : ndarray
+        Array of frequencies in rad/s.
+    S_zeta : ndarray
+        Wave spectrum array in m^2/(rad/s), must be of the same length as omegas.
+    r_dynamic : ndarray
+        A 3d array of the frequency dependent complex amplitudes of line nodes. The array has a shape of (m,n,3) where m is the number of frequencies,
+        n is the number of nodes, and the last dimension of 3 correspond to the x,y,z components.
+    depth : float
+        Water depth.
+    kbot : float
+        Vertical stiffness for points lying on the seabed.
+    cbot : float
+        Vertical damping for points lying on the seabed.
+    seabed_tol : float, optional
+        Distance from seabed within which a node is considered to be lying on the seabed, by default 1e-4 m.
+
+    Returns
+    -------
+    M: ndarray
+        Mass matrix.
+    A: ndarray
+        Added mass matrix.
+    B: ndarray
+        Damping matrix.
+    K: ndarray
+       Stiffness matrix.
+    M: ndarray
+        Mass matrix.
+    r_mean: ndarray
+        Mean static positions of the nodes given as a (m,3) array where m is the number of nodes.
+    EA_segs: ndarray
+        Extensional stiffness of segments.
+    """
+    # extract line properties
+    N = Line.nNodes
+    mden = Line.type['m'] # line mass density function
+    deq = Line.type['d_vol'] # line volume equivalent diameter
+    EA = Line.type['EA'] # extensional stiffness
+    Ca = Line.type['Ca'] # normal added mass coeff
+    CaAx = Line.type['CaAx'] # tangential added mass coeff
+    Cd = Line.type['Cd'] # normal drag coeff
+    CdAx = Line.type['CdAx'] # tangential drag coeff
+
+    # extract mean node coordinates
+    X_mean,Y_mean,Z_mean,T_mean = Line.getLineCoords(0.0,n=N) # coordinates of line nodes and tension values
+    r_mean = np.vstack((X_mean,Y_mean,Z_mean)).T # coordinates of line nodes
+
+    # evaluate node velocities
+    r_dynamic = np.ones((len(omegas),N,3),dtype='float')*r_dynamic
+    v_dynamic = 1j*omegas[:,None,None]*r_dynamic
+
+    # define out of plane normal
+    h_op = get_horizontal_oop_vec(r_mean[0],r_mean[-1]) # horizontal out-of-plane vector
+    hh_op = np.outer(h_op,h_op)
+
+    # intialize line matrices
+    M = np.zeros([3*N, 3*N], dtype='float') # mass matrix
+    A = np.zeros([3*N, 3*N], dtype='float') # added mass matrix
+    B = np.zeros([3*N, 3*N], dtype='float') # linearized viscous damping matrix
+    K = np.zeros([3*N, 3*N], dtype='float') # stiffness matrix
+
+    # Node 0
+    dr_e1 = r_mean[1] - r_mean[0]
+    L_e1 = np.linalg.norm(dr_e1) # element 1 length
+    t_e1 = (dr_e1)/L_e1 # tangential unit vector
+    p_e1 = np.cross(t_e1,h_op) # in plane normal unit vector
+
+
+    ut_e1 = np.einsum('ij,j->i',v_dynamic[:,0,:],t_e1) # tangential velocity
+    uh_e1 = np.einsum('ij,j->i',v_dynamic[:,0,:],h_op) # normal horizontal out of plane velocity
+    up_e1 = np.einsum('ij,j->i',v_dynamic[:,0,:],p_e1) # normal in plane velocity
+
+    sigma_ut_e1 = np.sqrt(np.trapezoid(np.abs(ut_e1)**2*S_zeta,omegas))
+    sigma_uh_e1 = np.sqrt(np.trapezoid(np.abs(uh_e1)**2*S_zeta,omegas))
+    sigma_up_e1 = np.sqrt(np.trapezoid(np.abs(up_e1)**2*S_zeta,omegas))
+
+    tt_e1 = np.outer(t_e1,t_e1) # local tangential to global components transformation matrix
+    pp_e1 = np.outer(p_e1,p_e1) # local normal inplane to global components transformation matrix
+
+    M[0:3,0:3] += mden*L_e1/2*np.eye(3) # element 1 mass contribution
+
+    A_e1 = 1025*np.pi/4*deq**2*L_e1/2*(Ca*(hh_op+pp_e1) + CaAx*tt_e1) # element 1 added mass contribution
+
+    B_e1 = 0.5*1025*deq*L_e1/2*np.sqrt(8/np.pi)*(Cd*(sigma_uh_e1*hh_op + sigma_up_e1*pp_e1) +
+                                                CdAx*sigma_ut_e1*tt_e1) # element 1 damping contribution 
+
+    K_e1 = EA/L_e1*tt_e1 + (T_mean[0]/L_e1)*(hh_op+pp_e1) # element 1 stiffness (axial + geometric)
+
+    ## assembling element 1 contributions (rows corresponding to node 0)
+    A[0:3,0:3] += A_e1 
+    B[0:3,0:3] += B_e1
+    K[0:3,0:3] += K_e1
+    K[0:3,3:6] += -K_e1
+
+    ## add seabed contribution to node 0
+    if np.isclose(r_mean[0,2],-depth,seabed_tol):
+        K[2,2] += kbot
+        B[2,2] += cbot 
+
+    # Internal nodes loop (each internal node has contributions from two elements n-1/2 and n+1/2)
+    for n in range(1, N-1):
+        
+        ## backward element (n-1/2) contributions
+        dr_bw = r_mean[n-1] - r_mean[n]
+        L_bw = np.linalg.norm(dr_bw) # element 1 length
+        t_bw = (dr_bw)/L_bw # tangential unit vector
+        p_bw = np.cross(t_bw,h_op) # in plane normal unit vector
+
+        ut_bw = np.einsum('ij,j->i',v_dynamic[:,n,:],t_bw) # tangential velocity
+        uh_bw = np.einsum('ij,j->i',v_dynamic[:,n,:],h_op) # normal horizontal out of plane velocity
+        up_bw = np.einsum('ij,j->i',v_dynamic[:,n,:],p_bw) # normal in plane velocity
+
+        sigma_ut_bw = np.sqrt(np.trapezoid(np.abs(ut_bw)**2*S_zeta,omegas))
+        sigma_uh_bw = np.sqrt(np.trapezoid(np.abs(uh_bw)**2*S_zeta,omegas))
+        sigma_up_bw = np.sqrt(np.trapezoid(np.abs(up_bw)**2*S_zeta,omegas))
+
+        tt_bw = np.outer(t_bw,t_bw) # local tangential to global components transformation matrix
+        pp_bw = np.outer(p_bw,p_bw) # local normal inplane to global components transformation matrix
+
+        M[3*n:3*n+3,3*n:3*n+3] += mden*L_bw/2*np.eye(3) # mass contribution from adjacent elements
+
+        A_bw = 1025*np.pi/4*deq**2*L_bw/2*(Ca*(hh_op+pp_bw) + CaAx*tt_bw) # backward element added mass contribution
+
+        B_bw = 0.5*1025*deq*L_bw/2*np.sqrt(8/np.pi)*(Cd*(sigma_uh_bw*hh_op + sigma_up_bw*pp_bw) +
+                                                        CdAx*sigma_ut_bw*tt_bw) # backward element damping contribution 
+
+        K_bw = EA/L_bw*tt_bw + (T_mean[n]/L_bw)*(hh_op+pp_bw) # backward element stiffness (axial + geometric)
+
+        ## forward element (n+1/2) contributions
+        dr_fw = r_mean[n+1] - r_mean[n]
+        L_fw = np.linalg.norm(dr_fw) # element 1 length
+        t_fw = (dr_fw)/L_fw # tangential unit vector
+        p_fw = np.cross(t_fw,h_op) # in plane normal unit vector
+
+
+        ut_fw = np.einsum('ij,j->i',v_dynamic[:,n,:],t_fw) # tangential velocity
+        uh_fw = np.einsum('ij,j->i',v_dynamic[:,n,:],h_op) # normal horizontal out of plane velocity
+        up_fw = np.einsum('ij,j->i',v_dynamic[:,n,:],p_fw) # normal in plane velocity
+
+        sigma_ut_fw = np.sqrt(np.trapezoid(np.abs(ut_fw)**2*S_zeta,omegas))
+        sigma_uh_fw = np.sqrt(np.trapezoid(np.abs(uh_fw)**2*S_zeta,omegas))
+        sigma_up_fw = np.sqrt(np.trapezoid(np.abs(up_fw)**2*S_zeta,omegas))
+
+        tt_fw = np.outer(t_fw,t_fw) # local tangential to global components transformation matrix
+        pp_fw = np.outer(p_fw,p_fw) # local normal inplane to global components transformation matrix
+        
+        M[3*n:3*n+3,3*n:3*n+3] += mden*L_fw/2*np.eye(3) # mass contribution from adjacent elements
+
+        A_fw = 1025*np.pi/4*deq**2*L_fw/2*(Ca*(hh_op+pp_fw) + CaAx*tt_fw) # forward element added mass contribution
+
+        B_fw = 0.5*1025*deq*L_fw/2*np.sqrt(8/np.pi)*(Cd*(sigma_uh_fw*hh_op + sigma_up_fw*pp_fw) +
+                                                    CdAx*sigma_ut_fw*tt_fw) # forward element damping contribution 
+
+        K_fw = EA/L_fw*tt_fw + (T_mean[n]/L_fw)*(hh_op+pp_fw) # forward element stiffness (axial + geometric)
+
+        ## assembling bwd and fwd elements contributions (rows corresponding to node n)
+        A[3*n:3*n+3,3*n:3*n+3] += A_bw + A_fw
+        B[3*n:3*n+3,3*n:3*n+3] += B_bw + B_fw
+        K[3*n:3*n+3,3*n:3*n+3] += K_bw + K_fw 
+        K[3*n:3*n+3,3*n-3:3*n] += -K_bw
+        K[3*n:3*n+3,3*n+3:3*n+6] += -K_fw
+        
+        ## add seabed contribution to node n
+        if np.isclose(r_mean[n,2],-depth,seabed_tol):
+            K[3*n+2,3*n+2] += kbot
+            B[3*n+2,3*n+2] += cbot
+
+    # Node N
+    dr_eN = r_mean[N-1] - r_mean[N-2]
+    L_eN = np.linalg.norm(dr_eN) # element N length
+    t_eN = (dr_eN)/L_eN # tangential unit vector
+    p_eN = np.cross(t_eN,h_op) # in plane normal unit vector
+
+    ut_eN = np.einsum('ij,j->i',v_dynamic[:,N-1,:],t_eN) # tangential velocity
+    uh_eN = np.einsum('ij,j->i',v_dynamic[:,N-1,:],h_op) # normal horizontal out of plane velocity
+    up_eN = np.einsum('ij,j->i',v_dynamic[:,N-1,:],p_eN) # normal in plane velocity
+
+    sigma_ut_eN = np.sqrt(np.trapezoid(np.abs(ut_eN)**2*S_zeta,omegas))
+    sigma_uh_eN = np.sqrt(np.trapezoid(np.abs(uh_eN)**2*S_zeta,omegas))
+    sigma_up_eN = np.sqrt(np.trapezoid(np.abs(up_eN)**2*S_zeta,omegas))
+
+    tt_eN = np.outer(t_eN,t_eN) # local tangential to global components transformation matrix
+    pp_eN = np.outer(p_eN,p_eN) # local normal inplane to global components transformation matrix
+
+    M[3*(N-1):3*(N-1)+3,3*(N-1):3*(N-1)+3] += mden*L_eN/2*np.eye(3) # element N mass contribution
+
+    A_eN = 1025*np.pi/4*deq**2*L_eN/2*(Ca*(hh_op+pp_eN) + CaAx*tt_eN) # element N added mass contribution
+
+    B_eN = 0.5*1025*deq*L_eN/2*np.sqrt(8/np.pi)*(Cd*(sigma_uh_eN*hh_op + sigma_up_eN*pp_eN) +
+                                                CdAx*sigma_ut_eN*tt_eN) # element N damping contribution 
+
+    K_eN = EA/L_eN*tt_eN + (T_mean[N-1]/L_eN)*(hh_op+pp_eN) # element N stiffness (axial + geometric)
+
+    ## assembling element N contributions (rows corresponding to node N)
+    A[3*(N-1):3*(N-1)+3,3*(N-1):3*(N-1)+3] += A_eN 
+    B[3*(N-1):3*(N-1)+3,3*(N-1):3*(N-1)+3] += B_eN 
+    K[3*(N-1):3*(N-1)+3,3*(N-1):3*(N-1)+3] += K_eN
+    K[3*(N-1):3*(N-1)+3,3*(N-1)-3:3*(N-1)] += -K_eN
+
+    ## add seabed contribution to node N
+    if np.isclose(r_mean[N-1,2],-depth,seabed_tol):
+        K[3*(N-1)+2,3*(N-1)+2] += kbot
+        B[3*(N-1)+2,3*(N-1)+2] += cbot
+
+    EA_segs = Line.type['EA']*np.ones(Line.nNodes - 1)
+
+    return M,A,B,K,r_mean,EA_segs
+
+
+def get_dynamic_tension(line,omegas,S_zeta,RAO_A,RAO_B,depth,kbot,cbot,seabed_tol=1e-4,tol = 0.01,iters=100, w = 0.8, conv_time=False, returnMatrices=False):
+    """
+    Evaluates dynamic tension at all the nodes for an instance of MoorPy's line or CompositeLine classes.
+
+    Parameters
+    ----------
+    line : line/CompositeLine
+        An instance of MoorPy's line or CompositeLine classes.
+    omegas : ndarray
+        Array of frequencies in rad/s.
+    S_zeta : ndarray
+        Wave spectrum array in m^2/(rad/s), must be of the same length as omegas.
+    RAO_A : ndarray
+        Translational RAOs for end node A given as a (m,3) array where m is the number of frequencies (must be equal to the length of omegas) .
+    RAO_B : ndarray
+        Translational RAOs for end node B given as a (m,3) array where m is the number of frequencies (must be equal to the length of omegas) .
+    depth : float
+        Water depth.
+    kbot : float
+        Vertical stiffness for points lying on the seabed.
+    cbot : float
+        Vertical damping for points lying on the seabed.
+    seabed_tol : float, optional
+        Distance from seabed within which a node is considered to be lying on the seabed, by default 1e-4 m.
+    tol : float, optional
+        Relative tolerance for iteration, by default 0.01
+    iters : int, optional
+        Maximum number of iterations, by default 100
+    w : float, optional
+        Succesive relaxation coefficient, by default 0.8
+
+    Returns (if returnMatrices = False)
+    -------
+    T_nodes_psd: ndarray
+        Tension amplitude at nodes given as (m,n) array where m is the number of frequencies and n is the number of nodes.
+    T_nodes_psd: ndarray
+        Tension spectra at nodes given as (m,n) array where m is the number of frequencies and n is the number of nodes.
+    T_nodes_std: ndarray
+        Tension standard deviation at nodes.
+    s: ndarray:
+        Node locations along the line.
+    r_static: ndarray
+        Nodes mean static position given as (n,3) array where n the number of nodes.
+    r_dynamic: ndarray
+        Nodes complex dynamic amplitudes given as (m,n,3) array where m the number of frequencies, n is the number of nodes
+    r_total: ndarray
+        Combined static and dynamic positions.
+    X: ndarray
+        Solution of the dynamic problem.
+
+    Returns (if returnMatrices = True)
+    -------
+    M: (n,n) inertia matrix, where n is the number of nodes
+    A: (n,n) added mass matrix
+    B: (n,n) damping matrix
+    K: (n,n) stiffness matrix
+    """
+    N = line.nNodes
+    n_dofs = 3*N
+
+    if np.all(RAO_A == 0):
+        RAO_A = np.zeros_like(RAO_B)
+    if np.all(RAO_B == 0):
+        RAO_B = np.zeros_like(RAO_A)
+
+    # intialize iteration matrices
+    r_dynamic_init = np.ones((len(omegas),N,3))
+    M,A,B,K,r_static,EA_segs = line.getDynamicMatrices(omegas,S_zeta,r_dynamic_init,depth,kbot,cbot,seabed_tol=seabed_tol) # TODO: return EA_segs
+    X = np.zeros((len(omegas),n_dofs),dtype = 'complex')
+    r_dynamic = np.zeros(((len(omegas),int(n_dofs/3),3)),dtype = 'complex')
+    S_Xd = np.zeros((len(omegas),n_dofs),dtype = 'float')
+    sigma_Xd = np.zeros(n_dofs,dtype = 'float')
+    sigma_Xd0 = np.zeros(n_dofs,dtype = 'float')
+    X[:, :3] = RAO_A
+    X[:,-3:] = RAO_B
+
+    # solving dynamics
+    start = time.time()
+    for ni in range(iters):
+        H = - omegas[:,None,None]**2*(M+A)[None,:,:]\
+            + 1j*omegas[:,None,None]*B[None,:,:]\
+            + K[None,:,:]\
+        
+        F_A = np.einsum('nij,njk->ni',-H[:,3:-3, :3],RAO_A[:,:,None])
+        F_B = np.einsum('nij,njk->ni',-H[:,3:-3,-3:],RAO_B[:,:,None])
+        F = F_A + F_B
+
+        # Solve for each frequency
+        for i in range(H.shape[0]):
+            X[i, 3:-3] = np.linalg.solve(H[i, 3:-3, 3:-3], F[i])
+            
+        S_Xd[:] = np.abs(1j*omegas[:,None]*X)**2*S_zeta[:,None]
+        sigma_Xd[:] = np.sqrt(np.trapezoid(S_Xd,omegas,axis=0)) 
+        r_dynamic[:] = X.reshape(X.shape[0],int(X.shape[1]/3),3)
+        if (np.abs(sigma_Xd-sigma_Xd0) <= tol*np.abs(sigma_Xd0)).all():
+            break
+        else:
+            sigma_Xd0[:] = w * sigma_Xd + (1.-w) * sigma_Xd0
+            _,_,B[:],_,_,_ = line.getDynamicMatrices(omegas,S_zeta,r_dynamic,depth,kbot,cbot,seabed_tol=seabed_tol)
+    if conv_time:
+        print(f'Finished {ni} dynamic tension iterations in {time.time()-start} seconds (w = {w}).')
+
+    # evaluate tension
+    dw = np.diff(omegas,
+            prepend= omegas[0] - (omegas[1]-omegas[0]),
+            append= omegas[-1] + (omegas[-1]-omegas[-2]))
+    dw = (dw[1:]+dw[:-1])/2
+    wave_amps = np.sqrt(2*S_zeta*dw) #evaluate wave amplitudes of harmonic components from wave spectrum
+
+    r_dynamic *= wave_amps[:,None,None]
+    r_total = r_static[None,:,:] + r_dynamic
+    dr_static = r_static[:-1] - r_static[1:]
+    dr_dynamic = r_dynamic[:,:-1,:] - r_dynamic[:,1:,:]
+    tangents = dr_static/np.linalg.norm(r_static[:-1] - r_static[1:], axis=-1)[:,None]
+    L_static = np.linalg.norm(dr_static, axis=-1)
+    dL_dynamic = np.einsum('mni,ni->mn', dr_dynamic, tangents)
+    eps_segs = dL_dynamic/L_static
+
+    T_segs = EA_segs * eps_segs
+    T_nodes_amp = np.zeros((len(omegas),N), dtype='complex')
+    T_nodes_amp[:,0] = T_segs[:,0]
+    T_nodes_amp[:,1:-1] = (T_segs[:,:-1] + T_segs[:,1:])/2
+    T_nodes_amp[:,-1] = T_segs[:,-1]
+
+    # S_T = np.zeros((len(omegas),N))
+    # S_T[:,1:] = T_e**2/dw[:,None]
+    # S_T[:,0] = S_T[:,1]
+
+    T_nodes_psd = np.abs(T_nodes_amp)**2/(2*dw[:,None])
+    T_nodes_std = np.sqrt(np.trapezoid(T_nodes_psd,omegas,axis=0))
+
+
+    dr = np.diff(r_static,axis=0)
+    ds = np.linalg.norm(dr,axis=1)
+    s = np.zeros_like(T_nodes_std)
+    s = np.cumsum(ds)
+
+    if returnMatrices:
+        return M, A, B, K
+    else:
+        return T_nodes_amp, T_nodes_psd, T_nodes_std, s, r_static, r_dynamic, r_total, X
+
+
+def get_modes(line,fix_A=True,fix_B=True,plot_modes=False,amp_factor=1,adj_view = False,kbot=3E+06,cbot=3E+05,seabed_tol=1E-04):
+    import matplotlib.pyplot as plt
+    from collections.abc import Iterable
+
+    M,A,_,K,r_nodes,_ = line.getDynamicMatrices(np.ones(1), np.ones(1),0.,line.sys.depth,kbot,cbot,seabed_tol=seabed_tol)
+
+    if fix_A:
+        n1 = 1
+    else:
+        n1 = 0
+    
+    if fix_B:
+        n2 = -1
+    else:
+        n2 = r_nodes.shape[0]
+    
+    eigvals,eigvecs = la.eig(K[3*n1:3*n2,3*n1:3*n2],M[3*n1:3*n2,3*n1:3*n2]+A[3*n1:3*n2,3*n1:3*n2])
+    stable_eigvals = eigvals[np.real(eigvals)>0]
+    stable_eigvecs = eigvecs[:,np.real(eigvals)>0]
+    
+    idx = stable_eigvals.argsort()[::-1]   
+    stable_eigvals = stable_eigvals[idx]
+    stable_eigvecs = stable_eigvecs[:,idx]
+   
+    freqs = np.sqrt(np.real(stable_eigvals))/2/np.pi
+    mode_shapes = np.zeros(stable_eigvecs.shape,dtype='float')
+    
+    for i in range(stable_eigvecs.shape[1]):
+        mode_shapes[:,i] = r_nodes[n1:n2].flatten('C') + stable_eigvecs[:,i]
+
+    freqs = np.flip(freqs)
+    mode_shapes = np.flip(mode_shapes,axis=1)
+
+    if plot_modes:
+        cols = 4
+        rows = plot_modes//cols + bool(plot_modes%cols)
+        fig,ax = plt.subplots(rows,cols,subplot_kw={"projection": "3d"},figsize=(5*cols,5*rows))
+
+        i = 0
+        for axes in ax:
+            if not isinstance(axes,Iterable):
+                axes = [axes]
+
+            for axis in axes:
+                if i >= plot_modes:
+                    break
+
+                r = r_nodes.copy()
+                r[n1:n2] = mode_shapes[:,i].reshape([int(len(mode_shapes[:,i])/3),3])
+                r = (r-r_nodes)*amp_factor
+                x = r[:,0]
+                y = r[:,1]
+                z = r[:,2]
+                
+                x_0 = r_nodes[:,0]
+                y_0 = r_nodes[:,1]
+                z_0 = r_nodes[:,2]
+                    
+                axis.plot(x_0,y_0,z_0,'-ko',label='initial')
+                axis.plot(x+x_0,y+y_0,z+z_0,'--ro',label='mode shape')
+                
+                # R_0 = np.sqrt(x_0**2 + y_0**2)
+                if adj_view:
+                    # h_min = np.min((x_0,y_0))
+                    # h_max = np.max((x_0,y_0))
+                    # axis.set_xlim(h_min,h_max)
+                    # axis.set_ylim(h_min,h_max)
+                    # axis.set_zlim(z_0.min(),z_0.max())
+                    sigma_x = x.std() 
+                    sigma_y = y.std()
+                    sigma_z = z.std()
+                    azim = np.arctan2(sigma_x,sigma_y)*180/np.pi
+                    elev = np.arctan2(np.hypot(sigma_x,sigma_y),sigma_z)*180/np.pi
+                    axis.view_init(elev=elev,azim=azim)
+
+                # axis.set_box_aspect([np.ptp(coord) for coord in [x, y, z]])
+                axis.set_xlabel('X (m)')
+                axis.set_ylabel('Y (m)')
+                axis.set_zlabel('Z (m)')
+                axis.set_title(f'f = {freqs[i]:.3f} Hz, T = {1/freqs[i]:.3f} s')
+
+                i+=1
+
+        fig.tight_layout()
+        return freqs,mode_shapes,r_nodes,M,A,K,fig,ax        
+    else:
+        return freqs,mode_shapes,r_nodes,M,A,K

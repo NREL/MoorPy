@@ -1,0 +1,174 @@
+# The ABCD YAML
+
+# Default point properties with cost curves based on work presented in:
+  # Davies, R, Baca, E, & Hall, M. "An Updated Mooring Cost Modeling Tool Set With Application to a Reference Model
+  # Wave Energy Converter." Proceedings of the ASME 2025 44th International Conference on Ocean, Offshore and Arctic 
+  # Engineering. Volume 5: Ocean Renewable Energy. Vancouver, British Columbia, Canada. June 22–27, 2025. V005T09A066. 
+  # ASME. https://doi.org/10.1115/OMAE2025-156384
+
+
+
+# The following is YAML syntax and follows a heirarchy of
+# AnchorProps  -> [anchor type name]          -> [component coefficients] NOT SUPPORTED - potential approach
+# BuoyProps    -> [buoy type name]            -> [component coefficients]
+# ConnectProps -> [connection component name] -> [component coefficients]
+# DesignProps  -> [point design name]         -> [number and size of components]
+
+# All possible AnchorProps coefficients are as follows: IN PROGRESS - Only the cost coefficients, mass, area are currently used from this structure 
+    # matcost_m    :     # material cost per mass [$/kg]
+    # matcost_m2   :     # material cost per mass^2 [$/kg^2]
+    # matcost_m3   :     # material cost per mass^3 [$/kg^3]
+    # matcost_m    :     # material cost per area [$/m^2]
+    # matcost_m2   :     # material cost per area^2 [$/m^4]
+    # matcost_m3   :     # material cost per area^3 [$/m^6]
+    # matcost      :     # baseline material cost offset [$]
+    # instcost_m   :     # installation cost per mass [$/kg]
+    # instcost_m2  :     # installation cost per mass^2 [$/kg^2]
+    # instcost_m3  :     # installation cost per mass^3 [$/kg^3]
+    # instcost_m   :     # installation cost per area [$/m^2]
+    # instcost_m2  :     # installation cost per area^2 [$/m^4]
+    # instcost_m3  :     # installation cost per area^3 [$/m^6]
+    # instcost     :     # baseline installation cost offset [$]
+    # decomcost_m  :     # decommissioning cost per mass [$/kg]
+    # decomcost_m2 :     # decommissioning cost per mass^2 [$/kg^2]
+    # decomcost_m3 :     # decommissioning cost per mass^3 [$/kg^3]
+    # decomcost_m  :     # decommissioning cost per area [$/m^2]
+    # decomcost_m2 :     # decommissioning cost per area^2 [$/m^4]
+    # decomcost_m3 :     # decommissioning cost per area^3 [$/m^6]
+    # decomcost    :     # baseline decommissioning cost offset [$]
+
+# All possible Buoy coefficients are as follows:
+    # mass_b    :     # mass as a function of buoyancy [kg/N] NOT YET SUPPORTED
+    # v_b       :     # volume as a function of buoyancy [m^3/N] NOT YET SUPPORTED
+    # cost_b0    :    # cost offset [$]
+    # cost_b1    :    # cost per buoyancy [$/N]
+    # cost_b2   :     # cost per buoyancy^2 [$/N^2]
+    # cost_b3   :     # cost per buoyancy^3 [$/N^3]
+
+# All possible ConnectProps coefficients are as follows:
+    # mass_mbl  :     # mass as a function of nominal size (bar diameter) [kg/N] NOT YET SUPPORTED
+    # v_mbl     :     # volume as a function of MBL [m^3/N] NOT YET SUPPORTED
+    # FOS       :     # the factor of safety between WLL and MBL
+    # cost_MBL0 :     # cost offset [$]
+    # cost_MBL1 :     # cost per MBL [$/N]
+    # cost_MBL2 :     # cost per MBL^2 [$/N^2]
+    # cost_MBL3 :     # cost per MBL^3 [$/N^3]
+
+# All possible DesignProps coefficients are as follows: 
+    # num_a_<anchor name> :   # number of this anchor type where <anchor name> matches the name of a AnchorProps entry (case sensistive). If no value is give num of component is assumed zero
+    # num_b_<buoy name>   :   # number of this buoy type where <buoy name> matches the name of a BuoyProps entry (case sensistive). If no value is give num of component is assumed zero
+    # num_c_<connect name>:   # number of this connection type where <connect name> matches the name of a ConnectProps entry (case sensistive). If no value is give num of component is assumed zero
+    # frac_a_<anchor name>:   # fraction of total anchor size per anchor of this type. Default is 1/total number of anchors.
+    # frac_b_<buoy name>  :   # fraction of total buoyancy per buoy of this type. Default is 1/total number of buoys.
+
+AnchorProps: 
+
+  # example       :
+    # matcost_m    :     # material cost per mass [$/kg]
+    # matcost_m2   :     # material cost per mass^2 [$/kg^2]
+    # matcost_m3   :     # material cost per mass^3 [$/kg^3]
+    # matcost_m    :     # material cost per area [$/m^2]
+    # matcost_m2   :     # material cost per area^2 [$/m^4]
+    # matcost_m3   :     # material cost per area^3 [$/m^6]
+    # matcost      :     # baseline material cost offset [$]
+    # instcost_m   :     # installation cost per mass [$/kg]
+    # instcost_m2  :     # installation cost per mass^2 [$/kg^2]
+    # instcost_m3  :     # installation cost per mass^3 [$/kg^3]
+    # instcost_m   :     # installation cost per area [$/m^2]
+    # instcost_m2  :     # installation cost per area^2 [$/m^4]
+    # instcost_m3  :     # installation cost per area^3 [$/m^6]
+    # instcost     :     # baseline installation cost offset [$]
+    # decomcost_m  :     # decommissioning cost per mass [$/kg]
+    # decomcost_m2 :     # decommissioning cost per mass^2 [$/kg^2]
+    # decomcost_m3 :     # decommissioning cost per mass^3 [$/kg^3]
+    # decomcost_m  :     # decommissioning cost per area [$/m^2]
+    # decomcost_m2 :     # decommissioning cost per area^2 [$/m^4]
+    # decomcost_m3 :     # decommissioning cost per area^3 [$/m^6]
+    # decomcost    :     # baseline decommissioning cost offset [$]
+
+  drag-embedment: 
+    matcost_m    :  4.15      # material cost per mass [2024$/kg]
+    # instcost     :  192986.64   # baseline installation cost offset [$] - from 163548*euros2dollars(1.18) in MoorProps.py
+    # decomcost    :  270181.06   # baseline decommissioning cost offset [$] - from 228967*euros2dollars(1.18) in MoorProps.py
+
+  gravity       :
+    matcost_m    :  5.40e-1   # material cost per mass [2024$/kg]
+
+  suction       : # not in OMAE2025-156384 because old data
+    matcost_m    :  10.25       # material cost per mass [$/kg] - from old number in MoorProps.py
+    # instcost     :  211610.58   # baseline installation cost offset [$] - from 179331*euros2dollars(1.18) in MoorProps.py
+    # decomcost    :  148127.76   # baseline decommissioning cost offset [$] - from 125532*euros2dollars(1.18) in MoorProps.py
+
+  SEPLA         :  # not in OMAE2025-156384 because only 3 data points
+    matcost_m    :  7.11      # material cost per mass [2024$/kg]
+
+  VLA           :
+    matcost_a    :  1.64e4      # material cost per area [2024$/m^2]
+
+  driven        : # driven piles
+    matcost_m    :  3.81        # material cost per mass [2024$/kg]
+
+BuoyProps:
+
+  # example     :
+    # mass_b    :     # mass as a function of buoyancy [kg/N]
+    # v_b       :     # volume as a function of buoyancy [m^3/N]  
+    # cost_b0   :     # cost offset [$] 
+    # cost_b1   :     # cost per buoyancy [$/N]
+    # cost_b2   :     # cost per buoyancy^2 [$/N^2]
+    # cost_b3   :     # cost per buoyancy^3 [$/N^3]
+
+  general      : # general buoy based on input from industry
+    # mass_b    :     # mass as a function of buoyancy [kg/N]
+    # v_b       :     # volume as a function of buoyancy [m^3/N]   
+    cost_b1 :  5.28e-1  # cost per buoyancy [2024$/N]
+    cost_b2 : -1.19e-6  # cost per buoyancy^2 [2024$/N^2]
+
+ConnectProps: 
+  # TODO: mass, v, and MBL relationships from the tables on pg 132 in the Vryhof Manual. Size to MBL relationships can also be derived from the data gathered in WEC cost modeling outreach. 
+
+  # example    :
+    # mass_mbl  :     # mass as a function of nominal size (bar diameter) [kg/N]
+    # v_mbl     :     # volume as a function of MBL [m^3/N] 
+    # FOS       :     # the factor of safety between WLL and MBL
+    # cost_MBL0 :     # cost offset [$]
+    # cost_MBL1 :     # cost per MBL [$/N]
+    # cost_MBL2 :     # cost per MBL^2 [$/N^2]
+    # cost_MBL3 :     # cost per MBL^3 [$/N^3]
+
+  shackle    :     
+    FOS       :  6            # the factor of safety between WLL and MBL
+    cost_MBL1 :  0.23e-3      # cost per MBL [2024$/k]
+
+  connector  :  
+    FOS       :  6            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
+    cost_MBL1 :  0.18e-3      # cost per MBL [2024$/k]
+
+  swivel     :  
+    FOS       :  5            # the factor of safety between WLL and MBL. NEED TO DOUBLE CHECK
+    cost_MBL1 :  0.91e-3      # cost per MBL [2024$/k]
+
+  triplate   :   
+    FOS       :  5            # the factor of safety between WLL and MBL
+    cost_MBL1 :  0.41e-3      # cost per MBL [2024$/k]
+
+  h-link     :  # not in OMAE2025-156384 because only 4 data points
+    FOS       :  4            # the factor of safety between WLL and MBL per (https://www.irizarforge.com/en/products/other-connectors/h-link)
+    cost_MBL1 :  22e-3        # cost per MBL [2024$/k]
+
+  misc       :     
+    FOS       :  5            # the factor of safety between WLL and MBL
+    cost_MBL1 :  0.20e-3      # cost per MBL [2024$/k]
+
+DesignProps: # These are data structures that hold information of what is in a point. Any point can have any number of Acnhor, Buoy, and Connection types as described in the respective props section. 
+
+  # example         :
+    # num_a_<anchor name> :   # number of this anchor type where <anchor name> matches the name of a AnchorProps entry (case sensistive). If no value is give num of component is assumed zero
+    # num_b_<buoy name>   :   # number of this buoy type where <buoy name> matches the name of a BuoyProps entry (case sensistive). If no value is give num of component is assumed zero
+    # num_c_<connect name>:   # number of this connection type where <connect name> matches the name of a ConnectProps entry (case sensistive). If no value is give num of component is assumed zero
+    # frac_a_<anchor name>:   # fraction of total anchor size per anchor of this type. Default is 1/total number of anchors.
+    # frac_b_<buoy name>  :   # fraction of total buoyancy per buoy of this type. Default is 1/total number of buoys.
+
+  general         :  # TODO: This is a place holder, it should be replaced by more detailed designs. 
+    num_c_shackle   : 2  # number of shackles in this design
+    num_c_misc      : 1  # number of other hardware components in this design (typically chain links)
