@@ -16,14 +16,14 @@ jobs:
             fail-fast: false #true
             matrix:
                 os: ["ubuntu-latest", "macOS-latest", "windows-latest"]
-                python-version: ["3.9", "3.10", "3.11"]
+                python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
 
         steps:
             - name: checkout repository
-              uses: actions/checkout@v3
+              uses: actions/checkout@v5
 
             - name: Set up Python ${{ matrix.python-version }}
-              uses: actions/setup-python@v4
+              uses: actions/setup-python@v6
               id: cp
               with:
                   python-version: ${{ matrix.python-version }}
@@ -50,13 +50,13 @@ jobs:
             fail-fast: false
             matrix:
                 os: ["ubuntu-latest", "macOS-latest", "windows-latest"]
-                python-version: ["3.9", "3.10", "3.11"]
+                python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
 
         steps:
             - name: checkout repository
-              uses: actions/checkout@v3
+              uses: actions/checkout@v5
 
-            - uses: conda-incubator/setup-miniconda@v2
+            - uses: conda-incubator/setup-miniconda@v3
               # https://github.com/marketplace/actions/setup-miniconda
               with:
                   miniconda-version: "latest"
