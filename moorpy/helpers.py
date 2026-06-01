@@ -671,14 +671,16 @@ def getLineProps(dnommm, material, lineProps=None, source=None, name="", rho=102
     # Shorthand for the sub-dictionary of properties for the material in question  
     mat = lineProps[material]       
     
+    # convert nominal diameter from mm to m (needed for the range checks below)
+    d = dnommm*0.001
+
     # Check valid diameter ranges
     if mat['d_max'] >= 0 and d > mat['d_max']: # if a max value is given and the diameter is greater than the max
         raise Exception(f"Input diameter {d} m is greater than the max valid value of {mat['d_max']} m for {material}.")
     if mat['d_min'] >= 0 and d < mat['d_min']: # if a min value is given and the diameter is less than the min
         raise Exception(f"Input diameter {d} m is less than the min valid value of {mat['d_min']} m for {material}.")
-        
+
     # calculate the relevant properties for this specific line type
-    d = dnommm*0.001                # convert nominal diameter from mm to m      
     mass = mat['mass_d2']*d**2
        
     MBL  = mat[ 'MBL_0'] + mat[ 'MBL_d']*d + mat[ 'MBL_d2']*d**2 + mat[ 'MBL_d3']*d**3 
@@ -841,7 +843,7 @@ def loadLineProps(source):
         output[mat]['cost_EA'  ] = getFromDict(props, 'cost_EA'  , default=0.0)
         output[mat]['cost_MBL' ] = getFromDict(props, 'cost_MBL' , default=0.0)
         output[mat]['d_min'    ] = getFromDict(props, 'd_min'    , default=-1.0) # -1 to disable checking
-        output[mat]['d_max'    ] = getFromDict(props, 'd_dmax'   , default=-1.0) # -1 to disable checking
+        output[mat]['d_max'    ] = getFromDict(props, 'd_max'    , default=-1.0) # -1 to disable checking
 
     return output
 
