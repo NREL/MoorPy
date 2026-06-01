@@ -902,7 +902,7 @@ class Subsystem(System, Line):
         
         tau0 = -self.fB[0]  # horizontal tension component [N]
 
-        yaw_stiff = (tau0/l)*self.rad_fair**2 + tau0*self.rad_fair  # [N-m]
+        yaw_stiff = (tau0/self.span)*self.rad_fair**2 + tau0*self.rad_fair  # [N-m]
         
         return yaw_stiff
 

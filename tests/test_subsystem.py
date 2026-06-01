@@ -12,6 +12,24 @@ from moorpy.helpers import getLineProps
 import matplotlib.pyplot as plt
 
 
+def test_getYawStiffness_runs():
+    """Subsystem.getYawStiffness must not raise NameError.
+
+    Regression test: the yaw-stiffness formula referenced an undefined local
+    ``l`` (a leftover from the rename of line length to ``span``), so every
+    call raised ``NameError: name 'l' is not defined``. It should instead use
+    ``self.span`` and return ``(tau0/span)*rad_fair**2 + tau0*rad_fair``.
+    """
+    ss = mp.Subsystem(depth=100, span=200, rad_fair=10, z_fair=-10)
+    # getYawStiffness reads the horizontal fairlead force fB (set during a
+    # solve); inject a representative value to exercise the formula directly.
+    ss.fB = np.array([-1.0e5, 0.0, 5.0e4])
+
+    tau0 = -ss.fB[0]
+    expected = (tau0 / ss.span) * ss.rad_fair**2 + tau0 * ss.rad_fair
+    assert_allclose(ss.getYawStiffness(), expected)
+
+
 """
 def test_tensions_swap():
     '''Compares two equivalent catenary mooring lines that are defined in opposite directions.'''
