@@ -18,9 +18,37 @@ inCBs = [0, 1.0, 10.0]  # friction coefficients as inputs for test_seabed
 
 def test_line_stiffness():
     '''Checks stiffness of mooring lines.'''
-       
-       
-       
+
+
+def test_getLineProps_diameter_limits():
+    '''getLineProps must apply the d_min / d_max range checks correctly.
+
+    Regression test for two bugs in the diameter validation:
+      1. ``d`` (the diameter in metres) was referenced in the range checks
+         before it was assigned, so any material with ``d_min >= 0`` or
+         ``d_max >= 0`` raised ``UnboundLocalError`` instead of the intended
+         range Exception.
+      2. ``loadLineProps`` read ``d_max`` from the key ``'d_dmax'`` (a typo),
+         so a user-specified ``d_max`` was silently dropped to the -1
+         "disabled" default and the upper-bound check never fired.
+    '''
+    base = {'mass_d2': 100.0, 'MBL_0': 0.0, 'MBL_d': 1e6}
+
+    # within the valid range -> succeeds and returns a line type dict
+    src = {'lineProps': {'rope': {**base, 'd_min': 0.01, 'd_max': 0.20}}}
+    lt = getLineProps(50.0, 'rope', source=src)  # 50 mm = 0.05 m, in range
+    assert isinstance(lt, dict) and lt['material'] == 'rope'
+
+    # below d_min -> the intended Exception (not UnboundLocalError)
+    with pytest.raises(Exception, match='less than the min'):
+        getLineProps(5.0, 'rope', source=src)    # 5 mm = 0.005 m < 0.01
+
+    # above d_max -> the intended Exception; this only works if the d_max
+    # typo is fixed (otherwise d_max stays -1 and the check is disabled)
+    with pytest.raises(Exception, match='greater than the max'):
+        getLineProps(300.0, 'rope', source=src)  # 300 mm = 0.3 m > 0.20
+
+
 if __name__ == '__main__':
     
     import moorpy as mp
